@@ -7,9 +7,9 @@ import { curveAt, positionFor } from "@/lib/palette/curve";
 import { targetLuminance } from "@/lib/palette/scale";
 import type { GeneratedHue, ScaleConfig } from "@/lib/palette/types";
 
-const W = 560;
-const H = 240;
-const PAD = { l: 44, r: 16, t: 24, b: 44 };
+const W = 360;
+const H = 200;
+const PAD = { l: 34, r: 12, t: 22, b: 38 };
 const PLOT_W = W - PAD.l - PAD.r;
 const PLOT_H = H - PAD.t - PAD.b;
 const DENSE = 48;
@@ -100,7 +100,7 @@ export function HueCurveChart({ generated, scale, space }: ChartProps) {
       <EndpointMarker x={xFor(0)} y={yFor(start)} above={yFor(samples[4].h) >= yFor(start)} label={`Lightest end: ${Math.round(normalize(start))}°`} anchor="start" color={generated.shades.find((s) => !s.anchor)?.hex} />
       <EndpointMarker x={xFor(1)} y={yFor(end)} above={yFor(samples[DENSE - 4].h) >= yFor(end)} label={`Darkest end: ${Math.round(normalize(end))}°`} anchor="end" color={[...generated.shades].reverse().find((s) => !s.anchor)?.hex} />
       {gradeAxis(sorted, sorted).map(({ g, x }) => (
-        <text key={g} x={x} y={H - 22} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
+        <text key={g} x={x} y={H - 20} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
           {g}
         </text>
       ))}
@@ -203,7 +203,7 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
           );
         })}
       {gradeAxis(sorted, sorted).map(({ g, x }) => (
-        <text key={g} x={x} y={H - 22} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
+        <text key={g} x={x} y={H - 20} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
           {g}
         </text>
       ))}

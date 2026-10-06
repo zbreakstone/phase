@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { parseHex } from "@/lib/color/convert";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { makeRules, uid } from "@/lib/palette/defaults";
 import {
@@ -23,8 +22,7 @@ import {
   targetLuminance,
   uniformLuminance,
 } from "@/lib/palette/scale";
-import type { ContrastReference, ContrastRule, ReferenceMode, ScaleConfig } from "@/lib/palette/types";
-import { HelpTip } from "./fields";
+import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
 const toPos = (y: number) => Math.log((y + 0.05) / 1.05) / Math.log(0.05 / 1.05);
 const fromPos = (p: number) => 1.05 * Math.pow(0.05 / 1.05, p) - 0.05;
@@ -115,54 +113,6 @@ export function StepsSettings({ scale, onChange }: ScaleProps) {
           </p>
         )}
       </div>
-    </div>
-  );
-}
-
-export function ReferenceSettings({ reference, onChange }: { reference: ContrastReference; onChange: (r: ContrastReference) => void }) {
-  const [draft, setDraft] = React.useState<string | null>(null);
-  return (
-    <div className="space-y-1.5">
-      <Label className="flex items-center gap-1.5 text-xs">
-        Contrast reference
-        <HelpTip>The grid and target curve show each shade&apos;s WCAG ratio against this colour. It doesn&apos;t change the scale itself.</HelpTip>
-      </Label>
-      <ToggleGroup
-        value={[reference.mode]}
-        onValueChange={(v) => v[0] && onChange({ ...reference, mode: v[0] as ReferenceMode })}
-        variant="outline"
-        size="sm"
-        spacing={0}
-        aria-label="Contrast reference"
-        className="w-full"
-      >
-        <ToggleGroupItem value="white" className="flex-1 rounded-none">White</ToggleGroupItem>
-        <ToggleGroupItem value="black" className="flex-1 rounded-none">Black</ToggleGroupItem>
-        <ToggleGroupItem value="custom" className="flex-1 rounded-none">Custom</ToggleGroupItem>
-      </ToggleGroup>
-      {reference.mode === "custom" ? (
-        <div className="flex items-center gap-2">
-          <Input
-            type="color"
-            aria-label="Reference colour"
-            value={reference.hex}
-            onChange={(e) => onChange({ mode: "custom", hex: e.target.value })}
-            className="h-8 w-10 shrink-0 cursor-pointer rounded-none p-0.5"
-          />
-          <Input
-            aria-label="Reference colour hex"
-            value={draft ?? reference.hex}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              const parsed = parseHex(e.target.value);
-              if (parsed) onChange({ mode: "custom", hex: parsed });
-            }}
-            onBlur={() => setDraft(null)}
-            aria-invalid={draft !== null && !parseHex(draft) ? true : undefined}
-            className="h-8 font-mono text-xs"
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -337,7 +287,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
           <span>Step</span>
           <span>dark ← luminance → light</span>
           <span className="text-right">Y</span>
-          <span className="text-right">vs ref</span>
+          <span className="text-right">vs white</span>
         </div>
         {grades.map((g) => (
           <TargetRow key={g} scale={scale} grade={g} custom={custom} referenceY={referenceY} onChange={(y) => setY(g, y)} />
