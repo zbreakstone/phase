@@ -63,24 +63,32 @@ export function uniformRatioForDiff(diff: number): number {
 }
 
 /**
- * Relative luminance windows per step from Katie Riley's Envoy scale
- * ("Designing an accessible color scheme, again", 2020): the USWDS table with
- * 600+ lightened for vibrancy (600 at 5.5–7:1 vs white, 100 no darker than
- * 1.221:1, 200 no darker than 1.83:1) and the rest tightened so any value
- * inside its window keeps the 400 / 500 / 700 magic numbers.
+ * Katie Riley's final Envoy table ("Designing an accessible color scheme,
+ * again", 2020), as contrast against white: [lightest allowed, darkest allowed].
+ * It lightens the USWDS ranges from 600 down so dark shades stay vibrant.
  */
-export const ENVOY_RANGES: Record<number, { min: number; max: number }> = {
-  50: { min: 0.85, max: 0.93 },
-  100: { min: 0.81, max: 0.84 },
-  200: { min: 0.523, max: 0.65 },
-  300: { min: 0.35, max: 0.45 },
-  400: { min: 0.225, max: 0.3 },
-  500: { min: 0.175, max: 0.183 },
-  600: { min: 0.1, max: 0.141 },
-  700: { min: 0.05, max: 0.077 },
-  800: { min: 0.02, max: 0.0389 },
-  900: { min: 0.005, max: 0.011 },
+export const ENVOY_CONTRAST: Record<number, [number, number]> = {
+  50: [1.07, 1.11],
+  100: [1.18, 1.22],
+  200: [1.5, 1.79],
+  300: [2, 2.46],
+  400: [3, 3.33],
+  500: [4.5, 4.67],
+  600: [5.5, 7],
+  700: [8, 10],
+  800: [11, 13],
+  900: [15, 16],
 };
+
+const luminanceForWhiteContrast = (ratio: number) => (WHITE_Y + 0.05) / ratio - 0.05;
+
+/** The same table as relative luminance windows. */
+export const ENVOY_RANGES: Record<number, { min: number; max: number }> = Object.fromEntries(
+  Object.entries(ENVOY_CONTRAST).map(([g, [light, dark]]) => [
+    Number(g),
+    { min: luminanceForWhiteContrast(dark), max: luminanceForWhiteContrast(light) },
+  ]),
+);
 
 /** Contrast-space midpoint of a window, so the target sits evenly between its limits. */
 function windowCentre({ min, max }: { min: number; max: number }): number {

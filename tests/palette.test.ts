@@ -5,6 +5,7 @@ import { convertHue, curveAt, generateHue, generatePalette, hueDelta } from "@/l
 import {
   checkTargets,
   envoyLuminance,
+  ENVOY_CONTRAST,
   ENVOY_RANGES,
   feasibleRange,
   parseGrades,
@@ -52,26 +53,22 @@ describe("Envoy luminance ranges", () => {
   it("is the default", () => {
     expect(defaultScale().luminanceMode).toBe("envoy");
   });
-  it("matches the limits stated in the article", () => {
+  it("converts the article's final table to luminance windows", () => {
     const vsWhite = (y: number) => 1.05 / (y + 0.05);
-    expect(vsWhite(ENVOY_RANGES[600].min)).toBeCloseTo(7, 2);
-    expect(vsWhite(ENVOY_RANGES[600].max)).toBeCloseTo(5.5, 1);
-    expect(vsWhite(ENVOY_RANGES[100].min)).toBeCloseTo(1.221, 2);
-    expect(vsWhite(ENVOY_RANGES[200].min)).toBeCloseTo(1.83, 2);
-    expect(vsWhite(ENVOY_RANGES[50].max)).toBeCloseTo(1.07, 2);
-    expect(vsWhite(ENVOY_RANGES[50].min)).toBeCloseTo(1.17, 2);
+    for (const [g, [light, dark]] of Object.entries(ENVOY_CONTRAST)) {
+      expect(vsWhite(ENVOY_RANGES[Number(g)].max)).toBeCloseTo(light, 6);
+      expect(vsWhite(ENVOY_RANGES[Number(g)].min)).toBeCloseTo(dark, 6);
+    }
+    expect(ENVOY_CONTRAST[900]).toEqual([15, 16]);
   });
-  it("keeps the 400 / 500 / 700 rules for any value inside each range", () => {
-    const rules = makeRules("uswds");
-    const lo = (g: number) => (g === 0 ? 1 : g === 1000 ? 0 : ENVOY_RANGES[g].min);
-    const hi = (g: number) => (g === 0 ? 1 : g === 1000 ? 0 : ENVOY_RANGES[g].max);
-    const grades = [0, ...Object.keys(ENVOY_RANGES).map(Number), 1000];
-    for (const a of grades) {
-      for (const b of grades) {
-        if (b <= a) continue;
-        const req = requiredRatio(b - a, rules);
-        if (req === null) continue;
-        expect((lo(a) + 0.05) / (hi(b) + 0.05)).toBeGreaterThanOrEqual(req - 1e-3);
+  it("lands each step of every default hue inside its Envoy window", () => {
+    const s = defaultState();
+    for (const g of generatePalette(s.space, s.scale, s.hues)) {
+      for (const shade of g.shades) {
+        const r = ENVOY_RANGES[shade.grade];
+        if (!r) continue;
+        expect(shade.luminance).toBeGreaterThanOrEqual(r.min - 0.002);
+        expect(shade.luminance).toBeLessThanOrEqual(r.max + 0.002);
       }
     }
   });
