@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Eye, Layers, Plus, RotateCcw, SunMedium, TriangleAlert } from "lucide-react";
+import { Check, Eye, Layers, Link2, Plus, RotateCcw, SunMedium, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import { HUE_PRESETS, defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig } from "@/lib/palette/types";
+import { hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
@@ -36,11 +37,17 @@ export function PaletteApp() {
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const saved = await storage.get(AUTOSAVE_ID);
-        if (saved && !cancelled) setState(saved.state);
-      } catch {
-        // Storage can be unavailable (private mode); start from the default palette.
+      const shared = stateFromHash(window.location.hash);
+      if (shared?.ok) {
+        setState(shared.state);
+      } else {
+        if (shared) toast.error(shared.error);
+        try {
+          const saved = await storage.get(AUTOSAVE_ID);
+          if (saved && !cancelled) setState(saved.state);
+        } catch {
+          // Storage can be unavailable (private mode); start from the default palette.
+        }
       }
       if (!cancelled) setReady(true);
     })();
@@ -50,12 +57,41 @@ export function PaletteApp() {
   }, [storage]);
 
   React.useEffect(() => {
+    const onHashChange = () => {
+      const shared = stateFromHash(window.location.hash);
+      if (!shared) return;
+      if (shared.ok) {
+        setState(shared.state);
+        setGrade(null);
+      } else {
+        toast.error(shared.error);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  React.useEffect(() => {
     if (!ready) return;
     const t = setTimeout(() => {
       storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() => undefined);
+      const hash = hashForState(state);
+      // replaceState keeps the address bar shareable without filling history or firing hashchange.
+      if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
     }, 400);
     return () => clearTimeout(t);
   }, [state, ready, storage]);
+
+  const share = async () => {
+    const url = `${window.location.origin}${window.location.pathname}${hashForState(state)}`;
+    window.history.replaceState(null, "", hashForState(state));
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied. Anyone who opens it sees this exact palette.");
+    } catch {
+      toast.message("Copy this link from the address bar to share your palette.");
+    }
+  };
 
   const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues), [state.space, state.scale, state.hues]);
   const report = React.useMemo(() => validatePalette(generated, state.scale.rules), [generated, state.scale.rules]);
@@ -147,6 +183,10 @@ export function PaletteApp() {
             <Button variant="ghost" size="sm" className="rounded-none" onClick={reset} aria-label="Reset to starter palette">
               <RotateCcw />
               <span className="hidden sm:inline">Reset</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="rounded-none" onClick={share} disabled={!ready} aria-label="Copy a share link">
+              <Link2 />
+              <span className="hidden sm:inline">Share</span>
             </Button>
             <ExportDialog state={state} generated={generated} />
           </div>

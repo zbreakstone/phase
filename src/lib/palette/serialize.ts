@@ -113,8 +113,23 @@ function fromBase64Url(text: string): string {
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }
 
+/** Five decimals keeps every colour identical after a round trip while keeping links short. */
+const roundForLink = (_key: string, v: unknown) => (typeof v === "number" ? Math.round(v * 1e5) / 1e5 : v);
+
 export function encodeState(state: PaletteState): string {
-  return toBase64Url(JSON.stringify(state));
+  return toBase64Url(JSON.stringify(state, roundForLink));
+}
+
+export const SHARE_PARAM = "p";
+
+/** Reads a palette from a location hash such as `#p=...`. Returns null when the hash has no palette. */
+export function stateFromHash(hash: string): DecodeResult | null {
+  const value = new URLSearchParams(hash.replace(/^#/, "")).get(SHARE_PARAM);
+  return value ? decodeState(value) : null;
+}
+
+export function hashForState(state: PaletteState): string {
+  return `#${SHARE_PARAM}=${encodeState(state)}`;
 }
 
 export type DecodeResult =

@@ -240,7 +240,7 @@ describe("switching colour space", () => {
 import { analyzeSource, nearestGrade, sourceAnchor } from "@/lib/palette/source";
 import { hueFromSource } from "@/lib/palette/defaults";
 import { coordsOf } from "@/lib/palette/source";
-import { sanitizeState, decodeState, encodeState } from "@/lib/palette/serialize";
+import { sanitizeState, decodeState, encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { toCss, toTailwindV4, toTokensJson } from "@/lib/export/formats";
 
 describe("step names and anchors", () => {
@@ -378,6 +378,20 @@ describe("source colours", () => {
     if (res.ok) expect(res.state.hues[res.state.hues.length - 1].source?.hex).toBe("#10b981");
     expect(decodeState("%%%").ok).toBe(false);
     expect(sanitizeState({ space: "oklch" })).toBeNull();
+  });
+  it("share links reproduce the exact palette", () => {
+    const state = defaultState();
+    state.hues[1] = { ...state.hues[1], chromaMid: 0.123456789, hueLight: 12.3456789 };
+    const hash = hashForState(state);
+    expect(hash.startsWith("#p=")).toBe(true);
+    const res = stateFromHash(hash);
+    expect(res?.ok).toBe(true);
+    if (!res?.ok) return;
+    const hexes = (s: typeof state) => generatePalette(s.space, s.scale, s.hues).flatMap((g) => g.shades.map((x) => x.hex));
+    expect(hexes(res.state)).toEqual(hexes(state));
+    expect(res.state.hues.map((h) => h.name)).toEqual(state.hues.map((h) => h.name));
+    expect(stateFromHash("")).toBeNull();
+    expect(stateFromHash("#p=garbage")?.ok).toBe(false);
   });
   it("coordsOf reads OKLCH for any hex", () => {
     expect(coordsOf("oklch", "#ff0000").h).toBeCloseTo(29.23, 1);
