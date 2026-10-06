@@ -2,17 +2,27 @@
 
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
+import { luminanceGray, simulateVision, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
 
-export type Metric = "contrast" | "lightness" | "off";
+export type Metric = "contrast" | "luminance" | "off";
 export type Against = "white" | "black" | "selected";
 
 export interface Overlay {
   metric: Metric;
   against: Against;
+  /** Paint each swatch as the grey of equal luminance. */
+  grayscale: boolean;
+  vision: VisionId;
 }
+
+export function displayHex(hex: string, overlay: Overlay): string {
+  return overlay.grayscale ? luminanceGray(hex) : simulateVision(hex, overlay.vision);
+}
+
+const fmtLuminance = (y: number) => `${(y * 100).toFixed(y < 0.1 ? 2 : 1)}%`;
 
 interface Props {
   generated: GeneratedHue[];
@@ -57,9 +67,11 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
           );
         })}
 
-        {overlay.metric === "lightness" ? (
+        {overlay.grayscale ? (
           <>
-            <div className="pt-2 text-[11px] text-muted-foreground">Spread across hues</div>
+            <div className="pt-2 text-[11px] text-muted-foreground" title="Difference in OKLCH lightness between the lightest and darkest hue at each step">
+              Lightness spread
+            </div>
             {steps.map((s, i) => {
               if (s.anchor) return <div key={s.grade} />;
               const Ls = generated.map((g) => g.shades[i].oklch.L);
@@ -146,11 +158,12 @@ function Cell({
   reference: Shade | null;
   onSelect: () => void;
 }) {
-  const fg = readableOn(shade.hex);
+  const shown = displayHex(shade.hex, overlay);
+  const fg = readableOn(shown);
   let label = "";
   let status: "pass" | "fail" | "none" | "self" | null = null;
 
-  if (overlay.metric === "lightness") label = shade.oklch.L.toFixed(2);
+  if (overlay.metric === "luminance") label = fmtLuminance(shade.luminance);
   else if (overlay.metric === "contrast" && overlay.against === "white") label = fmtRatio(contrastFromLuminance(1, shade.luminance));
   else if (overlay.metric === "contrast" && overlay.against === "black") label = fmtRatio(contrastFromLuminance(0, shade.luminance));
   else if (overlay.metric === "contrast" && reference) {
@@ -175,7 +188,7 @@ function Cell({
         "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
         status === "none" && "opacity-40",
       )}
-      style={{ backgroundColor: shade.hex, color: fg }}
+      style={{ backgroundColor: shown, color: fg }}
     >
       {status === "pass" ? <Check className="mr-0.5 size-3" aria-label="Meets its rule" /> : null}
       {status === "fail" ? <X className="mr-0.5 size-3" aria-label="Breaks its rule" /> : null}

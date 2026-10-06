@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Check, Layers, Plus, RotateCcw, TriangleAlert } from "lucide-react";
+import { Check, Eye, Layers, Plus, RotateCcw, SunMedium, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { parseHex } from "@/lib/color/convert";
+import { VISIONS, type VisionId } from "@/lib/color/vision";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import { HUE_PRESETS, defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
@@ -19,7 +21,7 @@ import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { HelpTip } from "./fields";
 import { HuePanel } from "./hue-panel";
-import { PaletteGrid, type Against, type Metric, type Overlay } from "./palette-grid";
+import { PaletteGrid, displayHex, type Against, type Metric, type Overlay } from "./palette-grid";
 import { ScaleDialog } from "./scale-dialog";
 
 const AUTOSAVE_ID = "__autosave__";
@@ -28,7 +30,7 @@ export function PaletteApp() {
   const [state, setState] = React.useState<PaletteState>(() => defaultState());
   const [ready, setReady] = React.useState(false);
   const [grade, setGrade] = React.useState<number | null>(null);
-  const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white" });
+  const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
 
   React.useEffect(() => {
@@ -197,6 +199,7 @@ export function PaletteApp() {
               onSelectGrade={setGrade}
               onChange={(patch) => updateHue(selected.hue.id, patch)}
               onRemove={() => remove(selected.hue.id)}
+              display={(hex) => displayHex(hex, overlay)}
             />
           ) : ready ? (
             <p className="text-sm text-muted-foreground">Add a colour to edit its hue and chroma here.</p>
@@ -231,7 +234,7 @@ function Toolbar({
           aria-label="What to show on each swatch"
         >
           <ToggleGroupItem value="contrast" className="rounded-none">Contrast</ToggleGroupItem>
-          <ToggleGroupItem value="lightness" className="rounded-none">Lightness</ToggleGroupItem>
+          <ToggleGroupItem value="luminance" className="rounded-none">Luminance</ToggleGroupItem>
           <ToggleGroupItem value="off" className="rounded-none">Off</ToggleGroupItem>
         </ToggleGroup>
       </div>
@@ -252,6 +255,41 @@ function Toolbar({
           </ToggleGroup>
         </div>
       ) : null}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">View</span>
+        <Toggle
+          variant="outline"
+          size="sm"
+          className="rounded-none"
+          pressed={overlay.grayscale}
+          onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
+          aria-label="Show swatches as greys of equal luminance"
+          title="Show each swatch as the grey with the same luminance, so you can check that steps line up across hues"
+        >
+          <SunMedium />
+          Luminance
+        </Toggle>
+        <Select
+          items={VISIONS.map((v) => ({ value: v.id, label: v.id === "normal" ? "Vision" : v.label }))}
+          value={overlay.vision}
+          onValueChange={(v) => v && onOverlay({ ...overlay, vision: v as VisionId, grayscale: false })}
+        >
+          <SelectTrigger size="sm" className="w-40 rounded-none" aria-label="Simulate colour vision">
+            <Eye />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {VISIONS.map((v) => (
+              <SelectItem key={v.id} value={v.id}>
+                <span className="flex flex-col">
+                  <span>{v.label}</span>
+                  {v.note ? <span className="text-[11px] text-muted-foreground">{v.note}</span> : null}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="ml-auto">
         <AddColour onAddPreset={onAddPreset} onAddHex={onAddHex} />
       </div>

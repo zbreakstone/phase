@@ -5,7 +5,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { solveForLuminance } from "@/lib/color/solve";
-import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
+import { contrastFromLuminance } from "@/lib/color/contrast";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, ScaleConfig } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,8 @@ interface Props {
   onSelectGrade: (grade: number) => void;
   onChange: (patch: Partial<HueConfig>) => void;
   onRemove: () => void;
+  /** How swatches are painted under the current view (vision simulation, greyscale). */
+  display: (hex: string) => string;
 }
 
 function hueGuide(space: SpaceId, y: number, chroma: number): React.CSSProperties {
@@ -29,7 +31,7 @@ function hueGuide(space: SpaceId, y: number, chroma: number): React.CSSPropertie
   return { background: `linear-gradient(to right, ${stops.join(", ")})` };
 }
 
-export function HuePanel({ generated, space, scale, selectedGrade, onSelectGrade, onChange, onRemove }: Props) {
+export function HuePanel({ generated, space, scale, selectedGrade, onSelectGrade, onChange, onRemove, display }: Props) {
   const hue = generated.hue;
   const def = SPACES[space];
   const ramp = generated.shades.filter((s) => !s.anchor);
@@ -82,7 +84,7 @@ export function HuePanel({ generated, space, scale, selectedGrade, onSelectGrade
               aria-label={`${hue.name} ${s.grade} ${s.hex}`}
               onClick={() => onSelectGrade(s.grade)}
               className={cn("relative h-10 flex-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset")}
-              style={{ backgroundColor: s.hex, color: readableOn(s.hex) }}
+              style={{ backgroundColor: display(s.hex) }}
             >
               {s.grade === selectedGrade ? <span aria-hidden className="absolute inset-0 border-2 border-white mix-blend-difference" /> : null}
             </button>
