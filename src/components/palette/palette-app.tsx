@@ -199,7 +199,7 @@ export function PaletteApp() {
           )}
         </section>
 
-        <aside aria-label="Selected hue" className="min-w-0 lg:border-l lg:border-border lg:pl-8">
+        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:border-l lg:border-border lg:pl-8">
           {ready && selected ? (
             <HuePanel
               key={selected.hue.id}
