@@ -44,9 +44,6 @@ type DropSide = "before" | "after";
 interface DragHandle {
   ref: (el: HTMLElement | null) => void;
   onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerMove: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerUp: (e: React.PointerEvent<HTMLElement>) => void;
-  onPointerCancel: () => void;
   onClickCapture: (e: React.MouseEvent<HTMLElement>) => void;
 }
 
@@ -60,22 +57,64 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
   const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 1fr))`;
 
   const handles = React.useRef(new Map<string, HTMLElement>());
-  const press = React.useRef<{ id: string; y: number; active: boolean; insert: number } | null>(null);
   const suppressClick = React.useRef(false);
+  const order = React.useRef<string[]>([]);
+  const reorder = React.useRef(onReorder);
+  React.useEffect(() => {
+    order.current = generated.map((g) => g.hue.id);
+    reorder.current = onReorder;
+  });
   /** Row being dragged and the index it would be inserted before (0..n, in the current order). */
   const [drag, setDrag] = React.useState<{ id: string; insert: number } | null>(null);
 
   const insertionAt = (clientY: number) => {
-    for (let i = 0; i < generated.length; i++) {
-      const rect = handles.current.get(generated[i].hue.id)?.getBoundingClientRect();
+    const ids = order.current;
+    for (let i = 0; i < ids.length; i++) {
+      const rect = handles.current.get(ids[i])?.getBoundingClientRect();
       if (rect && clientY < rect.top + rect.height / 2) return i;
     }
-    return generated.length;
+    return ids.length;
   };
 
-  const endDrag = () => {
-    press.current = null;
-    setDrag(null);
+  /**
+   * Follows the pointer on window from the moment of the press, so fast moves
+   * that leave the row and releases anywhere on the page are still seen.
+   */
+  const startPress = (hueId: string, startY: number) => {
+    let active = false;
+    let insert = -1;
+    const move = (ev: PointerEvent) => {
+      if (!active) {
+        if (Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+        active = true;
+        document.body.style.cursor = "grabbing";
+      }
+      const next = insertionAt(ev.clientY);
+      if (next !== insert) {
+        insert = next;
+        setDrag({ id: hueId, insert: next });
+      }
+    };
+    const finish = (commit: boolean) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      document.body.style.cursor = "";
+      if (active) {
+        suppressClick.current = true;
+        if (commit) {
+          const from = order.current.indexOf(hueId);
+          const to = insert > from ? insert - 1 : insert;
+          if (from >= 0 && insert >= 0 && to !== from) reorder.current(hueId, to);
+        }
+      }
+      setDrag(null);
+    };
+    const up = () => finish(true);
+    const cancel = () => finish(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
   };
 
   const handleFor = (hueId: string): DragHandle => ({
@@ -86,34 +125,8 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
     onPointerDown: (e) => {
       if (e.button !== 0) return;
       suppressClick.current = false;
-      press.current = { id: hueId, y: e.clientY, active: false, insert: -1 };
+      startPress(hueId, e.clientY);
     },
-    onPointerMove: (e) => {
-      const p = press.current;
-      if (!p || p.id !== hueId || (e.buttons & 1) === 0) return;
-      if (!p.active) {
-        if (Math.abs(e.clientY - p.y) < DRAG_THRESHOLD) return;
-        p.active = true;
-        // Capturing only once the drag starts keeps plain clicks on the name and grip buttons.
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
-      const insert = insertionAt(e.clientY);
-      if (insert !== p.insert) {
-        p.insert = insert;
-        setDrag({ id: hueId, insert });
-      }
-    },
-    onPointerUp: () => {
-      const p = press.current;
-      if (p?.active && p.id === hueId) {
-        suppressClick.current = true;
-        const from = generated.findIndex((g) => g.hue.id === hueId);
-        const to = p.insert > from ? p.insert - 1 : p.insert;
-        if (from >= 0 && to !== from) onReorder(hueId, to);
-      }
-      endDrag();
-    },
-    onPointerCancel: endDrag,
     onClickCapture: (e) => {
       if (!suppressClick.current) return;
       suppressClick.current = false;
