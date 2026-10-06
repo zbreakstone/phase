@@ -95,6 +95,16 @@ export function PaletteApp() {
       return { ...s, hues, selectedHueId: s.selectedHueId === id ? next : s.selectedHueId };
     });
 
+  const reorder = (id: string, toIndex: number) =>
+    setState((s) => {
+      const from = s.hues.findIndex((h) => h.id === id);
+      if (from < 0 || from === toIndex) return s;
+      const hues = [...s.hues];
+      const [moved] = hues.splice(from, 1);
+      hues.splice(toIndex, 0, moved);
+      return { ...s, hues };
+    });
+
   const reset = () => {
     setState(defaultState());
     setGrade(null);
@@ -170,6 +180,7 @@ export function PaletteApp() {
                       setState((s) => ({ ...s, selectedHueId: id }));
                       setGrade(g);
                     }}
+                    onReorder={reorder}
                   />
                   {overlay.metric === "contrast" && overlay.against === "selected" && grade === null ? (
                     <p className="text-xs text-muted-foreground">Click a swatch to compare every other swatch against it.</p>

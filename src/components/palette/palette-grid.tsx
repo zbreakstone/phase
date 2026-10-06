@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Crosshair, Pin, X } from "lucide-react";
+import * as React from "react";
+import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
 import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
 import { luminanceGray, simulateVision, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
@@ -31,15 +32,52 @@ interface Props {
   selectedHueId: string | null;
   selectedGrade: number | null;
   onSelect: (hueId: string, grade: number | null) => void;
+  /** Move a hue so it ends up at `toIndex` in the list. */
+  onReorder: (hueId: string, toIndex: number) => void;
 }
 
 const fmtRatio = (r: number) => (r >= 10 ? r.toFixed(1) : r.toFixed(2));
 
-export function PaletteGrid({ generated, rules, overlay, selectedHueId, selectedGrade, onSelect }: Props) {
+type DropSide = "before" | "after";
+
+/** Handlers spread on every element of a row so the whole row is a drop target. */
+interface RowDrop {
+  onDragOver: (e: React.DragEvent<HTMLElement>) => void;
+  onDrop: (e: React.DragEvent<HTMLElement>) => void;
+}
+
+export function PaletteGrid({ generated, rules, overlay, selectedHueId, selectedGrade, onSelect, onReorder }: Props) {
   const steps = generated[0]?.shades ?? [];
   const selectedHue = generated.find((g) => g.hue.id === selectedHueId);
   const anchorShade = selectedHue?.shades.find((s) => s.grade === selectedGrade) ?? null;
   const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 1fr))`;
+  const [dragId, setDragId] = React.useState<string | null>(null);
+  const [target, setTarget] = React.useState<{ id: string; side: DropSide } | null>(null);
+
+  const endDrag = () => {
+    setDragId(null);
+    setTarget(null);
+  };
+
+  const dropFor = (hueId: string, index: number): RowDrop => ({
+    onDragOver: (e) => {
+      if (!dragId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = e.currentTarget.getBoundingClientRect();
+      const side: DropSide = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+      if (target?.id !== hueId || target.side !== side) setTarget({ id: hueId, side });
+    },
+    onDrop: (e) => {
+      if (!dragId) return;
+      e.preventDefault();
+      const from = generated.findIndex((g) => g.hue.id === dragId);
+      let to = target?.side === "after" ? index + 1 : index;
+      if (from < to) to -= 1;
+      if (from !== to) onReorder(dragId, to);
+      endDrag();
+    },
+  });
 
   return (
     <div className="overflow-x-auto">
@@ -51,7 +89,7 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
           </div>
         ))}
 
-        {generated.map((g) => {
+        {generated.map((g, i) => {
           const rowSelected = g.hue.id === selectedHueId;
           return (
             <Row
@@ -63,6 +101,19 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
               selectedGrade={rowSelected ? selectedGrade : null}
               reference={anchorShade}
               onSelect={onSelect}
+              drop={dropFor(g.hue.id, i)}
+              dragging={dragId === g.hue.id}
+              dropSide={dragId && dragId !== g.hue.id && target?.id === g.hue.id ? target.side : null}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", g.hue.name);
+                setDragId(g.hue.id);
+              }}
+              onDragEnd={endDrag}
+              onMove={(delta) => {
+                const to = i + delta;
+                if (to >= 0 && to < generated.length) onReorder(g.hue.id, to);
+              }}
             />
           );
         })}
@@ -103,6 +154,12 @@ function Row({
   selectedGrade,
   reference,
   onSelect,
+  drop,
+  dragging,
+  dropSide,
+  onDragStart,
+  onDragEnd,
+  onMove,
 }: {
   g: GeneratedHue;
   rules: ContrastRule[];
@@ -111,20 +168,57 @@ function Row({
   selectedGrade: number | null;
   reference: Shade | null;
   onSelect: (hueId: string, grade: number | null) => void;
+  drop: RowDrop;
+  dragging: boolean;
+  dropSide: DropSide | null;
+  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+  onMove: (delta: number) => void;
 }) {
+  const indicator = dropSide ? (
+    <span aria-hidden className={cn("pointer-events-none absolute inset-x-0 z-20 h-0.5 bg-primary", dropSide === "before" ? "-top-px" : "-bottom-px")} />
+  ) : null;
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => onSelect(g.hue.id, selectedGrade)}
-        aria-pressed={rowSelected}
-        className={cn(
-          "sticky left-0 z-10 flex h-11 items-center truncate bg-background pr-2 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-          rowSelected ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground",
-        )}
+      <div
+        {...drop}
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        className={cn("group/row sticky left-0 z-10 flex h-11 cursor-grab items-center bg-background active:cursor-grabbing", dragging && "opacity-40")}
       >
-        <span className="truncate">{g.hue.name || "Unnamed"}</span>
-      </button>
+        <button
+          type="button"
+          aria-label={`Reorder ${g.hue.name}. Drag, or press Alt and an arrow key.`}
+          title="Drag to reorder (or Alt + ↑ / ↓)"
+          onKeyDown={(e) => {
+            if (!e.altKey) return;
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              onMove(-1);
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              onMove(1);
+            }
+          }}
+          className="flex h-full w-5 shrink-0 items-center justify-center text-muted-foreground/0 group-hover/row:text-muted-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <GripVertical className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelect(g.hue.id, selectedGrade)}
+          aria-pressed={rowSelected}
+          className={cn(
+            "flex h-full min-w-0 flex-1 items-center pr-2 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            rowSelected ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <span className="truncate">{g.hue.name || "Unnamed"}</span>
+        </button>
+        {indicator}
+      </div>
       {g.shades.map((s) => (
         <Cell
           key={s.grade}
@@ -135,6 +229,9 @@ function Row({
           selected={rowSelected && selectedGrade === s.grade}
           reference={reference}
           onSelect={() => onSelect(g.hue.id, s.grade)}
+          drop={drop}
+          dimmed={dragging}
+          indicator={indicator}
         />
       ))}
     </>
@@ -149,6 +246,9 @@ function Cell({
   selected,
   reference,
   onSelect,
+  drop,
+  dimmed,
+  indicator,
 }: {
   g: GeneratedHue;
   shade: Shade;
@@ -157,6 +257,9 @@ function Cell({
   selected: boolean;
   reference: Shade | null;
   onSelect: () => void;
+  drop: RowDrop;
+  dimmed: boolean;
+  indicator: React.ReactNode;
 }) {
   const shown = displayHex(shade.hex, overlay);
   const fg = readableOn(shown);
@@ -180,13 +283,14 @@ function Cell({
 
   return (
     <button
+      {...drop}
       type="button"
       onClick={onSelect}
       aria-label={`${g.hue.name} ${shade.grade}, ${shade.hex}${label ? `, ${label}` : ""}`}
       title={`${g.hue.name} ${shade.grade} · ${shade.hex}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`}
       className={cn(
         "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
-        status === "none" && "opacity-40",
+        (status === "none" || dimmed) && "opacity-40",
       )}
       style={{ backgroundColor: shown, color: fg }}
     >
@@ -200,6 +304,7 @@ function Cell({
           {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source colour" /> : <Crosshair className="size-2.5" aria-label="Source colour landed here" />}
         </span>
       ) : null}
+      {indicator}
     </button>
   );
 }
