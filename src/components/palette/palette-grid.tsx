@@ -40,44 +40,96 @@ const fmtRatio = (r: number) => (r >= 10 ? r.toFixed(1) : r.toFixed(2));
 
 type DropSide = "before" | "after";
 
-/** Handlers spread on every element of a row so the whole row is a drop target. */
-interface RowDrop {
-  onDragOver: (e: React.DragEvent<HTMLElement>) => void;
-  onDrop: (e: React.DragEvent<HTMLElement>) => void;
+/** Pointer handlers for a row's name cell, which is the drag handle. */
+interface DragHandle {
+  ref: (el: HTMLElement | null) => void;
+  onPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
+  onPointerMove: (e: React.PointerEvent<HTMLElement>) => void;
+  onPointerUp: (e: React.PointerEvent<HTMLElement>) => void;
+  onPointerCancel: () => void;
+  onClickCapture: (e: React.MouseEvent<HTMLElement>) => void;
 }
+
+/** Movement (px) before a press on a row name becomes a drag rather than a click. */
+const DRAG_THRESHOLD = 4;
 
 export function PaletteGrid({ generated, rules, overlay, selectedHueId, selectedGrade, onSelect, onReorder }: Props) {
   const steps = generated[0]?.shades ?? [];
   const selectedHue = generated.find((g) => g.hue.id === selectedHueId);
   const anchorShade = selectedHue?.shades.find((s) => s.grade === selectedGrade) ?? null;
   const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 1fr))`;
-  const [dragId, setDragId] = React.useState<string | null>(null);
-  const [target, setTarget] = React.useState<{ id: string; side: DropSide } | null>(null);
 
-  const endDrag = () => {
-    setDragId(null);
-    setTarget(null);
+  const handles = React.useRef(new Map<string, HTMLElement>());
+  const press = React.useRef<{ id: string; y: number; active: boolean; insert: number } | null>(null);
+  const suppressClick = React.useRef(false);
+  /** Row being dragged and the index it would be inserted before (0..n, in the current order). */
+  const [drag, setDrag] = React.useState<{ id: string; insert: number } | null>(null);
+
+  const insertionAt = (clientY: number) => {
+    for (let i = 0; i < generated.length; i++) {
+      const rect = handles.current.get(generated[i].hue.id)?.getBoundingClientRect();
+      if (rect && clientY < rect.top + rect.height / 2) return i;
+    }
+    return generated.length;
   };
 
-  const dropFor = (hueId: string, index: number): RowDrop => ({
-    onDragOver: (e) => {
-      if (!dragId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      const rect = e.currentTarget.getBoundingClientRect();
-      const side: DropSide = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
-      if (target?.id !== hueId || target.side !== side) setTarget({ id: hueId, side });
+  const endDrag = () => {
+    press.current = null;
+    setDrag(null);
+  };
+
+  const handleFor = (hueId: string): DragHandle => ({
+    ref: (el) => {
+      if (el) handles.current.set(hueId, el);
+      else handles.current.delete(hueId);
     },
-    onDrop: (e) => {
-      if (!dragId) return;
-      e.preventDefault();
-      const from = generated.findIndex((g) => g.hue.id === dragId);
-      let to = target?.side === "after" ? index + 1 : index;
-      if (from < to) to -= 1;
-      if (from !== to) onReorder(dragId, to);
+    onPointerDown: (e) => {
+      if (e.button !== 0) return;
+      suppressClick.current = false;
+      press.current = { id: hueId, y: e.clientY, active: false, insert: -1 };
+    },
+    onPointerMove: (e) => {
+      const p = press.current;
+      if (!p || p.id !== hueId || (e.buttons & 1) === 0) return;
+      if (!p.active) {
+        if (Math.abs(e.clientY - p.y) < DRAG_THRESHOLD) return;
+        p.active = true;
+        // Capturing only once the drag starts keeps plain clicks on the name and grip buttons.
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      const insert = insertionAt(e.clientY);
+      if (insert !== p.insert) {
+        p.insert = insert;
+        setDrag({ id: hueId, insert });
+      }
+    },
+    onPointerUp: () => {
+      const p = press.current;
+      if (p?.active && p.id === hueId) {
+        suppressClick.current = true;
+        const from = generated.findIndex((g) => g.hue.id === hueId);
+        const to = p.insert > from ? p.insert - 1 : p.insert;
+        if (from >= 0 && to !== from) onReorder(hueId, to);
+      }
       endDrag();
     },
+    onPointerCancel: endDrag,
+    onClickCapture: (e) => {
+      if (!suppressClick.current) return;
+      suppressClick.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
   });
+
+  const fromIndex = drag ? generated.findIndex((g) => g.hue.id === drag.id) : -1;
+  const isNoop = !drag || drag.insert === fromIndex || drag.insert === fromIndex + 1;
+  const dropSideFor = (i: number): DropSide | null => {
+    if (isNoop || !drag) return null;
+    if (drag.insert === i) return "before";
+    if (drag.insert === generated.length && i === generated.length - 1) return "after";
+    return null;
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -102,15 +154,9 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
               reference={anchorShade}
               onSelect={onSelect}
               edge={generated.length === 1 ? "only" : i === 0 ? "top" : i === generated.length - 1 ? "bottom" : null}
-              drop={dropFor(g.hue.id, i)}
-              dragging={dragId === g.hue.id}
-              dropSide={dragId && dragId !== g.hue.id && target?.id === g.hue.id ? target.side : null}
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", g.hue.name);
-                setDragId(g.hue.id);
-              }}
-              onDragEnd={endDrag}
+              handle={handleFor(g.hue.id)}
+              dragging={drag?.id === g.hue.id}
+              dropSide={dropSideFor(i)}
               onMove={(delta) => {
                 const to = i + delta;
                 if (to >= 0 && to < generated.length) onReorder(g.hue.id, to);
@@ -156,11 +202,9 @@ function Row({
   reference,
   onSelect,
   edge,
-  drop,
+  handle,
   dragging,
   dropSide,
-  onDragStart,
-  onDragEnd,
   onMove,
 }: {
   g: GeneratedHue;
@@ -171,11 +215,9 @@ function Row({
   reference: Shade | null;
   onSelect: (hueId: string, grade: number | null) => void;
   edge: "top" | "bottom" | "only" | null;
-  drop: RowDrop;
+  handle: DragHandle;
   dragging: boolean;
   dropSide: DropSide | null;
-  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
   onMove: (delta: number) => void;
 }) {
   const indicator = dropSide ? (
@@ -185,11 +227,11 @@ function Row({
   return (
     <>
       <div
-        {...drop}
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        className={cn("group/row sticky left-0 z-10 flex h-11 cursor-grab items-center bg-background active:cursor-grabbing", dragging && "opacity-40")}
+        {...handle}
+        className={cn(
+          "group/row sticky left-0 z-10 flex h-11 cursor-grab touch-none items-center bg-background select-none active:cursor-grabbing",
+          dragging && "opacity-40",
+        )}
       >
         <button
           type="button"
@@ -238,7 +280,6 @@ function Row({
           selected={rowSelected && selectedGrade === s.grade}
           reference={reference}
           onSelect={() => onSelect(g.hue.id, s.grade)}
-          drop={drop}
           dimmed={dragging}
           indicator={indicator}
         />
@@ -256,7 +297,6 @@ function Cell({
   reference,
   onSelect,
   corner,
-  drop,
   dimmed,
   indicator,
 }: {
@@ -269,7 +309,6 @@ function Cell({
   selected: boolean;
   reference: Shade | null;
   onSelect: () => void;
-  drop: RowDrop;
   dimmed: boolean;
   indicator: React.ReactNode;
 }) {
@@ -295,7 +334,6 @@ function Cell({
 
   return (
     <button
-      {...drop}
       type="button"
       onClick={onSelect}
       aria-label={`${g.hue.name} ${shade.grade}, ${shade.hex}${label ? `, ${label}` : ""}`}
