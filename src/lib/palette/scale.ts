@@ -62,6 +62,56 @@ export function uniformRatioForDiff(diff: number): number {
   return Math.pow(21, diff / SCALE_MAX);
 }
 
+/**
+ * Relative luminance windows per step from Katie Riley's Envoy scale
+ * ("Designing an accessible color scheme, again", 2020): the USWDS table with
+ * 600+ lightened for vibrancy (600 at 5.5–7:1 vs white, 100 no darker than
+ * 1.221:1, 200 no darker than 1.83:1) and the rest tightened so any value
+ * inside its window keeps the 400 / 500 / 700 magic numbers.
+ */
+export const ENVOY_RANGES: Record<number, { min: number; max: number }> = {
+  50: { min: 0.85, max: 0.93 },
+  100: { min: 0.81, max: 0.84 },
+  200: { min: 0.523, max: 0.65 },
+  300: { min: 0.35, max: 0.45 },
+  400: { min: 0.225, max: 0.3 },
+  500: { min: 0.175, max: 0.183 },
+  600: { min: 0.1, max: 0.141 },
+  700: { min: 0.05, max: 0.077 },
+  800: { min: 0.02, max: 0.0389 },
+  900: { min: 0.005, max: 0.011 },
+};
+
+/** Contrast-space midpoint of a window, so the target sits evenly between its limits. */
+function windowCentre({ min, max }: { min: number; max: number }): number {
+  return Math.sqrt((min + 0.05) * (max + 0.05)) - 0.05;
+}
+
+/**
+ * Envoy target for a step. Steps between the table's rows (150, 850 ...) are
+ * interpolated in contrast space between their neighbours.
+ */
+export function envoyLuminance(grade: number): number {
+  if (grade <= 0) return WHITE_Y;
+  if (grade >= SCALE_MAX) return BLACK_Y;
+  const exact = ENVOY_RANGES[grade];
+  if (exact) return windowCentre(exact);
+  const knots: [number, number][] = [
+    [0, WHITE_Y],
+    ...Object.entries(ENVOY_RANGES).map(([g, r]) => [Number(g), windowCentre(r)] as [number, number]),
+    [SCALE_MAX, BLACK_Y],
+  ];
+  for (let i = 0; i < knots.length - 1; i++) {
+    const [g0, y0] = knots[i];
+    const [g1, y1] = knots[i + 1];
+    if (grade > g0 && grade < g1) {
+      const t = (grade - g0) / (g1 - g0);
+      return (y0 + 0.05) * Math.pow((y1 + 0.05) / (y0 + 0.05), t) - 0.05;
+    }
+  }
+  return uniformLuminance(grade);
+}
+
 export function targetLuminance(scale: ScaleConfig, grade: number): number {
   if (grade <= 0) return WHITE_Y;
   if (grade >= SCALE_MAX) return BLACK_Y;
@@ -69,6 +119,7 @@ export function targetLuminance(scale: ScaleConfig, grade: number): number {
     const v = scale.customLuminance[String(grade)];
     if (typeof v === "number" && Number.isFinite(v)) return v;
   }
+  if (scale.luminanceMode === "envoy") return envoyLuminance(grade);
   return uniformLuminance(grade);
 }
 

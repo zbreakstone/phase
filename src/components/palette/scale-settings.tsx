@@ -20,7 +20,6 @@ import {
   ruleFeasibility,
   systemGrades,
   targetLuminance,
-  uniformLuminance,
 } from "@/lib/palette/scale";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
@@ -219,7 +218,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
 
 function materialize(scale: ScaleConfig): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const g of scale.grades) out[String(g)] = scale.luminanceMode === "custom" ? targetLuminance(scale, g) : uniformLuminance(g);
+  for (const g of scale.grades) out[String(g)] = targetLuminance(scale, g);
   return out;
 }
 
@@ -241,7 +240,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
         <ToggleGroup
           value={[scale.luminanceMode]}
           onValueChange={(v) => {
-            if (v[0] === "uniform") onChange({ ...scale, luminanceMode: "uniform" });
+            if (v[0] === "envoy" || v[0] === "uniform") onChange({ ...scale, luminanceMode: v[0], customLuminance: {} });
             if (v[0] === "custom") onChange({ ...scale, luminanceMode: "custom", customLuminance: materialize(scale) });
           }}
           variant="outline"
@@ -249,11 +248,12 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
           spacing={0}
           aria-label="Luminance mode"
         >
+          <ToggleGroupItem value="envoy" className="rounded-none">Envoy</ToggleGroupItem>
           <ToggleGroupItem value="uniform" className="rounded-none">Even contrast</ToggleGroupItem>
           <ToggleGroupItem value="custom" className="rounded-none">Custom</ToggleGroupItem>
         </ToggleGroup>
         {custom ? (
-          <Button variant="ghost" size="sm" onClick={() => onChange({ ...scale, luminanceMode: "uniform", customLuminance: {} })}>
+          <Button variant="ghost" size="sm" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>
             <RotateCcw />
             Reset
           </Button>
@@ -262,7 +262,9 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
       <p className="text-[11px] text-muted-foreground">
         {custom
           ? "Drag a step or type a luminance. The band behind each slider is the window that keeps every rule intact."
-          : "Each step multiplies contrast by the same factor, so ratio depends only on how far apart two steps are. Switch to Custom to move individual steps."}
+          : scale.luminanceMode === "envoy"
+            ? "Katie Riley's Envoy ranges: the USWDS luminance table with 600 and darker lightened for more vibrant dark shades. Each step sits in the middle of its range."
+            : "Each step multiplies contrast by the same factor, so ratio depends only on how far apart two steps are. Switch to Custom to move individual steps."}
       </p>
 
       {violations.length > 0 ? (

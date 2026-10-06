@@ -37,7 +37,7 @@ export interface ContrastRule {
   ratio: number;
 }
 
-export type LuminanceMode = "uniform" | "custom";
+export type LuminanceMode = "envoy" | "uniform" | "custom";
 
 export interface ScaleConfig {
   grades: number[];

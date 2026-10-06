@@ -4,6 +4,8 @@ import { HUE_PRESETS, defaultScale, defaultState, hueFromPreset, makeRules } fro
 import { convertHue, curveAt, generateHue, generatePalette, hueDelta } from "@/lib/palette/generate";
 import {
   checkTargets,
+  envoyLuminance,
+  ENVOY_RANGES,
   feasibleRange,
   parseGrades,
   requiredRatio,
@@ -40,9 +42,55 @@ describe("luminance targets", () => {
   });
   it("uniform targets satisfy every built-in rule preset", () => {
     for (const preset of RULE_PRESETS) {
-      const scale = { ...defaultScale(), rules: makeRules(preset.id) };
+      const scale = { ...defaultScale(), luminanceMode: "uniform" as const, rules: makeRules(preset.id) };
       expect(checkTargets(scale)).toEqual([]);
     }
+  });
+});
+
+describe("Envoy luminance ranges", () => {
+  it("is the default", () => {
+    expect(defaultScale().luminanceMode).toBe("envoy");
+  });
+  it("matches the limits stated in the article", () => {
+    const vsWhite = (y: number) => 1.05 / (y + 0.05);
+    expect(vsWhite(ENVOY_RANGES[600].min)).toBeCloseTo(7, 2);
+    expect(vsWhite(ENVOY_RANGES[600].max)).toBeCloseTo(5.5, 1);
+    expect(vsWhite(ENVOY_RANGES[100].min)).toBeCloseTo(1.221, 2);
+    expect(vsWhite(ENVOY_RANGES[200].min)).toBeCloseTo(1.83, 2);
+    expect(vsWhite(ENVOY_RANGES[50].max)).toBeCloseTo(1.07, 2);
+    expect(vsWhite(ENVOY_RANGES[50].min)).toBeCloseTo(1.17, 2);
+  });
+  it("keeps the 400 / 500 / 700 rules for any value inside each range", () => {
+    const rules = makeRules("uswds");
+    const lo = (g: number) => (g === 0 ? 1 : g === 1000 ? 0 : ENVOY_RANGES[g].min);
+    const hi = (g: number) => (g === 0 ? 1 : g === 1000 ? 0 : ENVOY_RANGES[g].max);
+    const grades = [0, ...Object.keys(ENVOY_RANGES).map(Number), 1000];
+    for (const a of grades) {
+      for (const b of grades) {
+        if (b <= a) continue;
+        const req = requiredRatio(b - a, rules);
+        if (req === null) continue;
+        expect((lo(a) + 0.05) / (hi(b) + 0.05)).toBeGreaterThanOrEqual(req - 1e-3);
+      }
+    }
+  });
+  it("places every default target inside its range and passes the default rules", () => {
+    const scale = defaultScale();
+    for (const g of scale.grades) {
+      const y = targetLuminance(scale, g);
+      expect(y).toBeGreaterThanOrEqual(ENVOY_RANGES[g].min);
+      expect(y).toBeLessThanOrEqual(ENVOY_RANGES[g].max);
+    }
+    expect(checkTargets(scale)).toEqual([]);
+  });
+  it("interpolates steps between table rows monotonically", () => {
+    const ys = [100, 150, 200, 850, 900, 950].map(envoyLuminance);
+    expect(ys[1]).toBeLessThan(ys[0]);
+    expect(ys[1]).toBeGreaterThan(ys[2]);
+    expect(ys[4]).toBeLessThan(ys[3]);
+    expect(ys[5]).toBeLessThan(ys[4]);
+    expect(ys[5]).toBeGreaterThan(0);
   });
 });
 

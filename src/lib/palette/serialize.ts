@@ -90,7 +90,8 @@ export function sanitizeState(raw: unknown): PaletteState | null {
     reference: sanitizeReference(r.reference),
     scale: {
       grades,
-      luminanceMode: scaleRaw.luminanceMode === "custom" ? "custom" : "uniform",
+      luminanceMode:
+        scaleRaw.luminanceMode === "custom" || scaleRaw.luminanceMode === "uniform" ? scaleRaw.luminanceMode : "envoy",
       customLuminance,
       rules,
     },

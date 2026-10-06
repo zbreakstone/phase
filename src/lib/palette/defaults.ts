@@ -18,7 +18,7 @@ export function makeRules(presetId = "uswds"): ContrastRule[] {
 export function defaultScale(): ScaleConfig {
   return {
     grades: [...GRADE_PRESETS[0].grades],
-    luminanceMode: "uniform",
+    luminanceMode: "envoy",
     customLuminance: {},
     rules: makeRules("uswds"),
   };
