@@ -59,7 +59,8 @@ describe("Envoy luminance ranges", () => {
       expect(vsWhite(ENVOY_RANGES[Number(g)].max)).toBeCloseTo(light, 6);
       expect(vsWhite(ENVOY_RANGES[Number(g)].min)).toBeCloseTo(dark, 6);
     }
-    expect(ENVOY_CONTRAST[900]).toEqual([15, 16]);
+    expect(ENVOY_RANGES[900].min).toBeGreaterThanOrEqual(0.005);
+    expect(ENVOY_RANGES[900].max).toBeLessThanOrEqual(0.015);
   });
   it("lands each step of every default hue inside its Envoy window", () => {
     const s = defaultState();
