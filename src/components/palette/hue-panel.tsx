@@ -38,6 +38,7 @@ export function HuePanel({ generated, space, scale, selectedGrade, onSelectGrade
   const lockedLight = generated.source?.grade === first?.grade;
   const lockedDark = generated.source?.grade === last?.grade && ramp.length > 1;
   const chosen = generated.shades.find((s) => s.grade === selectedGrade) ?? null;
+  const toned = generated.shades.filter((s) => !s.anchor && s.clipped).map((s) => s.grade);
 
   const lightGuide = React.useMemo(
     () => hueGuide(space, Math.min(first?.targetLuminance ?? 0.8, 0.8), Math.max(hue.chromaLight, def.chroma.max * 0.15)),
@@ -141,6 +142,12 @@ export function HuePanel({ generated, space, scale, selectedGrade, onSelectGrade
           </p>
         </div>
         <ChromaChart generated={generated} scale={scale} space={space} />
+        {toned.length > 0 ? (
+          <p className="text-[11px] text-muted-foreground">
+            {toned.length === 1 ? "Step" : "Steps"} {toned.join(", ")} {toned.length === 1 ? "is" : "are"} a little less colourful than asked, because
+            screens can&apos;t show that much colour at {toned.length === 1 ? "that" : "those"} lightness{toned.length === 1 ? "" : "es"}. Hue and contrast are unchanged.
+          </p>
+        ) : null}
         <SliderField
           id="chroma"
           label="Colourfulness"

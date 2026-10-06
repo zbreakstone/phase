@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Crosshair, Pin, Scissors, X } from "lucide-react";
+import { Check, Crosshair, Pin, X } from "lucide-react";
 import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
 import { requiredRatio } from "@/lib/palette/scale";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
@@ -182,10 +182,9 @@ function Cell({
       {label}
       {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
       {selected ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border-2 border-white mix-blend-difference" /> : null}
-      {shade.isSource || shade.clipped ? (
-        <span className="pointer-events-none absolute top-0.5 right-0.5 flex gap-0.5 opacity-80">
-          {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source colour" /> : shade.isSource ? <Crosshair className="size-2.5" aria-label="Source colour landed here" /> : null}
-          {shade.clipped ? <Scissors className="size-2.5" aria-label="Chroma reduced to fit sRGB" /> : null}
+      {shade.isSource ? (
+        <span className="pointer-events-none absolute top-0.5 right-0.5 opacity-80">
+          {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source colour" /> : <Crosshair className="size-2.5" aria-label="Source colour landed here" />}
         </span>
       ) : null}
     </button>
