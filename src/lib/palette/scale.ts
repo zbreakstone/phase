@@ -66,7 +66,8 @@ export function uniformRatioForDiff(diff: number): number {
  * Katie Riley's final Envoy table ("Designing an accessible color scheme,
  * again", 2020), as contrast against white: [lightest allowed, darkest allowed].
  * It lightens the USWDS ranges from 600 down so dark shades stay vibrant.
- * 900 keeps the darker USWDS window (16.5–19:1) so it sits close to black.
+ * 800 (centred on 14.4:1) and 900 (16.5–19:1) stay in the darker USWDS
+ * windows so the end of the scale steps evenly into black.
  */
 export const ENVOY_CONTRAST: Record<number, [number, number]> = {
   50: [1.07, 1.11],
@@ -77,7 +78,7 @@ export const ENVOY_CONTRAST: Record<number, [number, number]> = {
   500: [4.5, 4.67],
   600: [5.5, 7],
   700: [8, 10],
-  800: [11, 13],
+  800: [13.8, 15],
   900: [16.5, 19],
 };
 
