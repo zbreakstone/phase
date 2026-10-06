@@ -263,7 +263,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
         {custom
           ? "Drag a step or type a luminance. The band behind each slider is the window that keeps every rule intact."
           : scale.luminanceMode === "envoy"
-            ? "Katie Riley's Envoy ranges: the USWDS luminance table with 600 and darker lightened for more vibrant dark shades. Each step sits in the middle of its range."
+            ? "Tuned from Katie Riley's Envoy ranges: brighter mid-dark shades, with 800 and 900 kept close to black. Switch to Custom to move individual steps."
             : "Each step multiplies contrast by the same factor, so ratio depends only on how far apart two steps are. Switch to Custom to move individual steps."}
       </p>
 

@@ -63,39 +63,25 @@ export function uniformRatioForDiff(diff: number): number {
 }
 
 /**
- * Katie Riley's final Envoy table ("Designing an accessible color scheme,
- * again", 2020), as contrast against white: [lightest allowed, darkest allowed].
- * It lightens the USWDS ranges from 600 down so dark shades stay vibrant.
- * 800 (centred on 14.4:1) and 900 (16.5–19:1) stay in the darker USWDS
- * windows so the end of the scale steps evenly into black.
+ * Default contrast against white for each step. Based on Katie Riley's Envoy
+ * ranges ("Designing an accessible color scheme, again", 2020), with 800 and
+ * 900 kept in the darker USWDS windows so the scale steps evenly into black.
+ * 500 must stay within 4.5–4.67:1 to reach 4.5:1 against both white and black.
  */
-export const ENVOY_CONTRAST: Record<number, [number, number]> = {
-  50: [1.07, 1.11],
-  100: [1.18, 1.22],
-  200: [1.5, 1.79],
-  300: [2, 2.46],
-  400: [3, 3.33],
-  500: [4.5, 4.67],
-  600: [5.5, 7],
-  700: [8, 10],
-  800: [13.8, 15],
-  900: [16.5, 19],
+export const ENVOY_TARGETS: Record<number, number> = {
+  50: 1.12,
+  100: 1.25,
+  200: 1.65,
+  300: 2.3,
+  400: 3.2,
+  500: 4.55,
+  600: 6.5,
+  700: 9.6,
+  800: 14.4,
+  900: 17.7,
 };
 
-const luminanceForWhiteContrast = (ratio: number) => (WHITE_Y + 0.05) / ratio - 0.05;
-
-/** The same table as relative luminance windows. */
-export const ENVOY_RANGES: Record<number, { min: number; max: number }> = Object.fromEntries(
-  Object.entries(ENVOY_CONTRAST).map(([g, [light, dark]]) => [
-    Number(g),
-    { min: luminanceForWhiteContrast(dark), max: luminanceForWhiteContrast(light) },
-  ]),
-);
-
-/** Contrast-space midpoint of a window, so the target sits evenly between its limits. */
-function windowCentre({ min, max }: { min: number; max: number }): number {
-  return Math.sqrt((min + 0.05) * (max + 0.05)) - 0.05;
-}
+export const luminanceForWhiteContrast = (ratio: number) => (WHITE_Y + 0.05) / ratio - 0.05;
 
 /**
  * Envoy target for a step. Steps between the table's rows (150, 850 ...) are
@@ -104,11 +90,11 @@ function windowCentre({ min, max }: { min: number; max: number }): number {
 export function envoyLuminance(grade: number): number {
   if (grade <= 0) return WHITE_Y;
   if (grade >= SCALE_MAX) return BLACK_Y;
-  const exact = ENVOY_RANGES[grade];
-  if (exact) return windowCentre(exact);
+  const exact = ENVOY_TARGETS[grade];
+  if (exact) return luminanceForWhiteContrast(exact);
   const knots: [number, number][] = [
     [0, WHITE_Y],
-    ...Object.entries(ENVOY_RANGES).map(([g, r]) => [Number(g), windowCentre(r)] as [number, number]),
+    ...Object.entries(ENVOY_TARGETS).map(([g, c]) => [Number(g), luminanceForWhiteContrast(c)] as [number, number]),
     [SCALE_MAX, BLACK_Y],
   ];
   for (let i = 0; i < knots.length - 1; i++) {

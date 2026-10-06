@@ -5,8 +5,7 @@ import { convertHue, curveAt, generateHue, generatePalette, hueDelta } from "@/l
 import {
   checkTargets,
   envoyLuminance,
-  ENVOY_CONTRAST,
-  ENVOY_RANGES,
+  ENVOY_TARGETS,
   feasibleRange,
   parseGrades,
   requiredRatio,
@@ -19,7 +18,7 @@ import {
 } from "@/lib/palette/scale";
 import { buildMatrix, validatePalette } from "@/lib/palette/validate";
 import { SPACES } from "@/lib/color/spaces";
-import { wcagContrast } from "@/lib/color/contrast";
+import { contrastFromLuminance, wcagContrast } from "@/lib/color/contrast";
 
 describe("luminance targets", () => {
   it("anchors white and black", () => {
@@ -53,34 +52,26 @@ describe("Envoy luminance ranges", () => {
   it("is the default", () => {
     expect(defaultScale().luminanceMode).toBe("envoy");
   });
-  it("converts the article's final table to luminance windows", () => {
-    const vsWhite = (y: number) => 1.05 / (y + 0.05);
-    for (const [g, [light, dark]] of Object.entries(ENVOY_CONTRAST)) {
-      expect(vsWhite(ENVOY_RANGES[Number(g)].max)).toBeCloseTo(light, 6);
-      expect(vsWhite(ENVOY_RANGES[Number(g)].min)).toBeCloseTo(dark, 6);
-    }
-    expect(ENVOY_RANGES[900].min).toBeGreaterThanOrEqual(0.005);
-    expect(ENVOY_RANGES[900].max).toBeLessThanOrEqual(0.015);
+  it("keeps 900 inside the USWDS 0.005–0.015 luminance window", () => {
+    const y = envoyLuminance(900);
+    expect(y).toBeGreaterThanOrEqual(0.005);
+    expect(y).toBeLessThanOrEqual(0.015);
   });
-  it("lands each step of every default hue inside its Envoy window", () => {
+  it("lands each step of every default hue on its contrast target", () => {
     const s = defaultState();
     for (const g of generatePalette(s.space, s.scale, s.hues)) {
       for (const shade of g.shades) {
-        const r = ENVOY_RANGES[shade.grade];
-        if (!r) continue;
-        expect(shade.luminance).toBeGreaterThanOrEqual(r.min - 0.002);
-        expect(shade.luminance).toBeLessThanOrEqual(r.max + 0.002);
+        const c = ENVOY_TARGETS[shade.grade];
+        if (!c) continue;
+        expect(Math.abs(contrastFromLuminance(1, shade.luminance) / c - 1)).toBeLessThan(0.02);
       }
     }
   });
-  it("places every default target inside its range and passes the default rules", () => {
+  it("passes the default rules with the generated colours", () => {
     const scale = defaultScale();
-    for (const g of scale.grades) {
-      const y = targetLuminance(scale, g);
-      expect(y).toBeGreaterThanOrEqual(ENVOY_RANGES[g].min);
-      expect(y).toBeLessThanOrEqual(ENVOY_RANGES[g].max);
-    }
     expect(checkTargets(scale)).toEqual([]);
+    const s = defaultState();
+    expect(validatePalette(generatePalette(s.space, s.scale, s.hues), s.scale.rules).failures).toEqual([]);
   });
   it("interpolates steps between table rows monotonically", () => {
     const ys = [100, 150, 200, 850, 900, 950].map(envoyLuminance);
