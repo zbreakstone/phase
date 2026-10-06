@@ -101,6 +101,7 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
               selectedGrade={rowSelected ? selectedGrade : null}
               reference={anchorShade}
               onSelect={onSelect}
+              edge={generated.length === 1 ? "only" : i === 0 ? "top" : i === generated.length - 1 ? "bottom" : null}
               drop={dropFor(g.hue.id, i)}
               dragging={dragId === g.hue.id}
               dropSide={dragId && dragId !== g.hue.id && target?.id === g.hue.id ? target.side : null}
@@ -154,6 +155,7 @@ function Row({
   selectedGrade,
   reference,
   onSelect,
+  edge,
   drop,
   dragging,
   dropSide,
@@ -168,6 +170,7 @@ function Row({
   selectedGrade: number | null;
   reference: Shade | null;
   onSelect: (hueId: string, grade: number | null) => void;
+  edge: "top" | "bottom" | "only" | null;
   drop: RowDrop;
   dragging: boolean;
   dropSide: DropSide | null;
@@ -219,9 +222,15 @@ function Row({
         </button>
         {indicator}
       </div>
-      {g.shades.map((s) => (
+      {g.shades.map((s, i, all) => (
         <Cell
           key={s.grade}
+          corner={cn(
+            i === 0 && (edge === "top" || edge === "only") && "rounded-tl-lg",
+            i === all.length - 1 && (edge === "top" || edge === "only") && "rounded-tr-lg",
+            i === 0 && (edge === "bottom" || edge === "only") && "rounded-bl-lg",
+            i === all.length - 1 && (edge === "bottom" || edge === "only") && "rounded-br-lg",
+          )}
           g={g}
           shade={s}
           rules={rules}
@@ -246,10 +255,13 @@ function Cell({
   selected,
   reference,
   onSelect,
+  corner,
   drop,
   dimmed,
   indicator,
 }: {
+  /** Rounds the outside corner when this swatch sits at a corner of the table. */
+  corner: string;
   g: GeneratedHue;
   shade: Shade;
   rules: ContrastRule[];
@@ -291,14 +303,15 @@ function Cell({
       className={cn(
         "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
         (status === "none" || dimmed) && "opacity-40",
+        corner,
       )}
       style={{ backgroundColor: shown, color: fg }}
     >
       {status === "pass" ? <Check className="mr-0.5 size-3" aria-label="Meets its rule" /> : null}
       {status === "fail" ? <X className="mr-0.5 size-3" aria-label="Breaks its rule" /> : null}
       {label}
-      {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
-      {selected ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 border-2 border-white mix-blend-difference" /> : null}
+      {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-red-500" /> : null}
+      {selected ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] border-2 border-white mix-blend-difference" /> : null}
       {shade.isSource ? (
         <span className="pointer-events-none absolute top-0.5 right-0.5 opacity-80">
           {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source colour" /> : <Crosshair className="size-2.5" aria-label="Source colour landed here" />}
