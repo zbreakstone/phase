@@ -8,8 +8,8 @@ import { targetLuminance } from "@/lib/palette/scale";
 import type { GeneratedHue, HueConfig, ScaleConfig } from "@/lib/palette/types";
 
 const W = 560;
-const H = 220;
-const PAD = { l: 44, r: 16, t: 18, b: 30 };
+const H = 240;
+const PAD = { l: 44, r: 16, t: 24, b: 44 };
 const PLOT_W = W - PAD.l - PAD.r;
 const PLOT_H = H - PAD.t - PAD.b;
 const DENSE = 48;
@@ -74,30 +74,27 @@ export function HueCurveChart({ generated, scale, space }: ChartProps) {
           const h = SPACES[space].interpolation === "polar" ? unwrapped(t) : unwrapRect(space, hue, t, hue.hueLight);
           return <circle key={s.grade} cx={xFor(t)} cy={yFor(h)} r={5} fill={s.hex} className="stroke-foreground" strokeWidth={1.25} />;
         })}
-      <EndpointMarker x={xFor(0)} y={yFor(start)} label={`Lightest · ${Math.round(normalize(start))}°`} anchor="start" color={generated.shades.find((s) => !s.anchor)?.hex} />
-      <EndpointMarker x={xFor(1)} y={yFor(end)} label={`Darkest · ${Math.round(normalize(end))}°`} anchor="end" color={[...generated.shades].reverse().find((s) => !s.anchor)?.hex} />
+      <EndpointMarker x={xFor(0)} y={yFor(start)} above={yFor(samples[4].h) >= yFor(start)} label={`Lightest end: ${Math.round(normalize(start))}°`} anchor="start" color={generated.shades.find((s) => !s.anchor)?.hex} />
+      <EndpointMarker x={xFor(1)} y={yFor(end)} above={yFor(samples[DENSE - 4].h) >= yFor(end)} label={`Darkest end: ${Math.round(normalize(end))}°`} anchor="end" color={[...generated.shades].reverse().find((s) => !s.anchor)?.hex} />
       {gradeAxis(sorted, sorted).map(({ g, x }) => (
-        <text key={g} x={x} y={H - 10} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
+        <text key={g} x={x} y={H - 22} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
           {g}
         </text>
       ))}
-      <text x={PAD.l} y={H - 0.5} className="fill-muted-foreground text-[9px]">
-        lightest
-      </text>
-      <text x={W - PAD.r} y={H - 0.5} textAnchor="end" className="fill-muted-foreground text-[9px]">
-        darkest
+      <text x={PAD.l + PLOT_W / 2} y={H - 4} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+        Grade, lightest to darkest
       </text>
     </svg>
   );
 }
 
-function EndpointMarker({ x, y, label, anchor, color }: { x: number; y: number; label: string; anchor: "start" | "end"; color?: string }) {
-  const lx = anchor === "start" ? x + 4 : x - 4;
-  const ly = y < PAD.t + 30 ? y + 22 : y - 14;
+function EndpointMarker({ x, y, label, anchor, color, above }: { x: number; y: number; label: string; anchor: "start" | "end"; color?: string; above: boolean }) {
+  const lx = anchor === "start" ? x - 6 : x + 6;
+  const ly = above ? y - 16 : y + 24;
   return (
     <g>
       <circle cx={x} cy={y} r={9} fill={color ?? "currentColor"} className="stroke-foreground" strokeWidth={3} />
-      <text x={lx} y={ly} textAnchor={anchor} className="fill-foreground text-[11px] font-semibold">
+      <text x={lx} y={ly} textAnchor={anchor} className="fill-foreground stroke-background text-[11px] font-semibold" strokeWidth={4} paintOrder="stroke">
         {label}
       </text>
     </g>
@@ -188,15 +185,12 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
           );
         })}
       {gradeAxis(sorted, sorted).map(({ g, x }) => (
-        <text key={g} x={x} y={H - 10} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
+        <text key={g} x={x} y={H - 22} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
           {g}
         </text>
       ))}
-      <text x={PAD.l} y={H - 0.5} className="fill-muted-foreground text-[9px]">
-        lightest
-      </text>
-      <text x={W - PAD.r} y={H - 0.5} textAnchor="end" className="fill-muted-foreground text-[9px]">
-        darkest
+      <text x={PAD.l + PLOT_W / 2} y={H - 4} textAnchor="middle" className="fill-muted-foreground text-[10px]">
+        Grade, lightest to darkest
       </text>
     </svg>
   );

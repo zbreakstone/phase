@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -84,13 +85,15 @@ export function AddHueMenu({ onAdd, onAddBlank, size = "sm" }: { onAdd: (p: HueP
         Add hue
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        <DropdownMenuLabel>Start from a preset</DropdownMenuLabel>
-        {HUE_PRESETS.map((p) => (
-          <DropdownMenuItem key={p.key} onClick={() => onAdd(p)}>
-            <span className="size-3 rounded-full ring-1 ring-black/20" style={{ backgroundColor: p.swatch }} />
-            {p.name}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Start from a preset</DropdownMenuLabel>
+          {HUE_PRESETS.map((p) => (
+            <DropdownMenuItem key={p.key} onClick={() => onAdd(p)}>
+              <span className="size-3 rounded-full ring-1 ring-black/20" style={{ backgroundColor: p.swatch }} />
+              {p.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onAddBlank}>
           <Sparkles />
@@ -134,11 +137,11 @@ function HueControls({
   const hasShift = Math.abs(hue.hueLight - hue.hueDark) > 0.5 || hue.hueBias !== 0;
 
   const lightGuide = React.useMemo(
-    () => hueGradient(space, first?.targetLuminance ?? 0.8, Math.max(hue.chromaLight, def.chroma.max * 0.15)),
+    () => hueGradient(space, Math.min(first?.targetLuminance ?? 0.8, 0.8), Math.max(hue.chromaLight, def.chroma.max * 0.15)),
     [space, first?.targetLuminance, hue.chromaLight, def.chroma.max],
   );
   const darkGuide = React.useMemo(
-    () => hueGradient(space, last?.targetLuminance ?? 0.02, Math.max(hue.chromaDark, def.chroma.max * 0.15)),
+    () => hueGradient(space, Math.max(last?.targetLuminance ?? 0.02, 0.06), Math.max(hue.chromaDark, def.chroma.max * 0.15)),
     [space, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
 
