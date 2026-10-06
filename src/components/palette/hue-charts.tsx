@@ -3,9 +3,9 @@
 import * as React from "react";
 import { maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
-import { curveAt, easeT, hueDelta, positionFor } from "@/lib/palette/generate";
+import { curveAt, positionFor } from "@/lib/palette/curve";
 import { targetLuminance } from "@/lib/palette/scale";
-import type { GeneratedHue, HueConfig, ScaleConfig } from "@/lib/palette/types";
+import type { GeneratedHue, ScaleConfig } from "@/lib/palette/types";
 
 const W = 560;
 const H = 240;
@@ -30,14 +30,28 @@ function gradeAxis(grades: number[], sorted: number[]) {
 
 export function HueCurveChart({ generated, scale, space }: ChartProps) {
   const hue = generated.hue;
+  const def = SPACES[space];
   const sorted = [...scale.grades].sort((a, b) => a - b);
-  const delta = hueDelta(hue.hueLight, hue.hueDark, hue.hueDirection);
-  const unwrapped = (t: number) => hue.hueLight + delta * easeT(t, hue.hueBias);
 
-  const samples = Array.from({ length: DENSE + 1 }, (_, i) => {
-    const t = i / DENSE;
-    return { t, h: SPACES[space].interpolation === "polar" ? unwrapped(t) : unwrapRect(space, hue, t, hue.hueLight) };
-  });
+  const samples = React.useMemo(() => {
+    const out: { t: number; h: number }[] = [];
+    let prev = curveAt(def, hue, 0, generated.anchor).hue;
+    for (let i = 0; i <= DENSE; i++) {
+      const t = i / DENSE;
+      const raw = curveAt(def, hue, t, generated.anchor).hue;
+      let d = normalize(raw) - normalize(prev);
+      while (d > 180) d -= 360;
+      while (d < -180) d += 360;
+      prev = prev + d;
+      out.push({ t, h: prev });
+    }
+    return out;
+  }, [def, hue, generated.anchor]);
+
+  const unwrappedAt = (t: number) => {
+    const i = Math.min(DENSE, Math.max(0, Math.round(t * DENSE)));
+    return samples[i].h;
+  };
   const values = samples.map((s) => s.h);
   const lo = Math.min(...values, hue.hueLight);
   const hi = Math.max(...values, hue.hueLight);
@@ -71,8 +85,17 @@ export function HueCurveChart({ generated, scale, space }: ChartProps) {
         .filter((s) => !s.anchor)
         .map((s) => {
           const t = positionFor(s.grade, sorted);
-          const h = SPACES[space].interpolation === "polar" ? unwrapped(t) : unwrapRect(space, hue, t, hue.hueLight);
-          return <circle key={s.grade} cx={xFor(t)} cy={yFor(h)} r={5} fill={s.hex} className="stroke-foreground" strokeWidth={1.25} />;
+          const h = unwrappedAt(t);
+          return s.isSource ? (
+            <g key={s.grade}>
+              <rect x={xFor(t) - 8} y={yFor(h) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(h)})`} fill={s.hex} className="stroke-foreground" strokeWidth={2.5} />
+              <text x={xFor(t)} y={yFor(h) + 24} textAnchor="middle" className="fill-foreground stroke-background text-[10px] font-semibold" strokeWidth={4} paintOrder="stroke">
+                Source · {s.grade}
+              </text>
+            </g>
+          ) : (
+            <circle key={s.grade} cx={xFor(t)} cy={yFor(h)} r={5} fill={s.hex} className="stroke-foreground" strokeWidth={1.25} />
+          );
         })}
       <EndpointMarker x={xFor(0)} y={yFor(start)} above={yFor(samples[4].h) >= yFor(start)} label={`Lightest end: ${Math.round(normalize(start))}°`} anchor="start" color={generated.shades.find((s) => !s.anchor)?.hex} />
       <EndpointMarker x={xFor(1)} y={yFor(end)} above={yFor(samples[DENSE - 4].h) >= yFor(end)} label={`Darkest end: ${Math.round(normalize(end))}°`} anchor="end" color={[...generated.shades].reverse().find((s) => !s.anchor)?.hex} />
@@ -105,15 +128,6 @@ function normalize(h: number) {
   return ((h % 360) + 360) % 360;
 }
 
-/** For rectangular spaces the hue follows the a/b line, so unwrap it relative to the start hue. */
-function unwrapRect(space: SpaceId, hue: HueConfig, t: number, anchorHue: number) {
-  const h = curveAt(SPACES[space], hue, t).hue;
-  let d = normalize(h) - normalize(anchorHue);
-  while (d > 180) d -= 360;
-  while (d < -180) d += 360;
-  return anchorHue + d;
-}
-
 function niceTicks(min: number, max: number, count: number): number[] {
   const raw = (max - min) / count;
   const mag = Math.pow(10, Math.floor(Math.log10(raw)));
@@ -132,13 +146,13 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
     const dense = Array.from({ length: DENSE + 1 }, (_, i) => {
       const t = i / DENSE;
       const grade = sorted[0] + (sorted[sorted.length - 1] - sorted[0]) * t;
-      const want = curveAt(def, hue, t);
+      const want = curveAt(def, hue, t, generated.anchor);
       const y = targetLuminance(scale, grade);
       return { t, requested: want.chroma, available: maxChromaAt(def, y, want.hue) };
     });
     return dense;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [def, hue, scale.grades, scale.luminanceMode, scale.customLuminance]);
+  }, [def, hue, generated.anchor, scale.grades, scale.luminanceMode, scale.customLuminance]);
 
   const peak = Math.max(...model.map((m) => Math.max(m.requested, m.available)), def.chroma.max * 0.25);
   const yMax = niceCeil(Math.min(peak * 1.1, def.chroma.max * 1.5));
@@ -179,8 +193,12 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
           const t = positionFor(s.grade, sorted);
           return (
             <g key={s.grade}>
-              <circle cx={xFor(t)} cy={yFor(s.requestedChroma)} r={5} fill={s.hex} className={s.clipped ? "stroke-red-600" : "stroke-foreground"} strokeWidth={s.clipped ? 2.25 : 1.25} />
-              {s.clipped ? <line x1={xFor(t)} x2={xFor(t)} y1={yFor(s.requestedChroma)} y2={yFor(s.chroma)} className="stroke-red-600" strokeWidth={1.5} strokeDasharray="2 2" /> : null}
+              {s.isSource ? (
+                <rect x={xFor(t) - 8} y={yFor(s.requestedChroma) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(s.requestedChroma)})`} fill={s.hex} className="stroke-foreground" strokeWidth={2.5} />
+              ) : (
+                <circle cx={xFor(t)} cy={yFor(s.requestedChroma)} r={5} fill={s.hex} className={s.clipped ? "stroke-red-500" : "stroke-foreground"} strokeWidth={s.clipped ? 2.25 : 1.25} />
+              )}
+              {s.clipped ? <line x1={xFor(t)} x2={xFor(t)} y1={yFor(s.requestedChroma)} y2={yFor(s.chroma)} className="stroke-red-500" strokeWidth={1.5} strokeDasharray="2 2" /> : null}
             </g>
           );
         })}

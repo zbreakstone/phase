@@ -49,10 +49,10 @@ export function ExportPanel({ state, generated }: Props) {
 
   if (!outputs) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed p-10 text-center">
+      <div className="flex flex-col items-center gap-2 border border-dashed border-border p-10 text-center">
         <PackageOpen className="size-8 text-muted-foreground" />
         <p className="font-medium">Nothing to export yet</p>
-        <p className="max-w-sm text-sm text-muted-foreground">Add at least one hue and its shades will appear here as CSS variables, design tokens and a Tailwind theme.</p>
+        <p className="max-w-sm text-sm text-muted-foreground">Add at least one hue and its steps, plus white and black, will appear here as CSS variables, design tokens and a Tailwind theme.</p>
       </div>
     );
   }
@@ -134,7 +134,7 @@ export function ExportPanel({ state, generated }: Props) {
         </TabsList>
         {(["css", "json", "tailwind"] as const).map((t) => (
           <TabsContent key={t} value={t}>
-            <div className="relative rounded-lg border bg-muted/40">
+            <div className="relative border border-border bg-muted/30">
               <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
                 <FileCode2 className="size-3.5" />
                 {outputs[t].file}

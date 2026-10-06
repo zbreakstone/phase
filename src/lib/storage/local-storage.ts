@@ -1,7 +1,7 @@
 import { sanitizeState } from "../palette/serialize";
 import type { PaletteStorage, SavedPalette } from "./types";
 
-const KEY = "phase:palettes:v1";
+const KEY = "phase:palettes:v2";
 
 function read(): SavedPalette[] {
   if (typeof window === "undefined") return [];

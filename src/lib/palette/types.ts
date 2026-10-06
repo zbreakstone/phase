@@ -1,6 +1,17 @@
 import type { SpaceId } from "../color/spaces";
+import type { SourceAnalysis } from "./source";
+import type { SourceAnchor } from "./curve";
 
 export type HueDirection = "shortest" | "increasing" | "decreasing";
+
+export interface SourceColor {
+  /** The colour the user entered, as #rrggbb. */
+  hex: string;
+  /** Grade to land on, or null to use the nearest step by luminance. */
+  grade: number | null;
+  /** Keep the exact entered colour in the scale instead of adjusting it to the step. */
+  pinned: boolean;
+}
 
 export interface HueConfig {
   id: string;
@@ -15,6 +26,7 @@ export interface HueConfig {
   chromaLight: number;
   chromaMid: number;
   chromaDark: number;
+  source?: SourceColor | null;
 }
 
 export interface ContrastRule {
@@ -32,12 +44,20 @@ export interface ScaleConfig {
   luminanceMode: LuminanceMode;
   /** Luminance override per grade, used when luminanceMode is "custom". */
   customLuminance: Record<string, number>;
-  includeAnchors: boolean;
   rules: ContrastRule[];
+}
+
+export type ReferenceMode = "white" | "black" | "custom";
+
+export interface ContrastReference {
+  mode: ReferenceMode;
+  /** Used when mode is "custom". */
+  hex: string;
 }
 
 export interface PaletteState {
   space: SpaceId;
+  reference: ContrastReference;
   scale: ScaleConfig;
   hues: HueConfig[];
   selectedHueId: string | null;
@@ -57,9 +77,17 @@ export interface Shade {
   chroma: number;
   hue: number;
   clipped: boolean;
+  /** The final colour read back in OKLCH, whichever space generated it. */
+  oklch: { L: number; C: number; h: number };
+  /** True for the shade a source colour landed on. */
+  isSource?: boolean;
+  /** True when the exact source colour was kept (pinned) instead of the solved one. */
+  pinned?: boolean;
 }
 
 export interface GeneratedHue {
   hue: HueConfig;
   shades: Shade[];
+  source: SourceAnalysis | null;
+  anchor: SourceAnchor | null;
 }

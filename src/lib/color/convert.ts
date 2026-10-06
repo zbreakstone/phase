@@ -188,3 +188,11 @@ export function rectToPolar(a: number, b: number): [number, number] {
 }
 
 export const normHue = (h: number) => ((h % 360) + 360) % 360;
+
+/** Accepts #rgb, rgb, #rrggbb or rrggbb and returns normalised #rrggbb, or null. */
+export function parseHex(text: string): string | null {
+  const t = text.trim().replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(t)) return "#" + t.split("").map((c) => c + c).join("");
+  if (/^[0-9a-f]{6}$/.test(t)) return "#" + t;
+  return null;
+}

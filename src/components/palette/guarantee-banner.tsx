@@ -1,10 +1,9 @@
 "use client";
 
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import type { PaletteReport } from "@/lib/palette/validate";
 import type { ContrastRule } from "@/lib/palette/types";
+import type { PaletteReport } from "@/lib/palette/validate";
+import { cn } from "@/lib/utils";
 
 interface Props {
   report: PaletteReport;
@@ -15,38 +14,37 @@ interface Props {
 export function GuaranteeBanner({ report, rules, hueCount }: Props) {
   const sorted = [...rules].sort((a, b) => a.minDiff - b.minDiff);
   const ok = report.failures.length === 0;
+  const first = report.failures[0];
   return (
-    <Alert
-      variant={ok ? "default" : "destructive"}
-      className={ok ? "border-emerald-600/30 bg-emerald-50 text-emerald-950" : undefined}
+    <div
+      role="status"
+      className={cn(
+        "flex flex-wrap items-center gap-x-4 gap-y-1.5 border px-3 py-2 text-sm",
+        ok ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100" : "border-red-500/50 bg-red-500/10 text-red-100",
+      )}
     >
-      {ok ? <ShieldCheck className="text-emerald-700" /> : <ShieldAlert />}
-      <AlertTitle className="text-sm">
+      {ok ? <ShieldCheck className="size-4 shrink-0 text-emerald-400" /> : <ShieldAlert className="size-4 shrink-0 text-red-400" />}
+      <p className="font-medium">
         {ok
-          ? "Magic-number guarantee holds across every hue"
-          : `${report.failures.length} shade pair${report.failures.length === 1 ? "" : "s"} break the magic-number rule`}
-      </AlertTitle>
-      <AlertDescription className={ok ? "text-emerald-900/80" : undefined}>
-        <p>
-          {ok
-            ? `Checked ${report.pairsChecked.toLocaleString()} shade pairs across ${hueCount} hue${hueCount === 1 ? "" : "s"}, including every cross-hue combination.`
-            : `Out of ${report.pairsChecked.toLocaleString()} pairs checked. First failure: ${report.failures[0].fgHue} ${report.failures[0].fgGrade} on ${report.failures[0].bgHue} ${report.failures[0].bgGrade} is ${report.failures[0].ratio.toFixed(2)}:1 but needs ${report.failures[0].required}:1.`}
-          {ok && report.tightestMargin !== null
-            ? ` Tightest pair clears its target by ${((report.tightestMargin - 1) * 100).toFixed(1)}%.`
-            : ""}
-        </p>
-        {sorted.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {sorted.map((r) => (
-              <Badge key={r.id} variant="outline" className="bg-background/70 font-mono text-[11px]">
-                {r.minDiff}+ apart = {r.ratio}:1
-              </Badge>
-            ))}
-          </div>
+          ? "Magic-number guarantee holds"
+          : `${report.failures.length} pair${report.failures.length === 1 ? "" : "s"} break the rule`}
+      </p>
+      <p className="text-xs opacity-80">
+        {ok
+          ? `${report.pairsChecked.toLocaleString()} pairs checked across ${hueCount} hue${hueCount === 1 ? "" : "s"}, including every cross-hue combination${report.tightestMargin !== null ? `. Tightest clears its target by ${((report.tightestMargin - 1) * 100).toFixed(1)}%.` : "."}`
+          : `${first.fgHue} ${first.fgGrade} on ${first.bgHue} ${first.bgGrade} is ${first.ratio.toFixed(2)}:1 but needs ${first.required}:1. Out of ${report.pairsChecked.toLocaleString()} checked.`}
+      </p>
+      <div className="ml-auto flex flex-wrap gap-1">
+        {sorted.length === 0 ? (
+          <span className="text-xs opacity-80">No rules set</span>
         ) : (
-          <p className="mt-1">No rules are defined, so nothing is being enforced. Add one under Scale and rules.</p>
+          sorted.map((r) => (
+            <span key={r.id} className="border border-current/30 px-1.5 py-0.5 font-mono text-[11px]">
+              {r.minDiff}+ → {r.ratio}:1
+            </span>
+          ))
         )}
-      </AlertDescription>
-    </Alert>
+      </div>
+    </div>
   );
 }

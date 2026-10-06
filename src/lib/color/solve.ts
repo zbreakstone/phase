@@ -83,3 +83,23 @@ export function maxChromaAt(space: SpaceDef, targetY: number, hue: number): numb
   const cap = space.chroma.max * 1.5;
   return solveForLuminance(space, targetY, hue, cap).chroma;
 }
+
+/** Builds a displayable colour from coordinates in a space, shrinking chroma (never lightness) if it falls outside sRGB. */
+export function colorFromCoords(
+  space: SpaceDef,
+  L: number,
+  C: number,
+  h: number,
+): { hex: string; clipped: boolean } {
+  const Lc = Math.min(space.lightnessMax, Math.max(0, L));
+  const full = space.toLinear(Lc, Math.max(0, C), h);
+  if (inGamut(full)) return { hex: linearToHex(full), clipped: false };
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (inGamut(space.toLinear(Lc, C * mid, h))) lo = mid;
+    else hi = mid;
+  }
+  return { hex: linearToHex(space.toLinear(Lc, C * lo, h)), clipped: true };
+}

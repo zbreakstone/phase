@@ -1,4 +1,5 @@
 import { SPACES, type SpaceId } from "../color/spaces";
+import { hueFamilyName, coordsOf } from "./source";
 import { convertHue } from "./generate";
 import { GRADE_PRESETS, RULE_PRESETS } from "./scale";
 import type { ContrastRule, HueConfig, PaletteState, ScaleConfig } from "./types";
@@ -19,7 +20,6 @@ export function defaultScale(): ScaleConfig {
     grades: [...GRADE_PRESETS[0].grades],
     luminanceMode: "uniform",
     customLuminance: {},
-    includeAnchors: true,
     rules: makeRules("uswds"),
   };
 }
@@ -73,10 +73,35 @@ export function defaultState(space: SpaceId = "oklch"): PaletteState {
   const scale = defaultScale();
   const keys = ["gray", "red", "yellow", "green", "blue", "violet"];
   const hues = keys.map((k) => hueFromPreset(HUE_PRESETS.find((p) => p.key === k)!, space, scale, undefined, `hue-${k}`));
-  return { space, scale, hues, selectedHueId: hues[2].id };
+  return { space, reference: { mode: "white", hex: "#ffffff" }, scale, hues, selectedHueId: hues[2].id };
 }
 
 export function clampChroma(space: SpaceId, value: number): number {
   const { max } = SPACES[space].chroma;
   return Math.min(max, Math.max(0, value));
+}
+
+/** A new hue whose scale is built around a colour the user supplied. */
+export function hueFromSource(hex: string, space: SpaceId, name?: string, id = uid("hue")): HueConfig {
+  const c = coordsOf(space, hex);
+  const ok = coordsOf("oklch", hex);
+  const chromaMax = SPACES[space].chroma.max;
+  const achromatic = c.C < chromaMax * 0.01;
+  const round = (v: number) => {
+    const { step, decimals } = SPACES[space].chroma;
+    return Number((Math.round(v / step) * step).toFixed(decimals + 1));
+  };
+  const hue = achromatic ? 260 : Math.round(c.h * 10) / 10;
+  return {
+    id,
+    name: name ?? hueFamilyName(ok.h, ok.C, SPACES.oklch.chroma.max),
+    hueLight: hue,
+    hueDark: hue,
+    hueBias: 0,
+    hueDirection: "shortest",
+    chromaLight: round(c.C * 0.35),
+    chromaMid: round(c.C),
+    chromaDark: round(c.C * 0.75),
+    source: { hex, grade: null, pinned: false },
+  };
 }

@@ -42,6 +42,7 @@ interface SliderFieldProps {
   className?: string;
   startLabel?: string;
   endLabel?: string;
+  disabled?: boolean;
 }
 
 /** A labelled slider paired with a number input, with an optional gradient guide above the track. */
@@ -60,6 +61,7 @@ export function SliderField({
   className,
   startLabel,
   endLabel,
+  disabled,
 }: SliderFieldProps) {
   const [draft, setDraft] = React.useState<string | null>(null);
   const shown = draft ?? value.toFixed(decimals);
@@ -85,6 +87,7 @@ export function SliderField({
             min={min}
             max={max}
             step={step}
+            disabled={disabled}
             value={shown}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={(e) => commit(e.target.value)}
@@ -99,7 +102,7 @@ export function SliderField({
       {trackStyle ? (
         <div
           aria-hidden
-          className="h-2.5 w-full rounded-full ring-1 ring-black/10"
+          className="h-2.5 w-full"
           style={trackStyle}
         />
       ) : null}
@@ -109,6 +112,7 @@ export function SliderField({
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
         onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
       />
       {startLabel || endLabel ? (

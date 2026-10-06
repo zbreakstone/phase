@@ -50,7 +50,14 @@ export function formatColor(hex: string, format: ColorFormat): string {
   }
   const [L, a, bb] = linearToOklab(hexToLinear(hex));
   const [C, h] = rectToPolar(a, bb);
-  return `oklch(${round(L, 4)} ${round(C, 4)} ${C < 0.002 ? 0 : round(h, 2)})`;
+  const chroma = C < 0.0005 ? 0 : C;
+  return `oklch(${trim(L, 3)} ${trim(chroma, 3)} ${chroma === 0 ? 0 : trim(h, 3)})`;
+}
+
+/** Fixed decimals with trailing zeros dropped and no negative zero. */
+function trim(n: number, decimals: number): string {
+  const v = Number(n.toFixed(decimals));
+  return String(Object.is(v, -0) ? 0 : v);
 }
 
 interface Named {
@@ -69,22 +76,14 @@ function named(generated: GeneratedHue[]): Named[] {
 }
 
 function ramp(shades: Shade[]): Shade[] {
-  return shades.filter((s) => !s.anchor);
-}
-
-function hasAnchors(generated: GeneratedHue[]): boolean {
-  return generated.some((g) => g.shades.some((s) => s.anchor));
+  return shades;
 }
 
 export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = ""): string {
   const p = prefix ? `${prefix}-` : "";
   const lines: string[] = [":root {"];
-  if (hasAnchors(generated)) {
-    lines.push(`  --${p}white: ${formatColor("#ffffff", format)};`);
-    lines.push(`  --${p}black: ${formatColor("#000000", format)};`);
-  }
   named(generated).forEach((n, i) => {
-    if (i > 0 || hasAnchors(generated)) lines.push("");
+    if (i > 0) lines.push("");
     for (const s of ramp(n.shades)) {
       lines.push(`  --${p}${n.slug}-${s.grade}: ${formatColor(s.hex, format)};`);
     }
@@ -95,10 +94,6 @@ export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "
 
 export function toTokensJson(state: PaletteState, generated: GeneratedHue[], format: ColorFormat): string {
   const color: Record<string, Record<string, unknown>> = {};
-  if (hasAnchors(generated)) {
-    color.white = tokenFor("#ffffff", format, 0, 1);
-    color.black = tokenFor("#000000", format, 100, 0);
-  }
   for (const n of named(generated)) {
     const group: Record<string, unknown> = {};
     for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s.hex, format, s.grade, s.luminance);

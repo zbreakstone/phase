@@ -146,3 +146,104 @@ describe("luminance solver", () => {
     expect(solveForLuminance(SPACES.oklch, 0, 100, 0.1).hex).toBe("#000000");
   });
 });
+
+import { colorFromCoords } from "@/lib/color/solve";
+import { coordsOf } from "@/lib/palette/source";
+import { parseHex } from "@/lib/color/convert";
+import { formatColor } from "@/lib/export/formats";
+
+describe("OKLCH reference values (Ottosson / CSS Color 4)", () => {
+  const refs: [string, number, number, number][] = [
+    ["#ff0000", 0.62796, 0.25768, 29.234],
+    ["#00ff00", 0.86644, 0.29483, 142.495],
+    ["#0000ff", 0.45201, 0.31321, 264.052],
+    ["#ffff00", 0.96798, 0.21101, 109.769],
+    ["#00ffff", 0.9054, 0.15455, 194.769],
+    ["#ff00ff", 0.70167, 0.32249, 328.363],
+  ];
+  it.each(refs)("%s -> oklch(%f %f %f)", (hex, L, C, h) => {
+    const c = coordsOf("oklch", hex);
+    expect(c.L).toBeCloseTo(L, 3);
+    expect(c.C).toBeCloseTo(C, 3);
+    expect(Math.abs(c.h - h)).toBeLessThan(0.05);
+  });
+  it("converts oklch(0.628 0.2577 29.23) back to #ff0000", () => {
+    expect(colorFromCoords(SPACES.oklch, 0.628, 0.2577, 29.23).hex).toBe("#ff0000");
+  });
+  it("white is oklch(1 0 0) and black is oklch(0 0 0)", () => {
+    const w = coordsOf("oklch", "#ffffff");
+    expect(w.L).toBeCloseTo(1, 5);
+    expect(w.C).toBeLessThan(1e-4);
+    const b = coordsOf("oklch", "#000000");
+    expect(b.L).toBeCloseTo(0, 6);
+    expect(b.C).toBeLessThan(1e-6);
+  });
+  it("neutral greys have zero chroma", () => {
+    for (const hex of ["#111111", "#777777", "#cccccc"]) expect(coordsOf("oklch", hex).C).toBeLessThan(2e-4);
+  });
+  it("OKLab mid grey has the expected lightness (#777777 = L 0.5693)", () => {
+    expect(coordsOf("oklch", "#777777").L).toBeCloseTo(0.5693, 3);
+  });
+  it("round-trips every 8-bit grey and a colour sweep through OKLCH", () => {
+    for (let v = 0; v < 256; v += 5) {
+      const hex = "#" + v.toString(16).padStart(2, "0").repeat(3);
+      const c = coordsOf("oklch", hex);
+      expect(colorFromCoords(SPACES.oklch, c.L, c.C, c.h).hex).toBe(hex);
+    }
+    for (let r = 0; r < 256; r += 51) {
+      for (let g = 0; g < 256; g += 51) {
+        for (let b = 0; b < 256; b += 51) {
+          const hex = "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+          const c = coordsOf("oklch", hex);
+          expect(colorFromCoords(SPACES.oklch, c.L, c.C, c.h).hex).toBe(hex);
+        }
+      }
+    }
+  });
+});
+
+describe("gamut mapping reduces chroma at constant L and H", () => {
+  const cases: [number, number, number][] = [
+    [0.7, 0.35, 150],
+    [0.5, 0.4, 265],
+    [0.9, 0.3, 110],
+    [0.35, 0.3, 30],
+    [0.6, 0.38, 330],
+  ];
+  it.each(cases)("oklch(%f %f %f)", (L, C, h) => {
+    const { hex, clipped } = colorFromCoords(SPACES.oklch, L, C, h);
+    expect(clipped).toBe(true);
+    const out = coordsOf("oklch", hex);
+    expect(Math.abs(out.L - L)).toBeLessThan(0.004);
+    const dh = Math.abs(((out.h - h + 540) % 360) - 180);
+    expect(dh).toBeLessThan(1.5);
+    expect(out.C).toBeLessThan(C);
+    expect(out.C).toBeGreaterThan(0.05);
+  });
+  it("differs from per-channel clipping, which shifts hue", () => {
+    const [L, C, h] = [0.5, 0.4, 265];
+    const raw = SPACES.oklch.toLinear(L, C, h).map((v) => Math.min(1, Math.max(0, v)));
+    const clippedHex = linearToHex(raw as [number, number, number]);
+    const mapped = colorFromCoords(SPACES.oklch, L, C, h).hex;
+    const dhClip = Math.abs(((coordsOf("oklch", clippedHex).h - h + 540) % 360) - 180);
+    const dhMap = Math.abs(((coordsOf("oklch", mapped).h - h + 540) % 360) - 180);
+    expect(dhMap).toBeLessThan(dhClip);
+  });
+});
+
+describe("oklch() formatting follows CSS conventions", () => {
+  it("uses 3 decimals, drops trailing zeros and never prints -0", () => {
+    expect(formatColor("#ff0000", "oklch")).toBe("oklch(0.628 0.258 29.234)");
+    expect(formatColor("#ffffff", "oklch")).toBe("oklch(1 0 0)");
+    expect(formatColor("#000000", "oklch")).toBe("oklch(0 0 0)");
+  });
+});
+
+describe("hex parsing", () => {
+  it("normalises shorthand and case", () => {
+    expect(parseHex("#ABC")).toBe("#aabbcc");
+    expect(parseHex("336699")).toBe("#336699");
+    expect(parseHex("#12345")).toBeNull();
+    expect(parseHex("nope")).toBeNull();
+  });
+});

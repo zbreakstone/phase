@@ -4,38 +4,41 @@ import { contrastFromLuminance } from "../color/contrast";
 export const MIN_GRADES = 3;
 export const MAX_GRADES = 16;
 
+/** Steps run from 0 (white) to SCALE_MAX (black), named like Tailwind: 50, 100, 200 ... 900. */
+export const SCALE_MAX = 1000;
+
 export const GRADE_PRESETS: { id: string; label: string; grades: number[] }[] = [
-  { id: "uswds", label: "USWDS (10 grades)", grades: [5, 10, 20, 30, 40, 50, 60, 70, 80, 90] },
-  { id: "tens", label: "Tens (9 grades)", grades: [10, 20, 30, 40, 50, 60, 70, 80, 90] },
-  { id: "fives", label: "Fine (every 5, 13 grades)", grades: [5, 10, 15, 20, 30, 40, 50, 60, 70, 80, 85, 90, 95] },
+  { id: "default", label: "50 to 900 (10 steps)", grades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { id: "hundreds", label: "100 to 900 (9 steps)", grades: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { id: "fine", label: "Fine (13 steps)", grades: [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950] },
 ];
 
 export const RULE_PRESETS: { id: string; label: string; rules: Omit<ContrastRule, "id">[] }[] = [
   {
     id: "uswds",
-    label: "USWDS: 40 / 50 / 70",
+    label: "400 / 500 / 700 (USWDS magic numbers)",
     rules: [
-      { minDiff: 40, ratio: 3 },
-      { minDiff: 50, ratio: 4.5 },
-      { minDiff: 70, ratio: 7 },
+      { minDiff: 400, ratio: 3 },
+      { minDiff: 500, ratio: 4.5 },
+      { minDiff: 700, ratio: 7 },
     ],
   },
   {
     id: "relaxed",
-    label: "Relaxed: 50 / 70 / 90",
+    label: "Relaxed: 500 / 700 / 900",
     rules: [
-      { minDiff: 50, ratio: 3 },
-      { minDiff: 70, ratio: 4.5 },
-      { minDiff: 90, ratio: 7 },
+      { minDiff: 500, ratio: 3 },
+      { minDiff: 700, ratio: 4.5 },
+      { minDiff: 900, ratio: 7 },
     ],
   },
   {
     id: "strict",
-    label: "Strict: 40 / 50 / 60 (AA large / AA / AAA-ish)",
+    label: "Strict: 400 / 500 / 600",
     rules: [
-      { minDiff: 40, ratio: 3 },
-      { minDiff: 50, ratio: 4.5 },
-      { minDiff: 60, ratio: 6 },
+      { minDiff: 400, ratio: 3 },
+      { minDiff: 500, ratio: 4.5 },
+      { minDiff: 600, ratio: 6 },
     ],
   },
 ];
@@ -45,23 +48,23 @@ export const BLACK_Y = 0;
 
 /**
  * Luminance for a grade when contrast is spread evenly from white (grade 0) to
- * black (grade 100): (Y + 0.05) falls geometrically, so two grades N apart
- * always have a ratio of 21^(N/100) no matter where they sit on the scale.
+ * black (grade 1000): (Y + 0.05) falls geometrically, so two grades N apart
+ * always have a ratio of 21^(N/1000) no matter where they sit on the scale.
  */
 export function uniformLuminance(grade: number): number {
   const hi = WHITE_Y + 0.05;
   const lo = BLACK_Y + 0.05;
-  return hi * Math.pow(lo / hi, grade / 100) - 0.05;
+  return hi * Math.pow(lo / hi, grade / SCALE_MAX) - 0.05;
 }
 
 /** Contrast guaranteed between any two grades `diff` apart on the uniform scale. */
 export function uniformRatioForDiff(diff: number): number {
-  return Math.pow(21, diff / 100);
+  return Math.pow(21, diff / SCALE_MAX);
 }
 
 export function targetLuminance(scale: ScaleConfig, grade: number): number {
   if (grade <= 0) return WHITE_Y;
-  if (grade >= 100) return BLACK_Y;
+  if (grade >= SCALE_MAX) return BLACK_Y;
   if (scale.luminanceMode === "custom") {
     const v = scale.customLuminance[String(grade)];
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -69,10 +72,10 @@ export function targetLuminance(scale: ScaleConfig, grade: number): number {
   return uniformLuminance(grade);
 }
 
-/** Every grade the system reasons about, anchors included when enabled. */
+/** Every grade the system reasons about. White (0) and black (1000) always anchor the ends. */
 export function systemGrades(scale: ScaleConfig): number[] {
   const g = [...scale.grades].sort((a, b) => a - b);
-  return scale.includeAnchors ? [0, ...g, 100] : g;
+  return [0, ...g, SCALE_MAX];
 }
 
 export function requiredRatio(diff: number, rules: ContrastRule[]): number | null {
@@ -155,17 +158,17 @@ export function parseGrades(text: string): GradeParseResult {
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (parts.length === 0) return { ok: false, error: "Enter at least three grades, e.g. 10, 30, 50, 70, 90." };
+  if (parts.length === 0) return { ok: false, error: "Enter at least three steps, e.g. 100, 300, 500, 700, 900." };
   const nums = parts.map(Number);
   if (nums.some((n) => !Number.isInteger(n))) {
-    return { ok: false, error: "Grades must be whole numbers separated by commas." };
+    return { ok: false, error: "Steps must be whole numbers separated by commas." };
   }
-  if (nums.some((n) => n <= 0 || n >= 100)) {
-    return { ok: false, error: "Grades must be between 1 and 99. Grade 0 is white and 100 is black." };
+  if (nums.some((n) => n <= 0 || n >= SCALE_MAX)) {
+    return { ok: false, error: "Steps must be between 1 and 999. 0 is white and 1000 is black." };
   }
   const unique = Array.from(new Set(nums)).sort((a, b) => a - b);
-  if (unique.length !== nums.length) return { ok: false, error: "Each grade can only appear once." };
-  if (unique.length < MIN_GRADES) return { ok: false, error: `Use at least ${MIN_GRADES} grades.` };
-  if (unique.length > MAX_GRADES) return { ok: false, error: `Use at most ${MAX_GRADES} grades.` };
+  if (unique.length !== nums.length) return { ok: false, error: "Each step can only appear once." };
+  if (unique.length < MIN_GRADES) return { ok: false, error: `Use at least ${MIN_GRADES} steps.` };
+  if (unique.length > MAX_GRADES) return { ok: false, error: `Use at most ${MAX_GRADES} steps.` };
   return { ok: true, grades: unique };
 }

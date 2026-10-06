@@ -1,86 +1,55 @@
-import { hexToLinear, normHue, polarToRect, rectToPolar } from "../color/convert";
+import { hexToLinear } from "../color/convert";
 import { relativeLuminance } from "../color/contrast";
 import { solveForLuminance } from "../color/solve";
-import { SPACES, type SpaceDef, type SpaceId } from "../color/spaces";
-import { targetLuminance } from "./scale";
-import type { GeneratedHue, HueConfig, HueDirection, ScaleConfig, Shade } from "./types";
+import { SPACES, type SpaceId } from "../color/spaces";
+import { curveAt, positionFor } from "./curve";
+import { SCALE_MAX, targetLuminance } from "./scale";
+import { analyzeSource, coordsOf, sourceAnchor } from "./source";
+import type { GeneratedHue, HueConfig, ScaleConfig, Shade } from "./types";
 
-export function hueDelta(from: number, to: number, direction: HueDirection): number {
-  const raw = normHue(to) - normHue(from);
-  if (direction === "increasing") return ((raw % 360) + 360) % 360;
-  if (direction === "decreasing") return -((((-raw) % 360) + 360) % 360);
-  let d = ((raw % 360) + 360) % 360;
-  if (d > 180) d -= 360;
-  return d;
-}
-
-export function easeT(t: number, bias: number): number {
-  return Math.pow(t, Math.pow(3, bias));
-}
-
-export function chromaCurve(h: HueConfig, t: number): number {
-  const { chromaLight: a, chromaMid: b, chromaDark: c } = h;
-  const v = 2 * (t - 0.5) * (t - 1) * a - 4 * t * (t - 1) * b + 2 * t * (t - 0.5) * c;
-  return Math.max(0, v);
-}
-
-export interface CurvePoint {
-  hue: number;
-  chroma: number;
-}
-
-/** Requested hue and chroma at position t (0 = lightest shade, 1 = darkest). */
-export function curveAt(space: SpaceDef, h: HueConfig, t: number): CurvePoint {
-  const e = easeT(t, h.hueBias);
-  const chroma = chromaCurve(h, t);
-  if (space.interpolation === "polar") {
-    const hue = normHue(h.hueLight + hueDelta(h.hueLight, h.hueDark, h.hueDirection) * e);
-    return { hue, chroma };
-  }
-  const [la, lb] = polarToRect(h.chromaLight, h.hueLight);
-  const [da, db] = polarToRect(h.chromaDark, h.hueDark);
-  const a = la + (da - la) * e;
-  const b = lb + (db - lb) * e;
-  const [mag, hue] = rectToPolar(a, b);
-  const linearChroma = h.chromaLight + (h.chromaDark - h.chromaLight) * t;
-  const scale = linearChroma > 1e-9 ? chroma / linearChroma : 1;
-  const fallbackHue = h.hueLight;
-  return { hue: mag < 1e-9 ? fallbackHue : hue, chroma: mag * scale };
-}
-
-export function positionFor(grade: number, grades: number[]): number {
-  const min = Math.min(...grades);
-  const max = Math.max(...grades);
-  return max === min ? 0 : (grade - min) / (max - min);
-}
+export { chromaCurve, curveAt, easeT, hueDelta, positionFor } from "./curve";
 
 export function generateHue(spaceId: SpaceId, scale: ScaleConfig, hue: HueConfig): GeneratedHue {
   const space = SPACES[spaceId];
   const sorted = [...scale.grades].sort((a, b) => a - b);
   const shades: Shade[] = [];
 
-  if (scale.includeAnchors) shades.push(anchorShade(0, "#ffffff", scale));
+  const source = analyzeSource(spaceId, scale, hue);
+  const anchor = sourceAnchor(spaceId, scale, hue, source);
+
+  shades.push(anchorShade(0, "#ffffff", scale));
 
   for (const grade of sorted) {
     const t = positionFor(grade, sorted);
-    const want = curveAt(space, hue, t);
+    const want = curveAt(space, hue, t, anchor);
     const targetY = targetLuminance(scale, grade);
     const solved = solveForLuminance(space, targetY, want.hue, want.chroma);
+    const isSource = source?.grade === grade;
+    const pinned = isSource && source?.pinned === true;
+    const hex = pinned ? source!.original.hex : solved.hex;
     shades.push({
       grade,
-      hex: solved.hex,
+      hex,
       targetLuminance: targetY,
-      luminance: relativeLuminance(solved.hex),
+      luminance: relativeLuminance(hex),
       anchor: false,
       requestedChroma: want.chroma,
-      chroma: solved.chroma,
+      chroma: pinned ? source!.original.C : solved.chroma,
       hue: want.hue,
-      clipped: solved.clipped,
+      clipped: pinned ? false : solved.clipped,
+      oklch: oklchOf(hex),
+      isSource,
+      pinned,
     });
   }
 
-  if (scale.includeAnchors) shades.push(anchorShade(100, "#000000", scale));
-  return { hue, shades };
+  shades.push(anchorShade(SCALE_MAX, "#000000", scale));
+  return { hue, shades, source, anchor };
+}
+
+function oklchOf(hex: string) {
+  const { L, C, h } = coordsOf("oklch", hex);
+  return { L, C, h: C < 1e-4 ? 0 : h };
 }
 
 function anchorShade(grade: number, hex: string, scale: ScaleConfig): Shade {
@@ -94,6 +63,7 @@ function anchorShade(grade: number, hex: string, scale: ScaleConfig): Shade {
     chroma: 0,
     hue: 0,
     clipped: false,
+    oklch: oklchOf(hex),
   };
 }
 
@@ -103,7 +73,7 @@ export function generatePalette(spaceId: SpaceId, scale: ScaleConfig, hues: HueC
 
 /** A copy of the hue with no shift: same chroma curve, but one hue throughout. */
 export function withFixedHue(h: HueConfig): HueConfig {
-  return { ...h, hueDark: h.hueLight, hueBias: 0 };
+  return { ...h, hueDark: h.hueLight, hueBias: 0, source: null };
 }
 
 /**
@@ -118,9 +88,11 @@ export function convertHue(
 ): HueConfig {
   if (from === to) return hue;
   const sorted = [...scale.grades].sort((a, b) => a - b);
+  const g = generateHue(from, scale, hue);
+  const anchor = g.anchor;
   const sample = (t: number) => {
     const grade = sorted.length ? sorted[0] + (sorted[sorted.length - 1] - sorted[0]) * t : 50;
-    const want = curveAt(SPACES[from], hue, t);
+    const want = curveAt(SPACES[from], hue, t, anchor);
     const solved = solveForLuminance(SPACES[from], targetLuminance(scale, grade), want.hue, want.chroma);
     const p = SPACES[to].fromLinear(hexToLinear(solved.hex));
     return { hue: p.h, chroma: p.C, achromatic: p.C < 1e-4 };
