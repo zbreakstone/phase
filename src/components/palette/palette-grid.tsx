@@ -23,7 +23,8 @@ export function displayHex(hex: string, overlay: Overlay): string {
   return overlay.grayscale ? luminanceGray(hex) : simulateVision(hex, overlay.vision);
 }
 
-const fmtLuminance = (y: number) => `${(y * 100).toFixed(y < 0.1 ? 2 : 1)}%`;
+/** Relative luminance on the 0–1 scale used by the USWDS and Envoy tables. */
+const fmtLuminance = (y: number) => y.toFixed(3);
 
 interface Props {
   generated: GeneratedHue[];
