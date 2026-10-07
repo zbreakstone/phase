@@ -1,3 +1,4 @@
+import { DEFAULT_GAMUT } from "../color/gamut";
 import { SPACES, type SpaceId } from "../color/spaces";
 import { hueFamilyName, coordsOf } from "./source";
 import { convertHue } from "./generate";
@@ -73,7 +74,7 @@ export function defaultState(space: SpaceId = "oklch"): PaletteState {
   const scale = defaultScale();
   const keys = ["gray", "red", "yellow", "green", "blue", "violet"];
   const hues = keys.map((k) => hueFromPreset(HUE_PRESETS.find((p) => p.key === k)!, space, scale, undefined, `hue-${k}`));
-  return { space, reference: { mode: "white", hex: "#ffffff" }, scale, hues, selectedHueId: hues[2].id };
+  return { space, gamut: DEFAULT_GAMUT, reference: { mode: "white", hex: "#ffffff" }, scale, hues, selectedHueId: hues[2].id };
 }
 
 export function clampChroma(space: SpaceId, value: number): number {

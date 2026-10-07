@@ -1,5 +1,6 @@
-import { hexToLinear } from "../color/convert";
-import { relativeLuminance, contrastFromLuminance } from "../color/contrast";
+import { type RGB, hexToLinear, luminanceOfLinear } from "../color/convert";
+import { contrastFromLuminance } from "../color/contrast";
+import type { Gamut } from "../color/gamut";
 import { solveForLuminance } from "../color/solve";
 import { SPACES, type SpaceId } from "../color/spaces";
 import { baseCurveAt, positionFor, shortestHueDelta, type SourceAnchor } from "./curve";
@@ -31,9 +32,13 @@ export interface SourceAnalysis {
   pinned: boolean;
 }
 
+export function coordsOfLinear(spaceId: SpaceId, hex: string, linear: RGB): SourceCoords {
+  const p = SPACES[spaceId].fromLinear(linear);
+  return { hex, luminance: luminanceOfLinear(linear), L: p.L, C: p.C, h: p.h };
+}
+
 export function coordsOf(spaceId: SpaceId, hex: string): SourceCoords {
-  const p = SPACES[spaceId].fromLinear(hexToLinear(hex));
-  return { hex, luminance: relativeLuminance(hex), L: p.L, C: p.C, h: p.h };
+  return coordsOfLinear(spaceId, hex, hexToLinear(hex));
 }
 
 /** Nearest step in contrast terms, so dark steps are not favoured over light ones. */
@@ -50,7 +55,7 @@ export function nearestGrade(luminance: number, scale: ScaleConfig): number {
   return best;
 }
 
-export function analyzeSource(spaceId: SpaceId, scale: ScaleConfig, hue: HueConfig): SourceAnalysis | null {
+export function analyzeSource(spaceId: SpaceId, scale: ScaleConfig, hue: HueConfig, gamut: Gamut = "srgb"): SourceAnalysis | null {
   const source = hue.source;
   if (!source || scale.grades.length === 0) return null;
   const space = SPACES[spaceId];
@@ -59,8 +64,8 @@ export function analyzeSource(spaceId: SpaceId, scale: ScaleConfig, hue: HueConf
   const grade = manual ? (source.grade as number) : nearestGrade(original.luminance, scale);
   const target = targetLuminance(scale, grade);
   const hueAngle = original.C < 1e-4 ? hue.hueLight : original.h;
-  const solved = solveForLuminance(space, target, hueAngle, original.C);
-  const adjustedCoords = coordsOf(spaceId, solved.hex);
+  const solved = solveForLuminance(space, target, hueAngle, original.C, gamut);
+  const adjustedCoords = coordsOfLinear(spaceId, solved.hex, solved.linear);
   const shift = contrastFromLuminance(original.luminance, adjustedCoords.luminance);
   return {
     original,

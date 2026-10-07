@@ -1,3 +1,5 @@
+import type { RGB } from "../color/convert";
+import type { Gamut } from "../color/gamut";
 import type { SpaceId } from "../color/spaces";
 import type { SourceAnalysis } from "./source";
 import type { SourceAnchor } from "./curve";
@@ -57,6 +59,8 @@ export interface ContrastReference {
 
 export interface PaletteState {
   space: SpaceId;
+  /** The colours the palette may use. Chroma is limited to fit inside it. */
+  gamut: Gamut;
   reference: ContrastReference;
   scale: ScaleConfig;
   hues: HueConfig[];
@@ -65,15 +69,18 @@ export interface PaletteState {
 
 export interface Shade {
   grade: number;
+  /** 8-bit sRGB hex. In a P3 palette this is the clipped sRGB fallback; use `linear` for the real colour. */
   hex: string;
+  /** The final colour in linear-light sRGB coordinates. Outside 0–1 for P3 colours sRGB can't show. */
+  linear: RGB;
   /** Luminance the grade was aiming for. */
   targetLuminance: number;
-  /** Luminance of the final 8-bit colour. */
+  /** Luminance of the final colour. */
   luminance: number;
   anchor: boolean;
   /** Chroma requested by the curve at this grade. */
   requestedChroma: number;
-  /** Chroma that actually fit in sRGB. */
+  /** Chroma that actually fit in the palette's gamut. */
   chroma: number;
   hue: number;
   clipped: boolean;

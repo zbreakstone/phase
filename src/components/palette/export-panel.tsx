@@ -13,6 +13,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   COLOR_FORMATS,
   type ColorFormat,
+  formatClipsGamut,
+  formatLabel,
   slug,
   toCss,
   toTailwindV3,
@@ -38,12 +40,12 @@ export function ExportPanel({ state, generated }: Props) {
   const outputs = React.useMemo(() => {
     if (generated.length === 0) return null;
     return {
-      css: { text: toCss(generated, format, cleanPrefix), file: "palette.css", mime: "text/css" },
+      css: { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
       json: { text: toTokensJson(state, generated, format), file: "tokens.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
-          ? { text: toTailwindV4(generated, format), file: "theme.css", mime: "text/css" }
-          : { text: toTailwindV3(generated, format), file: "tailwind.palette.js", mime: "text/javascript" },
+          ? { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
+          : { text: toTailwindV3(generated, format, state.gamut), file: "tailwind.palette.js", mime: "text/javascript" },
     };
   }, [generated, state, format, twVersion, cleanPrefix]);
 
@@ -80,40 +82,42 @@ export function ExportPanel({ state, generated }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="export-format" className="text-sm">
-            Colour format
-          </Label>
-          <Select items={COLOR_FORMATS.map((f) => ({ value: f.id, label: f.label }))} value={format} onValueChange={(v) => setFormat(v as ColorFormat)}>
-            <SelectTrigger id="export-format" className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {COLOR_FORMATS.map((f) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {f.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {tab === "css" ? (
-          <div className="space-y-1.5">
-            <Label htmlFor="css-prefix" className="text-sm">
-              Variable prefix
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="export-format" className="text-sm">
+              Colour format
             </Label>
-            <Input id="css-prefix" value={prefix} placeholder="optional, e.g. brand" onChange={(e) => setPrefix(e.target.value)} className="w-44" />
+            <Select items={COLOR_FORMATS.map((f) => ({ value: f.id, label: formatLabel(f.id, state.gamut) }))} value={format} onValueChange={(v) => setFormat(v as ColorFormat)}>
+              <SelectTrigger id="export-format" className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLOR_FORMATS.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {formatLabel(f.id, state.gamut)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        ) : null}
-        {tab === "tailwind" ? (
-          <div className="space-y-1.5">
-            <Label className="text-sm">Tailwind version</Label>
-            <ToggleGroup value={[twVersion]} onValueChange={(v) => v[0] && setTwVersion(v[0] as "v3" | "v4")} variant="outline" spacing={0} aria-label="Tailwind version">
-              <ToggleGroupItem value="v4">v4 @theme</ToggleGroupItem>
-              <ToggleGroupItem value="v3">v3 config</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-        ) : null}
+          {tab === "css" ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="css-prefix" className="text-sm">
+                Variable prefix
+              </Label>
+              <Input id="css-prefix" value={prefix} placeholder="optional, e.g. brand" onChange={(e) => setPrefix(e.target.value)} className="w-44" />
+            </div>
+          ) : null}
+          {tab === "tailwind" ? (
+            <div className="grid gap-1.5">
+              <Label className="text-sm">Tailwind version</Label>
+              <ToggleGroup value={[twVersion]} onValueChange={(v) => v[0] && setTwVersion(v[0] as "v3" | "v4")} variant="outline" spacing={0} aria-label="Tailwind version">
+                <ToggleGroupItem value="v4">v4 @theme</ToggleGroupItem>
+                <ToggleGroupItem value="v3">v3 config</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          ) : null}
+        </div>
         <div className="ml-auto flex gap-2">
           <Button variant="outline" onClick={download}>
             <Download />
@@ -125,6 +129,12 @@ export function ExportPanel({ state, generated }: Props) {
           </Button>
         </div>
       </div>
+
+      {formatClipsGamut(format, state.gamut) ? (
+        <p className="text-xs text-muted-foreground">
+          Hex and HSL can only describe sRGB, so the extra Display P3 colours are clipped. Choose OKLCH or Display P3 to keep them.
+        </p>
+      ) : null}
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
