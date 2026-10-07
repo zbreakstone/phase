@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
 import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
+import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { luminanceGray, simulateVision, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
@@ -23,6 +24,12 @@ export function displayHex(hex: string, overlay: Overlay): string {
   return overlay.grayscale ? luminanceGray(hex) : simulateVision(hex, overlay.vision);
 }
 
+/** What to paint a swatch with. Vision and greyscale views work on hex, so they use the sRGB fallback. */
+export function displayShade(shade: Shade, overlay: Overlay, gamut: Gamut): string {
+  if (overlay.grayscale || overlay.vision !== "normal") return displayHex(shade.hex, overlay);
+  return cssColor(shade.hex, shade.linear, gamut);
+}
+
 /** Relative luminance on the 0–1 scale used by the USWDS and Envoy tables. */
 const fmtLuminance = (y: number) => y.toFixed(3);
 
@@ -30,6 +37,7 @@ interface Props {
   generated: GeneratedHue[];
   rules: ContrastRule[];
   overlay: Overlay;
+  gamut: Gamut;
   selectedHueId: string | null;
   selectedGrade: number | null;
   onSelect: (hueId: string, grade: number | null) => void;
@@ -51,7 +59,7 @@ interface DragHandle {
 /** Movement (px) before a press on a row name becomes a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
 
-export function PaletteGrid({ generated, rules, overlay, selectedHueId, selectedGrade, onSelect, onReorder }: Props) {
+export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, selectedGrade, onSelect, onReorder }: Props) {
   const steps = generated[0]?.shades ?? [];
   const selectedHue = generated.find((g) => g.hue.id === selectedHueId);
   const anchorShade = selectedHue?.shades.find((s) => s.grade === selectedGrade) ?? null;
@@ -163,6 +171,7 @@ export function PaletteGrid({ generated, rules, overlay, selectedHueId, selected
               g={g}
               rules={rules}
               overlay={overlay}
+              gamut={gamut}
               rowSelected={rowSelected}
               selectedGrade={rowSelected ? selectedGrade : null}
               reference={anchorShade}
@@ -211,6 +220,7 @@ function Row({
   g,
   rules,
   overlay,
+  gamut,
   rowSelected,
   selectedGrade,
   reference,
@@ -224,6 +234,7 @@ function Row({
   g: GeneratedHue;
   rules: ContrastRule[];
   overlay: Overlay;
+  gamut: Gamut;
   rowSelected: boolean;
   selectedGrade: number | null;
   reference: Shade | null;
@@ -291,6 +302,7 @@ function Row({
           shade={s}
           rules={rules}
           overlay={overlay}
+          gamut={gamut}
           selected={rowSelected && selectedGrade === s.grade}
           reference={reference}
           onSelect={() => onSelect(g.hue.id, s.grade)}
@@ -307,6 +319,7 @@ function Cell({
   shade,
   rules,
   overlay,
+  gamut,
   selected,
   reference,
   onSelect,
@@ -320,14 +333,16 @@ function Cell({
   shade: Shade;
   rules: ContrastRule[];
   overlay: Overlay;
+  gamut: Gamut;
   selected: boolean;
   reference: Shade | null;
   onSelect: () => void;
   dimmed: boolean;
   indicator: React.ReactNode;
 }) {
-  const shown = displayHex(shade.hex, overlay);
-  const fg = readableOn(shown);
+  const shown = displayShade(shade, overlay, gamut);
+  const fg = readableOn(displayHex(shade.hex, overlay));
+  const colour = cssColor(shade.hex, shade.linear, gamut);
   let label = "";
   let status: "pass" | "fail" | "none" | "self" | null = null;
 
@@ -350,8 +365,8 @@ function Cell({
     <button
       type="button"
       onClick={onSelect}
-      aria-label={`${g.hue.name} ${shade.grade}, ${shade.hex}${label ? `, ${label}` : ""}`}
-      title={`${g.hue.name} ${shade.grade} · ${shade.hex}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`}
+      aria-label={`${g.hue.name} ${shade.grade}, ${colour}${label ? `, ${label}` : ""}`}
+      title={`${g.hue.name} ${shade.grade} · ${colour}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`}
       className={cn(
         "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
         (status === "none" || dimmed) && "opacity-40",

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { GAMUTS, type Gamut, cssColor } from "@/lib/color/gamut";
 import { maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import { curveAt, positionFor } from "@/lib/palette/curve";
@@ -18,6 +19,7 @@ interface ChartProps {
   generated: GeneratedHue;
   scale: ScaleConfig;
   space: SpaceId;
+  gamut: Gamut;
 }
 
 function xFor(t: number) {
@@ -28,7 +30,7 @@ function gradeAxis(grades: number[], sorted: number[]) {
   return grades.map((g) => ({ g, x: xFor(positionFor(g, sorted)) }));
 }
 
-export function HueCurveChart({ generated, scale, space }: ChartProps) {
+export function HueCurveChart({ generated, scale, space, gamut }: ChartProps) {
   const hue = generated.hue;
   const def = SPACES[space];
   const sorted = [...scale.grades].sort((a, b) => a - b);
@@ -88,17 +90,17 @@ export function HueCurveChart({ generated, scale, space }: ChartProps) {
           const h = unwrappedAt(t);
           return s.isSource ? (
             <g key={s.grade}>
-              <rect x={xFor(t) - 8} y={yFor(h) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(h)})`} fill={s.hex} className="stroke-foreground" strokeWidth={2.5} />
+              <rect x={xFor(t) - 8} y={yFor(h) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(h)})`} fill={cssColor(s.hex, s.linear, gamut)} className="stroke-foreground" strokeWidth={2.5} />
               <text x={xFor(t)} y={yFor(h) + 24} textAnchor="middle" className="fill-foreground stroke-background text-[10px] font-semibold" strokeWidth={4} paintOrder="stroke">
                 Source · {s.grade}
               </text>
             </g>
           ) : (
-            <circle key={s.grade} cx={xFor(t)} cy={yFor(h)} r={5} fill={s.hex} className="stroke-foreground" strokeWidth={1.25} />
+            <circle key={s.grade} cx={xFor(t)} cy={yFor(h)} r={5} fill={cssColor(s.hex, s.linear, gamut)} className="stroke-foreground" strokeWidth={1.25} />
           );
         })}
-      <EndpointMarker x={xFor(0)} y={yFor(start)} above={yFor(samples[4].h) >= yFor(start)} label={`Lightest end: ${Math.round(normalize(start))}°`} anchor="start" color={generated.shades.find((s) => !s.anchor)?.hex} />
-      <EndpointMarker x={xFor(1)} y={yFor(end)} above={yFor(samples[DENSE - 4].h) >= yFor(end)} label={`Darkest end: ${Math.round(normalize(end))}°`} anchor="end" color={[...generated.shades].reverse().find((s) => !s.anchor)?.hex} />
+      <EndpointMarker x={xFor(0)} y={yFor(start)} above={yFor(samples[4].h) >= yFor(start)} label={`Lightest end: ${Math.round(normalize(start))}°`} anchor="start" color={endpointColor(generated.shades.find((s) => !s.anchor), gamut)} />
+      <EndpointMarker x={xFor(1)} y={yFor(end)} above={yFor(samples[DENSE - 4].h) >= yFor(end)} label={`Darkest end: ${Math.round(normalize(end))}°`} anchor="end" color={endpointColor([...generated.shades].reverse().find((s) => !s.anchor), gamut)} />
       {gradeAxis(sorted, sorted).map(({ g, x }) => (
         <text key={g} x={x} y={H - 20} textAnchor="middle" className="fill-muted-foreground font-mono text-[10px]">
           {g}
@@ -109,6 +111,10 @@ export function HueCurveChart({ generated, scale, space }: ChartProps) {
       </text>
     </svg>
   );
+}
+
+function endpointColor(shade: GeneratedHue["shades"][number] | undefined, gamut: Gamut) {
+  return shade ? cssColor(shade.hex, shade.linear, gamut) : undefined;
 }
 
 function EndpointMarker({ x, y, label, anchor, color, above }: { x: number; y: number; label: string; anchor: "start" | "end"; color?: string; above: boolean }) {
@@ -137,7 +143,7 @@ function niceTicks(min: number, max: number, count: number): number[] {
   return out;
 }
 
-export function ChromaChart({ generated, scale, space }: ChartProps) {
+export function ChromaChart({ generated, scale, space, gamut }: ChartProps) {
   const def = SPACES[space];
   const hue = generated.hue;
   const sorted = [...scale.grades].sort((a, b) => a - b);
@@ -148,11 +154,11 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
       const grade = sorted[0] + (sorted[sorted.length - 1] - sorted[0]) * t;
       const want = curveAt(def, hue, t, generated.anchor);
       const y = targetLuminance(scale, grade);
-      return { t, requested: want.chroma, available: maxChromaAt(def, y, want.hue) };
+      return { t, requested: want.chroma, available: maxChromaAt(def, y, want.hue, gamut) };
     });
     return dense;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [def, hue, generated.anchor, scale.grades, scale.luminanceMode, scale.customLuminance]);
+  }, [def, gamut, hue, generated.anchor, scale.grades, scale.luminanceMode, scale.customLuminance]);
 
   const peak = Math.max(...model.map((m) => Math.max(m.requested, m.available)), def.chroma.max * 0.25);
   const yMax = niceCeil(Math.min(peak * 1.1, def.chroma.max * 1.5));
@@ -166,7 +172,7 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
   const patternId = React.useId().replace(/:/g, "");
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Chroma against grade for ${hue.name}, with the area outside the sRGB gamut shaded`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={`Chroma against grade for ${hue.name}, with the area outside the ${GAMUTS[gamut].label} gamut shaded`}>
       <defs>
         <pattern id={patternId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="6" height="6" className="fill-muted" />
@@ -184,7 +190,7 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
       <path d={area} fill={`url(#${patternId})`} />
       <path d={line("available")} fill="none" className="stroke-muted-foreground" strokeWidth={1.5} />
       <text x={W - PAD.r - 4} y={PAD.t + 12} textAnchor="end" className="fill-muted-foreground text-[10px]">
-        outside sRGB: not displayable
+        outside {GAMUTS[gamut].label}: not displayable
       </text>
       <path d={line("requested")} fill="none" className="stroke-foreground" strokeWidth={2.5} strokeLinecap="round" />
       {generated.shades
@@ -194,9 +200,9 @@ export function ChromaChart({ generated, scale, space }: ChartProps) {
           return (
             <g key={s.grade}>
               {s.isSource ? (
-                <rect x={xFor(t) - 8} y={yFor(s.requestedChroma) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(s.requestedChroma)})`} fill={s.hex} className="stroke-foreground" strokeWidth={2.5} />
+                <rect x={xFor(t) - 8} y={yFor(s.requestedChroma) - 8} width={16} height={16} transform={`rotate(45 ${xFor(t)} ${yFor(s.requestedChroma)})`} fill={cssColor(s.hex, s.linear, gamut)} className="stroke-foreground" strokeWidth={2.5} />
               ) : (
-                <circle cx={xFor(t)} cy={yFor(s.requestedChroma)} r={5} fill={s.hex} className={s.clipped ? "stroke-red-500" : "stroke-foreground"} strokeWidth={s.clipped ? 2.25 : 1.25} />
+                <circle cx={xFor(t)} cy={yFor(s.requestedChroma)} r={5} fill={cssColor(s.hex, s.linear, gamut)} className={s.clipped ? "stroke-red-500" : "stroke-foreground"} strokeWidth={s.clipped ? 2.25 : 1.25} />
               )}
               {s.clipped ? <line x1={xFor(t)} x2={xFor(t)} y1={yFor(s.requestedChroma)} y2={yFor(s.chroma)} className="stroke-red-500" strokeWidth={1.5} strokeDasharray="2 2" /> : null}
             </g>

@@ -1,4 +1,5 @@
-import { hexToBytes, hexToLinear, linearToOklab, rectToPolar } from "../color/convert";
+import { type RGB, hexToBytes, hexToLinear, linearToOklab, rectToPolar } from "../color/convert";
+import { GAMUTS, type Gamut, p3Css } from "../color/gamut";
 import { SPACES } from "../color/spaces";
 import type { GeneratedHue, PaletteState, Shade } from "../palette/types";
 
@@ -10,6 +11,17 @@ export const COLOR_FORMATS: { id: ColorFormat; label: string }[] = [
   { id: "hsl", label: "HSL" },
   { id: "oklch", label: "OKLCH" },
 ];
+
+/** Label for a format in the picker. In a P3 palette "RGB" is written as color(display-p3 …). */
+export function formatLabel(format: ColorFormat, gamut: Gamut = "srgb"): string {
+  if (format === "rgb" && gamut === "p3") return "Display P3";
+  return COLOR_FORMATS.find((f) => f.id === format)!.label;
+}
+
+/** Hex and HSL can only describe sRGB, so a P3 palette loses its extra colours in them. */
+export function formatClipsGamut(format: ColorFormat, gamut: Gamut): boolean {
+  return gamut === "p3" && (format === "hex" || format === "hsl");
+}
 
 export function slug(name: string): string {
   const s = name
@@ -48,10 +60,26 @@ export function formatColor(hex: string, format: ColorFormat): string {
     }
     return `hsl(${round(h, 1)} ${round(s * 100, 1)}% ${round(l * 100, 1)}%)`;
   }
-  const [L, a, bb] = linearToOklab(hexToLinear(hex));
+  return oklchString(hexToLinear(hex));
+}
+
+function oklchString(linear: RGB): string {
+  const [L, a, bb] = linearToOklab(linear);
   const [C, h] = rectToPolar(a, bb);
   const chroma = C < 0.0005 ? 0 : C;
   return `oklch(${trim(L, 3)} ${trim(chroma, 3)} ${chroma === 0 ? 0 : trim(h, 3)})`;
+}
+
+/**
+ * A shade in the requested format. In a P3 palette OKLCH and Display P3 keep the full colour;
+ * hex and HSL fall back to the clipped sRGB value.
+ */
+export function formatShade(shade: Pick<Shade, "hex" | "linear">, format: ColorFormat, gamut: Gamut = "srgb"): string {
+  if (gamut === "p3") {
+    if (format === "oklch") return oklchString(shade.linear);
+    if (format === "rgb") return p3Css(shade.linear);
+  }
+  return formatColor(shade.hex, format);
 }
 
 /** Fixed decimals with trailing zeros dropped and no negative zero. */
@@ -79,13 +107,13 @@ function ramp(shades: Shade[]): Shade[] {
   return shades;
 }
 
-export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = ""): string {
+export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "", gamut: Gamut = "srgb"): string {
   const p = prefix ? `${prefix}-` : "";
   const lines: string[] = [":root {"];
   named(generated).forEach((n, i) => {
     if (i > 0) lines.push("");
     for (const s of ramp(n.shades)) {
-      lines.push(`  --${p}${n.slug}-${s.grade}: ${formatColor(s.hex, format)};`);
+      lines.push(`  --${p}${n.slug}-${s.grade}: ${formatShade(s, format, gamut)};`);
     }
   });
   lines.push("}");
@@ -96,7 +124,7 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
   const color: Record<string, Record<string, unknown>> = {};
   for (const n of named(generated)) {
     const group: Record<string, unknown> = {};
-    for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s.hex, format, s.grade, s.luminance);
+    for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s, format, state.gamut);
     color[n.slug] = group;
   }
   const doc = {
@@ -104,6 +132,7 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
     $extensions: {
       phase: {
         colorSpace: SPACES[state.space].label,
+        gamut: GAMUTS[state.gamut].label,
         magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
       },
     },
@@ -112,15 +141,15 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
   return JSON.stringify(doc, null, 2);
 }
 
-function tokenFor(hex: string, format: ColorFormat, grade: number, luminance: number) {
+function tokenFor(shade: Shade, format: ColorFormat, gamut: Gamut) {
   return {
     $type: "color",
-    $value: formatColor(hex, format),
-    $extensions: { phase: { grade, luminance: round(luminance, 4) } },
+    $value: formatShade(shade, format, gamut),
+    $extensions: { phase: { grade: shade.grade, luminance: round(shade.luminance, 4) } },
   };
 }
 
-export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat): string {
+export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat, gamut: Gamut = "srgb"): string {
   const lines = [
     "/** @type {import('tailwindcss').Config} */",
     "module.exports = {",
@@ -131,7 +160,7 @@ export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat): st
   for (const n of named(generated)) {
     lines.push(`        ${JSON.stringify(n.slug)}: {`);
     for (const s of ramp(n.shades)) {
-      lines.push(`          ${s.grade}: ${JSON.stringify(formatColor(s.hex, format))},`);
+      lines.push(`          ${s.grade}: ${JSON.stringify(formatShade(s, format, gamut))},`);
     }
     lines.push("        },");
   }
@@ -139,12 +168,12 @@ export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat): st
   return lines.join("\n");
 }
 
-export function toTailwindV4(generated: GeneratedHue[], format: ColorFormat): string {
+export function toTailwindV4(generated: GeneratedHue[], format: ColorFormat, gamut: Gamut = "srgb"): string {
   const lines = ["@import \"tailwindcss\";", "", "@theme {"];
   named(generated).forEach((n, i) => {
     if (i > 0) lines.push("");
     for (const s of ramp(n.shades)) {
-      lines.push(`  --color-${n.slug}-${s.grade}: ${formatColor(s.hex, format)};`);
+      lines.push(`  --color-${n.slug}-${s.grade}: ${formatShade(s, format, gamut)};`);
     }
   });
   lines.push("}");

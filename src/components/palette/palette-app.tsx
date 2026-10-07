@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { parseHex } from "@/lib/color/convert";
+import { DEFAULT_GAMUT, GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import { HUE_PRESETS, defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
@@ -22,7 +23,7 @@ import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { HelpTip } from "./fields";
 import { HuePanel } from "./hue-panel";
-import { PaletteGrid, displayHex, type Against, type Metric, type Overlay } from "./palette-grid";
+import { PaletteGrid, displayShade, type Against, type Metric, type Overlay } from "./palette-grid";
 import { ScaleDialog } from "./scale-dialog";
 
 const AUTOSAVE_ID = "__autosave__";
@@ -44,7 +45,8 @@ export function PaletteApp() {
         if (shared) toast.error(shared.error);
         try {
           const saved = await storage.get(AUTOSAVE_ID);
-          if (saved && !cancelled) setState(saved.state);
+          // Autosaves from before the gamut control have no gamut and were always sRGB.
+          if (saved && !cancelled) setState({ ...saved.state, gamut: saved.state.gamut ?? DEFAULT_GAMUT });
         } catch {
           // Storage can be unavailable (private mode); start from the default palette.
         }
@@ -93,12 +95,13 @@ export function PaletteApp() {
     }
   };
 
-  const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues), [state.space, state.scale, state.hues]);
+  const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues, state.gamut), [state.space, state.scale, state.hues, state.gamut]);
   const report = React.useMemo(() => validatePalette(generated, state.scale.rules), [generated, state.scale.rules]);
   const selected = generated.find((g) => g.hue.id === state.selectedHueId) ?? generated[0] ?? null;
 
   const setSpace = (space: SpaceId) =>
-    setState((s) => (space === s.space ? s : { ...s, space, hues: s.hues.map((h) => convertHue(h, s.scale, s.space, space)) }));
+    setState((s) => (space === s.space ? s : { ...s, space, hues: s.hues.map((h) => convertHue(h, s.scale, s.space, space, s.gamut)) }));
+  const setGamut = (gamut: Gamut) => setState((s) => (gamut === s.gamut ? s : { ...s, gamut }));
   const setScale = (scale: ScaleConfig) => setState((s) => ({ ...s, scale }));
   const updateHue = (id: string, patch: Partial<HueConfig>) =>
     setState((s) => ({ ...s, hues: s.hues.map((h) => (h.id === id ? { ...h, ...patch } : h)) }));
@@ -178,6 +181,25 @@ export function PaletteApp() {
             </Select>
             <HelpTip>{SPACES[state.space].description}</HelpTip>
           </div>
+          <div className="flex items-center gap-1.5">
+            <Select
+              items={GAMUT_ORDER.map((id) => ({ value: id, label: GAMUTS[id].label }))}
+              value={state.gamut}
+              onValueChange={(v) => setGamut(v as Gamut)}
+            >
+              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Colour gamut">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GAMUT_ORDER.map((id) => (
+                  <SelectItem key={id} value={id}>
+                    {GAMUTS[id].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <HelpTip>{GAMUTS[state.gamut].description}</HelpTip>
+          </div>
           <div className="ml-auto flex items-center gap-2">
             <ScaleDialog scale={state.scale} onChange={setScale} />
             <Button variant="ghost" size="sm" className="rounded-none" onClick={reset} aria-label="Reset to starter palette">
@@ -214,6 +236,7 @@ export function PaletteApp() {
                     generated={generated}
                     rules={state.scale.rules}
                     overlay={overlay}
+                    gamut={state.gamut}
                     selectedHueId={selected?.hue.id ?? null}
                     selectedGrade={grade}
                     onSelect={(id, g) => {
@@ -245,12 +268,13 @@ export function PaletteApp() {
               key={selected.hue.id}
               generated={selected}
               space={state.space}
+              gamut={state.gamut}
               scale={state.scale}
               selectedGrade={grade}
               onSelectGrade={setGrade}
               onChange={(patch) => updateHue(selected.hue.id, patch)}
               onRemove={() => remove(selected.hue.id)}
-              display={(hex) => displayHex(hex, overlay)}
+              display={(shade) => displayShade(shade, overlay, state.gamut)}
             />
           ) : ready ? (
             <p className="text-sm text-muted-foreground">Add a colour to edit its hue and chroma here.</p>

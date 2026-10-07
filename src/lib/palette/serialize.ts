@@ -87,6 +87,8 @@ export function sanitizeState(raw: unknown): PaletteState | null {
 
   return {
     space: r.space as SpaceId,
+    // Links made before the gamut control existed have no gamut and were always sRGB.
+    gamut: r.gamut === "p3" ? "p3" : "srgb",
     reference: sanitizeReference(r.reference),
     scale: {
       grades,
