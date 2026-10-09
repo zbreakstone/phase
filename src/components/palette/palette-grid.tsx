@@ -4,7 +4,7 @@ import * as React from "react";
 import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
 import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
-import { luminanceGray, simulateVision, type VisionId } from "@/lib/color/vision";
+import { luminanceGrayLinear, simulateVisionLinear, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
@@ -20,13 +20,14 @@ export interface Overlay {
   vision: VisionId;
 }
 
-export function displayHex(hex: string, overlay: Overlay): string {
-  return overlay.grayscale ? luminanceGray(hex) : simulateVision(hex, overlay.vision);
+/** Greyscale and vision views, worked from the shade's true linear colour (not its clipped hex) so P3 luminance stays exact. */
+export function displayHex(shade: Shade, overlay: Overlay): string {
+  return overlay.grayscale ? luminanceGrayLinear(shade.linear) : simulateVisionLinear(shade.linear, overlay.vision);
 }
 
-/** What to paint a swatch with. Vision and greyscale views work on hex, so they use the sRGB fallback. */
+/** What to paint a swatch with. */
 export function displayShade(shade: Shade, overlay: Overlay, gamut: Gamut): string {
-  if (overlay.grayscale || overlay.vision !== "normal") return displayHex(shade.hex, overlay);
+  if (overlay.grayscale || overlay.vision !== "normal") return displayHex(shade, overlay);
   return cssColor(shade.hex, shade.linear, gamut);
 }
 
@@ -341,7 +342,7 @@ function Cell({
   indicator: React.ReactNode;
 }) {
   const shown = displayShade(shade, overlay, gamut);
-  const fg = readableOn(displayHex(shade.hex, overlay));
+  const fg = readableOn(displayHex(shade, overlay));
   const colour = cssColor(shade.hex, shade.linear, gamut);
   let label = "";
   let status: "pass" | "fail" | "none" | "self" | null = null;
