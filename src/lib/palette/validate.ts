@@ -33,6 +33,10 @@ export function buildMatrix(
 }
 
 export interface Failure {
+  fgHueId: string;
+  bgHueId: string;
+  fg: Shade;
+  bg: Shade;
   fgHue: string;
   bgHue: string;
   fgGrade: number;
@@ -66,6 +70,10 @@ export function validatePalette(generated: GeneratedHue[], rules: ContrastRule[]
           if (tightest === null || margin < tightest) tightest = margin;
           if (ratio + 1e-9 < required) {
             failures.push({
+              fgHueId: a.hue.id,
+              bgHueId: b.hue.id,
+              fg,
+              bg,
               fgHue: a.hue.name,
               bgHue: b.hue.name,
               fgGrade: fg.grade,

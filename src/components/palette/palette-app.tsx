@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Eye, Layers, Link2, Plus, RotateCcw, SunMedium, TriangleAlert } from "lucide-react";
+import { Eye, Layers, Link2, Plus, RotateCcw, SunMedium } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { parseHex } from "@/lib/color/convert";
+import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
@@ -153,7 +154,7 @@ export function PaletteApp() {
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
           <div className="flex items-center gap-2 font-semibold tracking-tight">
@@ -215,8 +216,8 @@ export function PaletteApp() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="min-w-0 space-y-3">
+      <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+        <section className="min-w-0 space-y-3 lg:overflow-y-auto">
           {!ready ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading your palette">
               <Skeleton className="h-9 w-full rounded-none" />
@@ -248,21 +249,22 @@ export function PaletteApp() {
                   {overlay.metric === "contrast" && overlay.against === "selected" && grade === null ? (
                     <p className="text-xs text-muted-foreground">Click a swatch to compare every other swatch against it.</p>
                   ) : null}
-                  <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs ${report.failures.length ? "text-red-300" : "text-muted-foreground"}`}>
-                    {report.failures.length === 0 ? <Check className="size-3.5 text-emerald-400" /> : <TriangleAlert className="size-3.5" />}
-                    {rules.length === 0
-                      ? "No contrast rules are set."
-                      : report.failures.length === 0
-                        ? `Any two steps ${rules.map((r) => `${r.minDiff}+ apart reach ${r.ratio}:1`).join(", ")}, for every hue.`
-                        : `${report.failures.length} pair${report.failures.length === 1 ? "" : "s"} miss a rule (${rules.map((r) => `${r.minDiff}+ → ${r.ratio}:1`).join(", ")}). Compare against a selected swatch to see which.`}
-                  </p>
+                  <ContrastReport
+                    report={report}
+                    rules={rules}
+                    gamut={state.gamut}
+                    onSelect={(id, g) => {
+                      setState((s) => ({ ...s, selectedHueId: id }));
+                      setGrade(g);
+                    }}
+                  />
                 </>
               )}
             </>
           )}
         </section>
 
-        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:border-l lg:border-border lg:pl-8">
+        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:overflow-y-auto lg:border-l lg:border-border lg:pl-8">
           {ready && selected ? (
             <HuePanel
               key={selected.hue.id}

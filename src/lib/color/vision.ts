@@ -64,7 +64,12 @@ const gray = (y: number): RGB => [y, y, y];
 /** How a colour appears under the given colour vision. */
 export function simulateVision(hex: string, vision: VisionId): string {
   if (vision === "normal") return hex;
-  const rgb = hexToLinear(hex);
+  return simulateVisionLinear(hexToLinear(hex), vision);
+}
+
+/** Same, from linear light, so wide-gamut colours keep their true luminance instead of their clipped hex. */
+export function simulateVisionLinear(rgb: RGB, vision: VisionId): string {
+  if (vision === "normal") return linearToHex(rgb);
   if (vision === "achromatopsia") return linearToHex(gray(luminanceOfLinear(rgb)));
   if (vision === "achromatomaly") {
     const y = luminanceOfLinear(rgb);
@@ -76,5 +81,9 @@ export function simulateVision(hex: string, vision: VisionId): string {
 
 /** The neutral grey with the same relative luminance, for checking that steps line up across hues. */
 export function luminanceGray(hex: string): string {
-  return linearToHex(gray(luminanceOfLinear(hexToLinear(hex))));
+  return luminanceGrayLinear(hexToLinear(hex));
+}
+
+export function luminanceGrayLinear(rgb: RGB): string {
+  return linearToHex(gray(luminanceOfLinear(rgb)));
 }
