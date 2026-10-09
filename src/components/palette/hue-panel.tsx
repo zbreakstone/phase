@@ -116,6 +116,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           id="hue-light"
           label="Lightest shade"
           disabled={lockedLight}
+          hint={lockedLight ? "Locked: your base colour sits on the lightest step, so this end of the curve is fixed to its hue. Move the base colour to a darker step to adjust it." : undefined}
           value={hue.hueLight}
           min={0}
           max={360}
@@ -128,6 +129,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           id="hue-dark"
           label="Darkest shade"
           disabled={lockedDark}
+          hint={lockedDark ? "Locked: your base colour sits on the darkest step, so this end of the curve is fixed to its hue. Move the base colour to a lighter step to adjust it." : undefined}
           value={hue.hueDark}
           min={0}
           max={360}

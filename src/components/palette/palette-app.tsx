@@ -153,7 +153,7 @@ export function PaletteApp() {
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
           <div className="flex items-center gap-2 font-semibold tracking-tight">
@@ -215,8 +215,8 @@ export function PaletteApp() {
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="min-w-0 space-y-3">
+      <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
+        <section className="min-w-0 space-y-3 lg:overflow-y-auto">
           {!ready ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading your palette">
               <Skeleton className="h-9 w-full rounded-none" />
@@ -262,7 +262,7 @@ export function PaletteApp() {
           )}
         </section>
 
-        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:border-l lg:border-border lg:pl-8">
+        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:overflow-y-auto lg:border-l lg:border-border lg:pl-8">
           {ready && selected ? (
             <HuePanel
               key={selected.hue.id}
