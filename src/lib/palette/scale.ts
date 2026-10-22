@@ -115,8 +115,39 @@ export function targetLuminance(scale: ScaleConfig, grade: number): number {
     const v = scale.customLuminance[String(grade)];
     if (typeof v === "number" && Number.isFinite(v)) return v;
   }
-  if (scale.luminanceMode === "envoy") return envoyLuminance(grade);
+  // A custom scale with no value for this step reads as Envoy, the same default custom mode starts from.
+  if (scale.luminanceMode === "envoy" || scale.luminanceMode === "custom") return envoyLuminance(grade);
   return uniformLuminance(grade);
+}
+
+/**
+ * Changes the step list without moving the steps you already have. Custom luminance targets are kept
+ * for every step that survives; a new step starts between its nearest existing neighbours (spaced
+ * evenly in contrast terms, like the Envoy in-between steps) so it lands where you would expect.
+ * Envoy and even scales have no per-step values, so they just take the new list.
+ */
+export function withGrades(scale: ScaleConfig, grades: number[]): ScaleConfig {
+  if (scale.luminanceMode !== "custom") return { ...scale, grades, customLuminance: {} };
+
+  const known = new Map<number, number>([[0, WHITE_Y], [SCALE_MAX, BLACK_Y]]);
+  for (const g of scale.grades) known.set(g, targetLuminance(scale, g));
+  const anchors = [...known.keys()].sort((a, b) => a - b);
+
+  const customLuminance: Record<string, number> = {};
+  for (const g of grades) {
+    const kept = known.get(g);
+    if (kept !== undefined) {
+      customLuminance[String(g)] = kept;
+      continue;
+    }
+    const lower = Math.max(...anchors.filter((a) => a < g));
+    const upper = Math.min(...anchors.filter((a) => a > g));
+    const y0 = known.get(lower)!;
+    const y1 = known.get(upper)!;
+    const t = (g - lower) / (upper - lower);
+    customLuminance[String(g)] = (y0 + 0.05) * Math.pow((y1 + 0.05) / (y0 + 0.05), t) - 0.05;
+  }
+  return { ...scale, grades, customLuminance };
 }
 
 /** Every grade the system reasons about. White (0) and black (1000) always anchor the ends. */
