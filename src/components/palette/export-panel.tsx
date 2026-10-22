@@ -19,6 +19,7 @@ import {
   slug,
   toCss,
   toTailwindV3,
+  toFigmaVariables,
   toTailwindV4,
   toTokensJson,
 } from "@/lib/export/formats";
@@ -29,7 +30,7 @@ interface Props {
   generated: GeneratedHue[];
 }
 
-type Tab = "css" | "json" | "tailwind";
+type Tab = "css" | "json" | "tailwind" | "figma";
 
 export function ExportPanel({ state, generated }: Props) {
   const [tab, setTab] = React.useState<Tab>("css");
@@ -44,6 +45,7 @@ export function ExportPanel({ state, generated }: Props) {
     return {
       css: { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
       json: { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
+      figma: { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
           ? { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
@@ -85,6 +87,7 @@ export function ExportPanel({ state, generated }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-wrap items-start gap-4">
+          {tab !== "figma" ? (
           <div className="grid gap-1.5">
             <Label htmlFor="export-format" className="text-sm">
               Colour format
@@ -102,10 +105,11 @@ export function ExportPanel({ state, generated }: Props) {
               </SelectContent>
             </Select>
           </div>
-          {tab === "css" ? (
+          ) : null}
+          {tab === "css" || tab === "figma" ? (
             <div className="grid gap-1.5">
               <Label htmlFor="css-prefix" className="text-sm">
-                Variable prefix
+                {tab === "figma" ? "CSS variable prefix" : "Variable prefix"}
               </Label>
               <Input id="css-prefix" value={prefix} placeholder="optional, e.g. brand" onChange={(e) => setPrefix(e.target.value)} className="w-44" />
             </div>
@@ -143,7 +147,12 @@ export function ExportPanel({ state, generated }: Props) {
         </div>
       </div>
 
-      {formatClipsGamut(format, state.gamut) ? (
+      {tab === "figma" ? (
+        <p className="text-xs text-muted-foreground">
+          In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;.
+          {state.gamut === "p3" ? " Figma reads hex, so Display P3 colours are clipped to sRGB." : ""}
+        </p>
+      ) : formatClipsGamut(format, state.gamut) ? (
         <p className="text-xs text-muted-foreground">
           Hex and HSL can only describe sRGB, so the extra Display P3 colours are clipped. Choose OKLCH or Display P3 to keep them.
         </p>
@@ -154,8 +163,9 @@ export function ExportPanel({ state, generated }: Props) {
           <TabsTrigger value="css">CSS variables</TabsTrigger>
           <TabsTrigger value="json">JSON tokens</TabsTrigger>
           <TabsTrigger value="tailwind">Tailwind</TabsTrigger>
+          <TabsTrigger value="figma">Figma variables</TabsTrigger>
         </TabsList>
-        {(["css", "json", "tailwind"] as const).map((t) => (
+        {(["css", "json", "tailwind", "figma"] as const).map((t) => (
           <TabsContent key={t} value={t}>
             <div className="relative border border-border bg-muted/30">
               <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">

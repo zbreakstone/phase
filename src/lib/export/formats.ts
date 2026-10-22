@@ -189,3 +189,29 @@ export function toTailwindV4(generated: GeneratedHue[], format: ColorFormat, gam
   lines.push("}");
   return lines.join("\n");
 }
+
+export const FIGMA_COLLECTION = "Phase palette";
+
+/**
+ * Figma's variables JSON (Variables panel → Import): an array of collections, each with named modes
+ * holding nested groups of tokens. Hues become groups and grades become colour variables,
+ * so a shade is named `colors/red/500`. Figma reads hex, so a P3 palette is clipped to sRGB here.
+ */
+export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string {
+  const p = prefix ? `${prefix}-` : "";
+  const colors: Record<string, Record<string, unknown>> = {};
+  for (const n of named(generated)) {
+    const group: Record<string, unknown> = {};
+    for (const s of ramp(n.shades)) {
+      group[String(s.grade)] = {
+        $type: "color",
+        $value: s.hex,
+        $scopes: ["ALL_FILLS", "STROKE_COLOR"],
+        $description: `Luminance ${round(s.luminance, 3)} · OKLCH ${trim(s.oklch.L, 3)} ${trim(s.oklch.C, 3)} ${trim(s.oklch.h, 0)}`,
+        $codeSyntax: { WEB: `var(--${p}${n.slug}-${s.grade})` },
+      };
+    }
+    colors[n.slug] = group;
+  }
+  return JSON.stringify([{ [FIGMA_COLLECTION]: { modes: { Default: { colors } } } }], null, 2);
+}
