@@ -120,32 +120,42 @@ export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "
   return lines.join("\n");
 }
 
-export function toTokensJson(state: PaletteState, generated: GeneratedHue[], format: ColorFormat): string {
+/**
+ * Design Tokens JSON. By default it is just `$type` and `$value` per colour, which is what a codebase
+ * import wants. `includeMetadata` adds the gamut, colour space, contrast rules and per-step luminance
+ * under `$extensions.phase`, for auditing a file or rebuilding it in Phase.
+ */
+export function toTokensJson(state: PaletteState, generated: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
   const color: Record<string, Record<string, unknown>> = {};
   for (const n of named(generated)) {
     const group: Record<string, unknown> = {};
-    for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s, format, state.gamut);
+    for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s, format, state.gamut, includeMetadata);
     color[n.slug] = group;
   }
-  const doc = {
+  const doc: Record<string, unknown> = {
     $description: "Contrast-safe colour scale generated with Phase.",
-    $extensions: {
-      phase: {
-        colorSpace: SPACES[state.space].label,
-        gamut: GAMUTS[state.gamut].label,
-        magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
-      },
-    },
+    ...(includeMetadata
+      ? {
+          $extensions: {
+            phase: {
+              colorSpace: SPACES[state.space].label,
+              gamut: GAMUTS[state.gamut].label,
+              magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
+            },
+          },
+        }
+      : {}),
     color,
   };
   return JSON.stringify(doc, null, 2);
 }
 
-function tokenFor(shade: Shade, format: ColorFormat, gamut: Gamut) {
+function tokenFor(shade: Shade, format: ColorFormat, gamut: Gamut, includeMetadata: boolean) {
   return {
     $type: "color",
     $value: formatShade(shade, format, gamut),
-    $extensions: { phase: { grade: shade.grade, luminance: round(shade.luminance, 4) } },
+    // The step is already the key, so only the measured luminance is extra.
+    ...(includeMetadata ? { $extensions: { phase: { luminance: round(shade.luminance, 4) } } } : {}),
   };
 }
 
