@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -35,19 +36,20 @@ export function ExportPanel({ state, generated }: Props) {
   const [format, setFormat] = React.useState<ColorFormat>("hex");
   const [twVersion, setTwVersion] = React.useState<"v4" | "v3">("v4");
   const [prefix, setPrefix] = React.useState("");
+  const [metadata, setMetadata] = React.useState(false);
 
   const cleanPrefix = prefix ? slug(prefix) : "";
   const outputs = React.useMemo(() => {
     if (generated.length === 0) return null;
     return {
       css: { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
-      json: { text: toTokensJson(state, generated, format), file: "tokens.json", mime: "application/json" },
+      json: { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
           ? { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
           : { text: toTailwindV3(generated, format, state.gamut), file: "tailwind.palette.js", mime: "text/javascript" },
     };
-  }, [generated, state, format, twVersion, cleanPrefix]);
+  }, [generated, state, format, twVersion, cleanPrefix, metadata]);
 
   if (!outputs) {
     return (
@@ -106,6 +108,17 @@ export function ExportPanel({ state, generated }: Props) {
                 Variable prefix
               </Label>
               <Input id="css-prefix" value={prefix} placeholder="optional, e.g. brand" onChange={(e) => setPrefix(e.target.value)} className="w-44" />
+            </div>
+          ) : null}
+          {tab === "json" ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="json-metadata" className="text-sm">
+                Phase metadata
+              </Label>
+              <div className="flex h-8 items-center gap-2">
+                <Switch id="json-metadata" checked={metadata} onCheckedChange={setMetadata} />
+                <span className="max-w-64 text-xs text-muted-foreground">Adds gamut, contrast rules and luminance. Only needed to audit the file or rebuild it in Phase.</span>
+              </div>
             </div>
           ) : null}
           {tab === "tailwind" ? (
