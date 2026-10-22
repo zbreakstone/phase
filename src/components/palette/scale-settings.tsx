@@ -20,6 +20,7 @@ import {
   ruleFeasibility,
   systemGrades,
   targetLuminance,
+  withGrades,
 } from "@/lib/palette/scale";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
@@ -49,7 +50,7 @@ export function StepsSettings({ scale, onChange }: ScaleProps) {
       return;
     }
     setError(null);
-    onChange({ ...scale, grades: res.grades, customLuminance: {} });
+    onChange(withGrades(scale, res.grades));
   };
 
   const presetId = GRADE_PRESETS.find((p) => p.grades.join() === scale.grades.join())?.id ?? "custom";
@@ -66,7 +67,7 @@ export function StepsSettings({ scale, onChange }: ScaleProps) {
           value={presetId}
           onValueChange={(v) => {
             const p = GRADE_PRESETS.find((x) => x.id === v);
-            if (p) onChange({ ...scale, grades: [...p.grades], customLuminance: {} });
+            if (p) onChange(withGrades(scale, [...p.grades]));
           }}
         >
           <SelectTrigger id="grade-preset" size="sm" className="w-full">
