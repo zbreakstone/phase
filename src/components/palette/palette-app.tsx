@@ -246,13 +246,14 @@ export function PaletteApp() {
                     }}
                     onReorder={reorder}
                   />
-                  {overlay.metric === "contrast" && overlay.against === "selected" && grade === null ? (
+                  {(overlay.metric === "contrast" || overlay.metric === "apca") && overlay.against === "selected" && grade === null ? (
                     <p className="text-xs text-muted-foreground">Click a swatch to compare every other swatch against it.</p>
                   ) : null}
                   <ContrastReport
                     report={report}
                     rules={rules}
                     gamut={state.gamut}
+                    showApcaNote={overlay.metric === "apca"}
                     onSelect={(id, g) => {
                       setState((s) => ({ ...s, selectedHueId: id }));
                       setGrade(g);
@@ -311,13 +312,14 @@ function Toolbar({
           aria-label="What to show on each swatch"
         >
           <ToggleGroupItem value="contrast" className="rounded-none">Contrast</ToggleGroupItem>
+          <ToggleGroupItem value="apca" className="rounded-none" title="APCA Lc, the WCAG 3 draft contrast model. Informational: WCAG 2 ratios still decide pass or fail.">APCA</ToggleGroupItem>
           <ToggleGroupItem value="luminance" className="rounded-none">Luminance</ToggleGroupItem>
           <ToggleGroupItem value="off" className="rounded-none">Off</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {overlay.metric === "contrast" ? (
+      {overlay.metric === "contrast" || overlay.metric === "apca" ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">against</span>
+          <span className="text-xs text-muted-foreground">{overlay.metric === "apca" ? "text colour" : "against"}</span>
           <ToggleGroup
             value={[overlay.against]}
             onValueChange={(v) => v[0] && onOverlay({ ...overlay, against: v[0] as Against })}

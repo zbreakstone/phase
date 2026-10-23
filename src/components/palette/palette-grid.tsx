@@ -2,14 +2,15 @@
 
 import * as React from "react";
 import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
-import { contrastFromLuminance, readableOn } from "@/lib/color/contrast";
+import { apcaContrastLinear, contrastFromLuminance, readableOn } from "@/lib/color/contrast";
+import type { RGB } from "@/lib/color/convert";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { luminanceGrayLinear, simulateVisionLinear, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
 
-export type Metric = "contrast" | "luminance" | "off";
+export type Metric = "contrast" | "apca" | "luminance" | "off";
 export type Against = "white" | "black" | "selected";
 
 export interface Overlay {
@@ -45,6 +46,11 @@ interface Props {
   /** Move a hue so it ends up at `toIndex` in the list. */
   onReorder: (hueId: string, toIndex: number) => void;
 }
+
+/** APCA Lc as a whole number; the sign only says dark-on-light or light-on-dark, which the toggle already fixes. */
+const fmtLc = (lc: number) => String(Math.round(Math.abs(lc)));
+const WHITE: RGB = [1, 1, 1];
+const BLACK: RGB = [0, 0, 0];
 
 const fmtRatio = (r: number) => (r >= 10 ? r.toFixed(1) : r.toFixed(2));
 
@@ -348,6 +354,10 @@ function Cell({
   let status: "pass" | "fail" | "none" | "self" | null = null;
 
   if (overlay.metric === "luminance") label = fmtLuminance(shade.luminance);
+  // APCA is one-directional: the "against" colour is the text and the swatch is the background.
+  else if (overlay.metric === "apca" && overlay.against === "white") label = fmtLc(apcaContrastLinear(WHITE, shade.linear));
+  else if (overlay.metric === "apca" && overlay.against === "black") label = fmtLc(apcaContrastLinear(BLACK, shade.linear));
+  else if (overlay.metric === "apca" && reference) label = reference === shade ? "" : fmtLc(apcaContrastLinear(reference.linear, shade.linear));
   else if (overlay.metric === "contrast" && overlay.against === "white") label = fmtRatio(contrastFromLuminance(1, shade.luminance));
   else if (overlay.metric === "contrast" && overlay.against === "black") label = fmtRatio(contrastFromLuminance(0, shade.luminance));
   else if (overlay.metric === "contrast" && reference) {
