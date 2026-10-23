@@ -207,6 +207,50 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
   return JSON.stringify(doc, null, 2);
 }
 
+/**
+ * Tokens JSON with both gamuts. `$value` stays the standard sRGB colour so DTCG tools (Style Dictionary,
+ * Tokens Studio) read the file unchanged; the Display P3 solve rides along in `$extensions.phase.p3`.
+ */
+export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
+  const color: Record<string, Record<string, unknown>> = {};
+  const a = named(srgb);
+  const b = named(p3);
+  const wideFormat = p3BlockFormat(format);
+  a.forEach((n, i) => {
+    const group: Record<string, unknown> = {};
+    for (const s of ramp(n.shades)) {
+      const w = b[i]?.shades.find((x) => x.grade === s.grade) ?? s;
+      group[String(s.grade)] = {
+        $type: "color",
+        $value: formatShade(s, format, "srgb"),
+        $extensions: {
+          phase: {
+            p3: formatShade(w, wideFormat, "p3"),
+            ...(includeMetadata ? { luminance: { srgb: round(s.luminance, 4), p3: round(w.luminance, 4) } } : {}),
+          },
+        },
+      };
+    }
+    color[n.slug] = group;
+  });
+  const doc: Record<string, unknown> = {
+    $description: "Contrast-safe colour scale generated with Phase, solved separately for sRGB and Display P3.",
+    ...(includeMetadata
+      ? {
+          $extensions: {
+            phase: {
+              colorSpace: SPACES[state.space].label,
+              gamuts: ["sRGB", "Display P3"],
+              magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
+            },
+          },
+        }
+      : {}),
+    color,
+  };
+  return JSON.stringify(doc, null, 2);
+}
+
 function tokenFor(shade: Shade, format: ColorFormat, gamut: Gamut, includeMetadata: boolean) {
   return {
     $type: "color",
@@ -254,7 +298,7 @@ export const FIGMA_COLLECTION = "Phase palette";
  * holding nested groups of tokens. Hues become groups and grades become colour variables,
  * so a shade is named `colors/red/500`. Figma reads hex, so a P3 palette is clipped to sRGB here.
  */
-export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string {
+function figmaColors(generated: GeneratedHue[], prefix: string) {
   const p = prefix ? `${prefix}-` : "";
   const colors: Record<string, Record<string, unknown>> = {};
   for (const n of named(generated)) {
@@ -270,5 +314,22 @@ export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string
     }
     colors[n.slug] = group;
   }
-  return JSON.stringify([{ [FIGMA_COLLECTION]: { modes: { Default: { colors } } } }], null, 2);
+  return colors;
+}
+
+export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string {
+  return JSON.stringify([{ [FIGMA_COLLECTION]: { modes: { Default: { colors: figmaColors(generated, prefix) } } } }], null, 2);
+}
+
+/**
+ * One collection with an "sRGB" mode and a "Display P3" mode, each from its own solve. Figma reads
+ * hex, so the P3 mode holds the P3 palette's sRGB fallback values unless the Figma file is set to
+ * Display P3.
+ */
+export function toFigmaVariablesDual(srgb: GeneratedHue[], p3: GeneratedHue[], prefix = ""): string {
+  return JSON.stringify(
+    [{ [FIGMA_COLLECTION]: { modes: { sRGB: { colors: figmaColors(srgb, prefix) }, "Display P3": { colors: figmaColors(p3, prefix) } } } }],
+    null,
+    2,
+  );
 }

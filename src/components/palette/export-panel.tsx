@@ -21,9 +21,11 @@ import {
   toCssDual,
   toTailwindV3,
   toFigmaVariables,
+  toFigmaVariablesDual,
   toTailwindV4,
   toTailwindV4Dual,
   toTokensJson,
+  toTokensJsonDual,
 } from "@/lib/export/formats";
 import { GAMUTS } from "@/lib/color/gamut";
 import { generatePalette } from "@/lib/palette/generate";
@@ -45,9 +47,8 @@ export function ExportPanel({ state, generated }: Props) {
   const [gamutOut, setGamutOut] = React.useState<"both" | "current">("both");
 
   const cleanPrefix = prefix ? slug(prefix) : "";
-  // Dual output applies to the CSS-variable based exports. Tailwind v3 config files and the token
-  // JSON formats can't carry a media query, so they keep following the project gamut.
-  const dualTab = tab === "css" || (tab === "tailwind" && twVersion === "v4");
+  // Dual output applies everywhere except the Tailwind v3 config, which can't carry a media query.
+  const dualTab = tab !== "tailwind" || twVersion === "v4";
   const dual = gamutOut === "both" && dualTab;
   const labelGamut = dual ? "srgb" : state.gamut;
 
@@ -66,8 +67,12 @@ export function ExportPanel({ state, generated }: Props) {
       css: useDual
         ? { text: toCssDual(both.srgb, both.p3, format, cleanPrefix), file: "palette.css", mime: "text/css" }
         : { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
-      json: { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
-      figma: { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
+      json: useDual
+        ? { text: toTokensJsonDual(state, both.srgb, both.p3, format, metadata), file: "tokens.json", mime: "application/json" }
+        : { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
+      figma: useDual
+        ? { text: toFigmaVariablesDual(both.srgb, both.p3, cleanPrefix), file: "figma-variables.json", mime: "application/json" }
+        : { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
           ? useDual
@@ -183,7 +188,16 @@ export function ExportPanel({ state, generated }: Props) {
       {tab === "figma" ? (
         <p className="text-xs text-muted-foreground">
           In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;.
-          {state.gamut === "p3" ? " Figma reads hex, so Display P3 colours are clipped to sRGB." : ""}
+          {dual
+            ? " It has two modes, sRGB and Display P3, each solved for the same contrast. Figma reads hex, so the P3 mode holds sRGB fallback values unless the file's colour space is Display P3."
+            : state.gamut === "p3"
+              ? " Figma reads hex, so Display P3 colours are clipped to sRGB."
+              : ""}
+        </p>
+      ) : dual && tab === "json" ? (
+        <p className="text-xs text-muted-foreground">
+          <code>$value</code> is the sRGB colour, so standard token tools read this file as-is. The Display P3 colour ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
+          <code>$extensions.phase.p3</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
         </p>
       ) : dual ? (
         <p className="text-xs text-muted-foreground">
