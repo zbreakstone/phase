@@ -197,7 +197,7 @@ export function ExportPanel({ state, generated }: Props) {
       ) : dual && tab === "json" ? (
         <p className="text-xs text-muted-foreground">
           <code>$value</code> is the sRGB colour, so standard token tools read this file as-is. The Display P3 colour ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
-          <code>$extensions.phase.p3</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
+          <code>$extensions.gamut[&quot;display-p3&quot;]</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
         </p>
       ) : dual ? (
         <p className="text-xs text-muted-foreground">

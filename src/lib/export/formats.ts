@@ -209,7 +209,7 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
 
 /**
  * Tokens JSON with both gamuts. `$value` stays the standard sRGB colour so DTCG tools (Style Dictionary,
- * Tokens Studio) read the file unchanged; the Display P3 solve rides along in `$extensions.phase.p3`.
+ * Tokens Studio) read the file unchanged; the Display P3 solve rides along in `$extensions.gamut["display-p3"]`.
  */
 export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
   const color: Record<string, Record<string, unknown>> = {};
@@ -224,10 +224,8 @@ export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: 
         $type: "color",
         $value: formatShade(s, format, "srgb"),
         $extensions: {
-          phase: {
-            p3: formatShade(w, wideFormat, "p3"),
-            ...(includeMetadata ? { luminance: { srgb: round(s.luminance, 4), p3: round(w.luminance, 4) } } : {}),
-          },
+          gamut: { "display-p3": formatShade(w, wideFormat, "p3") },
+          ...(includeMetadata ? { phase: { luminance: { srgb: round(s.luminance, 4), p3: round(w.luminance, 4) } } } : {}),
         },
       };
     }
