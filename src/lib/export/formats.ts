@@ -121,6 +121,63 @@ export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "
 }
 
 /**
+ * Format used for the P3 block of a dual-gamut export. Hex, RGB and HSL cannot describe P3, so they
+ * become `color(display-p3 …)`; OKLCH stays OKLCH.
+ */
+export function p3BlockFormat(format: ColorFormat): ColorFormat {
+  return format === "oklch" ? "oklch" : "rgb";
+}
+
+/** Same colour to the eye (well under a just-noticeable difference), so 8-bit rounding does not count as a change. */
+const sameColour = (a: RGB, b: RGB) => {
+  const [l1, a1, b1] = linearToOklab(a);
+  const [l2, a2, b2] = linearToOklab(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2) < 0.004;
+};
+
+/**
+ * Both gamuts as CSS custom properties. The base declarations are the palette solved in sRGB, which
+ * every screen can show. The `@media (color-gamut: p3)` block overrides only the colours that differ,
+ * using the palette solved in P3. Both solves hit the same luminance targets, so contrast holds either way.
+ */
+function dualBlocks(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, name: (slug: string, grade: number) => string) {
+  const base: string[] = [];
+  const wide: string[] = [];
+  const a = named(srgb);
+  const b = named(p3);
+  const wideFormat = p3BlockFormat(format);
+  a.forEach((n, i) => {
+    if (i > 0) base.push("");
+    const other = b[i];
+    for (const s of ramp(n.shades)) {
+      base.push(`${name(n.slug, s.grade)}: ${formatShade(s, format, "srgb")};`);
+      const w = other?.shades.find((x) => x.grade === s.grade);
+      if (w && !sameColour(w.linear, s.linear)) wide.push(`${name(n.slug, s.grade)}: ${formatShade(w, wideFormat, "p3")};`);
+    }
+  });
+  return { base, wide };
+}
+
+const indent = (lines: string[], pad: string) => lines.map((l) => (l ? pad + l : l));
+
+/** sRGB base plus a Display P3 override inside `@media (color-gamut: p3)`. */
+export function toCssDual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, prefix = ""): string {
+  const p = prefix ? `${prefix}-` : "";
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--${p}${slug}-${grade}`);
+  const out = [":root {", ...indent(base, "  "), "}"];
+  if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated colour. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
+  return out.join("\n");
+}
+
+/** Tailwind v4 theme in sRGB, with the P3 colours overriding the theme variables on wide-gamut screens. */
+export function toTailwindV4Dual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat): string {
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--color-${slug}-${grade}`);
+  const out = ['@import "tailwindcss";', "", "@theme {", ...indent(base, "  "), "}"];
+  if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated colour. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
+  return out.join("\n");
+}
+
+/**
  * Design Tokens JSON. By default it is just `$type` and `$value` per colour, which is what a codebase
  * import wants. `includeMetadata` adds the gamut, colour space, contrast rules and per-step luminance
  * under `$extensions.phase`, for auditing a file or rebuilding it in Phase.
@@ -140,6 +197,48 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
             phase: {
               colorSpace: SPACES[state.space].label,
               gamut: GAMUTS[state.gamut].label,
+              magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
+            },
+          },
+        }
+      : {}),
+    color,
+  };
+  return JSON.stringify(doc, null, 2);
+}
+
+/**
+ * Tokens JSON with both gamuts. `$value` stays the standard sRGB colour so DTCG tools (Style Dictionary,
+ * Tokens Studio) read the file unchanged; the Display P3 solve rides along in `$extensions.gamut["display-p3"]`.
+ */
+export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
+  const color: Record<string, Record<string, unknown>> = {};
+  const a = named(srgb);
+  const b = named(p3);
+  const wideFormat = p3BlockFormat(format);
+  a.forEach((n, i) => {
+    const group: Record<string, unknown> = {};
+    for (const s of ramp(n.shades)) {
+      const w = b[i]?.shades.find((x) => x.grade === s.grade) ?? s;
+      group[String(s.grade)] = {
+        $type: "color",
+        $value: formatShade(s, format, "srgb"),
+        $extensions: {
+          gamut: { "display-p3": formatShade(w, wideFormat, "p3") },
+          ...(includeMetadata ? { phase: { luminance: { srgb: round(s.luminance, 4), p3: round(w.luminance, 4) } } } : {}),
+        },
+      };
+    }
+    color[n.slug] = group;
+  });
+  const doc: Record<string, unknown> = {
+    $description: "Contrast-safe colour scale generated with Phase, solved separately for sRGB and Display P3.",
+    ...(includeMetadata
+      ? {
+          $extensions: {
+            phase: {
+              colorSpace: SPACES[state.space].label,
+              gamuts: ["sRGB", "Display P3"],
               magicNumbers: state.scale.rules.map((r) => ({ minGradeDifference: r.minDiff, minContrast: r.ratio })),
             },
           },
@@ -197,7 +296,7 @@ export const FIGMA_COLLECTION = "Phase palette";
  * holding nested groups of tokens. Hues become groups and grades become colour variables,
  * so a shade is named `colors/red/500`. Figma reads hex, so a P3 palette is clipped to sRGB here.
  */
-export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string {
+function figmaColors(generated: GeneratedHue[], prefix: string) {
   const p = prefix ? `${prefix}-` : "";
   const colors: Record<string, Record<string, unknown>> = {};
   for (const n of named(generated)) {
@@ -213,5 +312,22 @@ export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string
     }
     colors[n.slug] = group;
   }
-  return JSON.stringify([{ [FIGMA_COLLECTION]: { modes: { Default: { colors } } } }], null, 2);
+  return colors;
+}
+
+export function toFigmaVariables(generated: GeneratedHue[], prefix = ""): string {
+  return JSON.stringify([{ [FIGMA_COLLECTION]: { modes: { Default: { colors: figmaColors(generated, prefix) } } } }], null, 2);
+}
+
+/**
+ * One collection with an "sRGB" mode and a "Display P3" mode, each from its own solve. Figma reads
+ * hex, so the P3 mode holds the P3 palette's sRGB fallback values unless the Figma file is set to
+ * Display P3.
+ */
+export function toFigmaVariablesDual(srgb: GeneratedHue[], p3: GeneratedHue[], prefix = ""): string {
+  return JSON.stringify(
+    [{ [FIGMA_COLLECTION]: { modes: { sRGB: { colors: figmaColors(srgb, prefix) }, "Display P3": { colors: figmaColors(p3, prefix) } } } }],
+    null,
+    2,
+  );
 }

@@ -18,11 +18,17 @@ import {
   formatLabel,
   slug,
   toCss,
+  toCssDual,
   toTailwindV3,
   toFigmaVariables,
+  toFigmaVariablesDual,
   toTailwindV4,
+  toTailwindV4Dual,
   toTokensJson,
+  toTokensJsonDual,
 } from "@/lib/export/formats";
+import { GAMUTS } from "@/lib/color/gamut";
+import { generatePalette } from "@/lib/palette/generate";
 import type { GeneratedHue, PaletteState } from "@/lib/palette/types";
 
 interface Props {
@@ -38,20 +44,43 @@ export function ExportPanel({ state, generated }: Props) {
   const [twVersion, setTwVersion] = React.useState<"v4" | "v3">("v4");
   const [prefix, setPrefix] = React.useState("");
   const [metadata, setMetadata] = React.useState(false);
+  const [gamutOut, setGamutOut] = React.useState<"both" | "current">("both");
 
   const cleanPrefix = prefix ? slug(prefix) : "";
-  const outputs = React.useMemo(() => {
+  // Dual output applies everywhere except the Tailwind v3 config, which can't carry a media query.
+  const dualTab = tab !== "tailwind" || twVersion === "v4";
+  const dual = gamutOut === "both" && dualTab;
+  const labelGamut = dual ? "srgb" : state.gamut;
+
+  const both = React.useMemo(() => {
     if (generated.length === 0) return null;
     return {
-      css: { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
-      json: { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
-      figma: { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
+      srgb: generatePalette(state.space, state.scale, state.hues, "srgb"),
+      p3: generatePalette(state.space, state.scale, state.hues, "p3"),
+    };
+  }, [generated.length, state.space, state.scale, state.hues]);
+
+  const outputs = React.useMemo(() => {
+    if (generated.length === 0 || !both) return null;
+    const useDual = gamutOut === "both";
+    return {
+      css: useDual
+        ? { text: toCssDual(both.srgb, both.p3, format, cleanPrefix), file: "palette.css", mime: "text/css" }
+        : { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
+      json: useDual
+        ? { text: toTokensJsonDual(state, both.srgb, both.p3, format, metadata), file: "tokens.json", mime: "application/json" }
+        : { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
+      figma: useDual
+        ? { text: toFigmaVariablesDual(both.srgb, both.p3, cleanPrefix), file: "figma-variables.json", mime: "application/json" }
+        : { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
-          ? { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
+          ? useDual
+            ? { text: toTailwindV4Dual(both.srgb, both.p3, format), file: "theme.css", mime: "text/css" }
+            : { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
           : { text: toTailwindV3(generated, format, state.gamut), file: "tailwind.palette.js", mime: "text/javascript" },
     };
-  }, [generated, state, format, twVersion, cleanPrefix, metadata]);
+  }, [generated, both, state, format, twVersion, cleanPrefix, metadata, gamutOut]);
 
   if (!outputs) {
     return (
@@ -92,19 +121,28 @@ export function ExportPanel({ state, generated }: Props) {
             <Label htmlFor="export-format" className="text-sm">
               Colour format
             </Label>
-            <Select items={COLOR_FORMATS.map((f) => ({ value: f.id, label: formatLabel(f.id, state.gamut) }))} value={format} onValueChange={(v) => setFormat(v as ColorFormat)}>
+            <Select items={COLOR_FORMATS.map((f) => ({ value: f.id, label: formatLabel(f.id, labelGamut) }))} value={format} onValueChange={(v) => setFormat(v as ColorFormat)}>
               <SelectTrigger id="export-format" className="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {COLOR_FORMATS.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    {formatLabel(f.id, state.gamut)}
+                    {formatLabel(f.id, labelGamut)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+          ) : null}
+          {dualTab ? (
+            <div className="grid gap-1.5">
+              <Label className="text-sm">Gamut</Label>
+              <ToggleGroup value={[gamutOut]} onValueChange={(v) => v[0] && setGamutOut(v[0] as "both" | "current")} variant="outline" spacing={0} aria-label="Gamut output">
+                <ToggleGroupItem value="both">sRGB + P3</ToggleGroupItem>
+                <ToggleGroupItem value="current">{GAMUTS[state.gamut].label} only</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           ) : null}
           {tab === "css" || tab === "figma" ? (
             <div className="grid gap-1.5">
@@ -150,7 +188,21 @@ export function ExportPanel({ state, generated }: Props) {
       {tab === "figma" ? (
         <p className="text-xs text-muted-foreground">
           In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;.
-          {state.gamut === "p3" ? " Figma reads hex, so Display P3 colours are clipped to sRGB." : ""}
+          {dual
+            ? " It has two modes, sRGB and Display P3, each solved for the same contrast. Figma reads hex, so the P3 mode holds sRGB fallback values unless the file's colour space is Display P3."
+            : state.gamut === "p3"
+              ? " Figma reads hex, so Display P3 colours are clipped to sRGB."
+              : ""}
+        </p>
+      ) : dual && tab === "json" ? (
+        <p className="text-xs text-muted-foreground">
+          <code>$value</code> is the sRGB colour, so standard token tools read this file as-is. The Display P3 colour ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
+          <code>$extensions.gamut[&quot;display-p3&quot;]</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
+        </p>
+      ) : dual ? (
+        <p className="text-xs text-muted-foreground">
+          The base values are the palette solved in sRGB, which any screen can show. Inside <code>@media (color-gamut: p3)</code>, only the colours that differ are overridden with the palette solved in P3
+          {format === "oklch" ? " (OKLCH)" : " (Display P3)"}. Both hit the same luminance targets, so contrast holds on either.
         </p>
       ) : formatClipsGamut(format, state.gamut) ? (
         <p className="text-xs text-muted-foreground">
