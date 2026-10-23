@@ -121,6 +121,63 @@ export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "
 }
 
 /**
+ * Format used for the P3 block of a dual-gamut export. Hex, RGB and HSL cannot describe P3, so they
+ * become `color(display-p3 …)`; OKLCH stays OKLCH.
+ */
+export function p3BlockFormat(format: ColorFormat): ColorFormat {
+  return format === "oklch" ? "oklch" : "rgb";
+}
+
+/** Same colour to the eye (well under a just-noticeable difference), so 8-bit rounding does not count as a change. */
+const sameColour = (a: RGB, b: RGB) => {
+  const [l1, a1, b1] = linearToOklab(a);
+  const [l2, a2, b2] = linearToOklab(b);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2) < 0.004;
+};
+
+/**
+ * Both gamuts as CSS custom properties. The base declarations are the palette solved in sRGB, which
+ * every screen can show. The `@media (color-gamut: p3)` block overrides only the colours that differ,
+ * using the palette solved in P3. Both solves hit the same luminance targets, so contrast holds either way.
+ */
+function dualBlocks(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, name: (slug: string, grade: number) => string) {
+  const base: string[] = [];
+  const wide: string[] = [];
+  const a = named(srgb);
+  const b = named(p3);
+  const wideFormat = p3BlockFormat(format);
+  a.forEach((n, i) => {
+    if (i > 0) base.push("");
+    const other = b[i];
+    for (const s of ramp(n.shades)) {
+      base.push(`${name(n.slug, s.grade)}: ${formatShade(s, format, "srgb")};`);
+      const w = other?.shades.find((x) => x.grade === s.grade);
+      if (w && !sameColour(w.linear, s.linear)) wide.push(`${name(n.slug, s.grade)}: ${formatShade(w, wideFormat, "p3")};`);
+    }
+  });
+  return { base, wide };
+}
+
+const indent = (lines: string[], pad: string) => lines.map((l) => (l ? pad + l : l));
+
+/** sRGB base plus a Display P3 override inside `@media (color-gamut: p3)`. */
+export function toCssDual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, prefix = ""): string {
+  const p = prefix ? `${prefix}-` : "";
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--${p}${slug}-${grade}`);
+  const out = [":root {", ...indent(base, "  "), "}"];
+  if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated colour. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
+  return out.join("\n");
+}
+
+/** Tailwind v4 theme in sRGB, with the P3 colours overriding the theme variables on wide-gamut screens. */
+export function toTailwindV4Dual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat): string {
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--color-${slug}-${grade}`);
+  const out = ['@import "tailwindcss";', "", "@theme {", ...indent(base, "  "), "}"];
+  if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated colour. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
+  return out.join("\n");
+}
+
+/**
  * Design Tokens JSON. By default it is just `$type` and `$value` per colour, which is what a codebase
  * import wants. `includeMetadata` adds the gamut, colour space, contrast rules and per-step luminance
  * under `$extensions.phase`, for auditing a file or rebuilding it in Phase.
