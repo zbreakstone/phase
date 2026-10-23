@@ -1,4 +1,4 @@
-import { hexToLinear, luminanceOfLinear } from "./convert";
+import { hexToLinear, linearToSrgb, luminanceOfLinear, type RGB } from "./convert";
 
 export function relativeLuminance(hex: string): number {
   return luminanceOfLinear(hexToLinear(hex));
@@ -47,8 +47,26 @@ function hexToLinearGamma(hex: string): [number, number, number] {
 }
 
 export function apcaContrast(textHex: string, bgHex: string): number {
-  let txt = apcaY(textHex);
-  let bg = apcaY(bgHex);
+  return apcaFromY(apcaY(textHex), apcaY(bgHex));
+}
+
+/** APCA luminance of a linear-light colour. Keeps the real colour for P3 shades the hex would clip. */
+function apcaYLinear([r, g, b]: RGB): number {
+  const ch = (c: number) => {
+    const e = linearToSrgb(c);
+    return (e < 0 ? -1 : 1) * Math.pow(Math.abs(e), 2.4);
+  };
+  return Math.max(0, 0.2126729 * ch(r) + 0.7151522 * ch(g) + 0.072175 * ch(b));
+}
+
+/** APCA Lc of text on a background, both given as linear-light sRGB. Positive for dark text, negative for light text. */
+export function apcaContrastLinear(text: RGB, bg: RGB): number {
+  return apcaFromY(apcaYLinear(text), apcaYLinear(bg));
+}
+
+function apcaFromY(txtY: number, bgY: number): number {
+  let txt = txtY;
+  let bg = bgY;
   if (txt <= APCA.blkThrs) txt += Math.pow(APCA.blkThrs - txt, APCA.blkClmp);
   if (bg <= APCA.blkThrs) bg += Math.pow(APCA.blkThrs - bg, APCA.blkClmp);
   if (Math.abs(bg - txt) < APCA.deltaYmin) return 0;
