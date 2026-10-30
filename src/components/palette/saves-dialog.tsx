@@ -55,6 +55,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
   const [busy, setBusy] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
+  const [code, setCode] = React.useState("");
   const [name, setName] = React.useState("");
   const [note, setNote] = React.useState("");
   const [palettes, setPalettes] = React.useState<PaletteSummary[]>([]);
@@ -105,6 +106,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     setEditing(null);
     if (next) {
       setSent(false);
+      setCode("");
       setName(current?.name ?? "");
       setNote("");
       if (session) void refresh(current?.id ?? null);
@@ -118,6 +120,17 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
       const { error } = await cloud.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
       if (error) throw new Error(error.message);
       setSent(true);
+    });
+
+  // Typing the emailed code works in any browser, unlike the link, which only finishes sign-in where it was requested.
+  const verifyCode = () =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const { error } = await cloud.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
+      if (error) throw new Error(error.message);
+      setCode("");
+      await refresh(current?.id ?? null);
     });
 
   const signOut = () =>
@@ -202,7 +215,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
           <DialogDescription>
             {signedIn
               ? "Every save adds a version you can come back to. Sign in on another browser to pick up where you left off."
-              : "Saved palettes follow you across browsers. We email you a sign-in link, so there's no password."}
+              : "Saved palettes follow you across browsers. We email you a sign-in code, so there's no password."}
           </DialogDescription>
         </DialogHeader>
 
@@ -217,10 +230,10 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
             <Input type="email" required autoComplete="email" placeholder="you@example.com" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <Button type="submit" disabled={busy || !email.trim()}>
               <Mail />
-              Email me a sign-in link
+              {sent ? "Email me a new code" : "Email me a sign-in code"}
             </Button>
             {sent ? (
-              <p className="text-xs text-muted-foreground">Check your inbox, then open the link in this browser. Your current palette stays as it is.</p>
+              <p className="text-xs text-muted-foreground">Check your inbox, then enter the code below. Your current palette stays as it is.</p>
             ) : null}
           </form>
         ) : (
@@ -334,6 +347,29 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
             </div>
           </div>
         )}
+
+        {!signedIn && sent ? (
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (code.length >= 6) void verifyCode();
+            }}
+          >
+            <Input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="Code from the email"
+              aria-label="Sign-in code"
+              maxLength={10}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            />
+            <Button type="submit" disabled={busy || code.length < 6}>
+              Sign in
+            </Button>
+          </form>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
