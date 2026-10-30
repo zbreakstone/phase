@@ -18,16 +18,18 @@ import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import { HUE_PRESETS, defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig } from "@/lib/palette/types";
-import { hashForState, stateFromHash } from "@/lib/palette/serialize";
+import { encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { HelpTip } from "./fields";
 import { HuePanel } from "./hue-panel";
 import { PaletteGrid, displayShade, type Against, type Metric, type Overlay } from "./palette-grid";
+import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScaleDialog } from "./scale-dialog";
 
 const AUTOSAVE_ID = "__autosave__";
+const CURRENT_KEY = "phase:current:v1";
 
 export function PaletteApp() {
   const [state, setState] = React.useState<PaletteState>(() => defaultState());
@@ -35,10 +37,19 @@ export function PaletteApp() {
   const [grade, setGrade] = React.useState<number | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
+  /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
+  const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
+  const stateKey = React.useMemo(() => encodeState(state), [state]);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
+      try {
+        const raw = window.localStorage.getItem(CURRENT_KEY);
+        if (raw && !cancelled) setCurrent(JSON.parse(raw) as CurrentPalette);
+      } catch {
+        // Unreadable pointer: treat the palette as unsaved.
+      }
       const shared = stateFromHash(window.location.hash);
       if (shared?.ok) {
         setState(shared.state);
@@ -58,6 +69,16 @@ export function PaletteApp() {
       cancelled = true;
     };
   }, [storage]);
+
+  const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
+    setCurrent(next);
+    try {
+      if (next) window.localStorage.setItem(CURRENT_KEY, JSON.stringify(next));
+      else window.localStorage.removeItem(CURRENT_KEY);
+    } catch {
+      // Private mode: the pointer just won't survive a reload.
+    }
+  }, []);
 
   React.useEffect(() => {
     const onHashChange = () => {
@@ -203,6 +224,17 @@ export function PaletteApp() {
           </div>
           <div className="ml-auto flex items-center gap-2">
             <ScaleDialog scale={state.scale} onChange={setScale} />
+            <SavesDialog
+              state={state}
+              stateKey={stateKey}
+              current={current}
+              hasUnsaved={current !== null && current.savedKey !== stateKey}
+              onCurrent={updateCurrent}
+              onOpen={(loaded) => {
+                setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
+                setGrade(null);
+              }}
+            />
             <Button variant="ghost" size="sm" className="rounded-none" onClick={reset} aria-label="Reset to starter palette">
               <RotateCcw />
               <span className="hidden sm:inline">Reset</span>
