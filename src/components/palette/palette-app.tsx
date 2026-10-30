@@ -20,6 +20,8 @@ import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig } from "@/lib/palette/types";
 import { encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
+import { cloudEnabled, getCloud } from "@/lib/cloud/client";
+import { createShare, getShared } from "@/lib/cloud/palettes";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { HelpTip } from "./fields";
@@ -31,7 +33,7 @@ import { ScaleDialog } from "./scale-dialog";
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
 
-export function PaletteApp() {
+export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const [state, setState] = React.useState<PaletteState>(() => defaultState());
   const [ready, setReady] = React.useState(false);
   const [grade, setGrade] = React.useState<number | null>(null);
@@ -50,8 +52,30 @@ export function PaletteApp() {
       } catch {
         // Unreadable pointer: treat the palette as unsaved.
       }
-      const shared = stateFromHash(window.location.hash);
-      if (shared?.ok) {
+      let fromCode: PaletteState | null = null;
+      if (shareCode) {
+        try {
+          const cloud = getCloud();
+          if (!cloud) throw new Error("Short links aren't turned on here.");
+          fromCode = await getShared(cloud, shareCode);
+          if (!fromCode) toast.error("That link doesn't exist or was removed. Showing your own palette instead.");
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "That link couldn't be opened.");
+        }
+      }
+      const shared = fromCode ? null : stateFromHash(window.location.hash);
+      if (fromCode) {
+        if (!cancelled) {
+          setState({ ...fromCode, gamut: fromCode.gamut ?? DEFAULT_GAMUT });
+          // A shared snapshot isn't one of your saved palettes.
+          setCurrent(null);
+          try {
+            window.localStorage.removeItem(CURRENT_KEY);
+          } catch {
+            // Nothing to clear in private mode.
+          }
+        }
+      } else if (shared?.ok) {
         setState(shared.state);
       } else {
         if (shared) toast.error(shared.error);
@@ -68,7 +92,7 @@ export function PaletteApp() {
     return () => {
       cancelled = true;
     };
-  }, [storage]);
+  }, [storage, shareCode]);
 
   const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
     setCurrent(next);
@@ -99,6 +123,11 @@ export function PaletteApp() {
     if (!ready) return;
     const t = setTimeout(() => {
       storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() => undefined);
+      if (cloudEnabled()) {
+        // Short links replace the long ones, so keep the address bar clean (this also leaves a /s/code page).
+        if (window.location.hash || window.location.pathname !== "/") window.history.replaceState(null, "", "/");
+        return;
+      }
       const hash = hashForState(state);
       // replaceState keeps the address bar shareable without filling history or firing hashchange.
       if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
@@ -107,11 +136,27 @@ export function PaletteApp() {
   }, [state, ready, storage]);
 
   const share = async () => {
-    const url = `${window.location.origin}${window.location.pathname}${hashForState(state)}`;
-    window.history.replaceState(null, "", hashForState(state));
+    let url = `${window.location.origin}${window.location.pathname}${hashForState(state)}`;
+    let short = false;
+    const cloud = cloudEnabled() ? getCloud() : null;
+    if (cloud) {
+      const { data } = await cloud.auth.getSession();
+      if (data.session) {
+        try {
+          url = `${window.location.origin}/s/${await createShare(cloud, state)}`;
+          short = true;
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Couldn't make a short link.");
+          return;
+        }
+      } else {
+        toast.message("Sign in to get short links. Copying the long link for now.");
+      }
+    }
+    if (!cloud) window.history.replaceState(null, "", hashForState(state));
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Link copied. Anyone who opens it sees this exact palette.");
+      toast.success(short ? `Short link copied: ${url}` : "Link copied. Anyone who opens it sees this exact palette.");
     } catch {
       toast.message("Copy this link from the address bar to share your palette.");
     }
