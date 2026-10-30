@@ -15,6 +15,14 @@ export interface SourceColor {
   pinned: boolean;
 }
 
+/** A nudge to one step's colour. Lightness is untouched, so the step keeps its contrast. */
+export interface StepTweak {
+  /** Hue shift in degrees, added to the curve's hue at this step. */
+  dh: number;
+  /** Chroma change as a fraction of the curve's chroma at this step: 0.25 is 25% more colourful, -0.5 is half. */
+  dc: number;
+}
+
 export interface HueConfig {
   id: string;
   name: string;
@@ -28,6 +36,8 @@ export interface HueConfig {
   chromaLight: number;
   chromaMid: number;
   chromaDark: number;
+  /** Per-step hue and chroma nudges, keyed by grade. Steps without an entry follow the curve. */
+  stepTweaks?: Record<string, StepTweak>;
   source?: SourceColor | null;
 }
 
@@ -86,6 +96,8 @@ export interface Shade {
   clipped: boolean;
   /** The final colour read back in OKLCH, whichever space generated it. */
   oklch: { L: number; C: number; h: number };
+  /** True when a per-step tweak moved this shade off the curve. */
+  tweaked?: boolean;
   /** True for the shade a source colour landed on. */
   isSource?: boolean;
   /** True when the exact source colour was kept (pinned) instead of the solved one. */

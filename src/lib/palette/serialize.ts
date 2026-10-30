@@ -2,7 +2,7 @@ import { SPACE_ORDER, type SpaceId } from "../color/spaces";
 import { parseHex } from "../color/convert";
 import { uid } from "./defaults";
 import { MAX_GRADES } from "./scale";
-import type { ContrastReference, ContrastRule, HueConfig, HueDirection, PaletteState, SourceColor } from "./types";
+import type { ContrastReference, ContrastRule, HueConfig, HueDirection, PaletteState, SourceColor, StepTweak } from "./types";
 
 const num = (v: unknown, fallback: number, min = -Infinity, max = Infinity): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
@@ -14,6 +14,19 @@ function sanitizeSource(raw: unknown): SourceColor | null {
   if (!hex) return null;
   const grade = typeof r.grade === "number" && Number.isInteger(r.grade) ? r.grade : null;
   return { hex, grade, pinned: r.pinned === true };
+}
+
+function sanitizeTweaks(raw: unknown): Record<string, StepTweak> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, StepTweak> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d+$/.test(k) || !v || typeof v !== "object") continue;
+    const t = v as Record<string, unknown>;
+    const dh = num(t.dh, 0, -180, 180);
+    const dc = num(t.dc, 0, -1, 2);
+    if (dh !== 0 || dc !== 0) out[k] = { dh, dc };
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function sanitizeReference(raw: unknown): ContrastReference {
@@ -39,6 +52,7 @@ function sanitizeHue(raw: unknown): HueConfig | null {
     chromaLight: num(h.chromaLight, 0, 0, 200),
     chromaMid: num(h.chromaMid, 0, 0, 200),
     chromaDark: num(h.chromaDark, 0, 0, 200),
+    ...(sanitizeTweaks(h.stepTweaks) ? { stepTweaks: sanitizeTweaks(h.stepTweaks) } : {}),
     source: sanitizeSource(h.source),
   };
 }
