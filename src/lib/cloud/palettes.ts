@@ -107,3 +107,19 @@ export async function updateVersionNote(db: SupabaseClient, versionId: string, n
   if (error) throw new Error(error.message);
   return next;
 }
+
+/** Creates (or reuses) a short, read-only link to a snapshot of the palette. Needs a signed-in user. */
+export async function createShare(db: SupabaseClient, state: PaletteState): Promise<string> {
+  const { data, error } = await db.rpc("create_share", { p_state: state });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string") throw new Error("Couldn't create a share link.");
+  return data;
+}
+
+/** The palette behind a short link, or null when the code doesn't exist. Works without signing in. */
+export async function getShared(db: SupabaseClient, code: string): Promise<PaletteState | null> {
+  const { data, error } = await db.rpc("get_shared_palette", { p_code: code });
+  if (error) throw new Error(error.message);
+  return data ? sanitizeState(data) : null;
+}
+
