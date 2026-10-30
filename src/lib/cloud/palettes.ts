@@ -99,3 +99,11 @@ export async function deletePalette(db: SupabaseClient, paletteId: string): Prom
   const { error } = await db.from("palettes").delete().eq("id", paletteId);
   if (error) throw new Error(error.message);
 }
+
+/** Fixes a version's note. The saved palette itself can't be changed, only its description. */
+export async function updateVersionNote(db: SupabaseClient, versionId: string, note: string): Promise<string | null> {
+  const next = note.trim() || null;
+  const { error } = await db.from("palette_versions").update({ note: next }).eq("id", versionId);
+  if (error) throw new Error(error.message);
+  return next;
+}

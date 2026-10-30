@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Cloud, CloudOff, LogOut, Mail, Trash2 } from "lucide-react";
+import { Check, Cloud, CloudOff, LogOut, Mail, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,6 +20,7 @@ import {
   loadVersion,
   renamePalette,
   saveVersion,
+  updateVersionNote,
 } from "@/lib/cloud/palettes";
 import { encodeState } from "@/lib/palette/serialize";
 import type { PaletteState } from "@/lib/palette/types";
@@ -58,6 +59,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
   const [note, setNote] = React.useState("");
   const [palettes, setPalettes] = React.useState<PaletteSummary[]>([]);
   const [versions, setVersions] = React.useState<VersionSummary[]>([]);
+  const [editing, setEditing] = React.useState<{ id: string; text: string } | null>(null);
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -100,6 +102,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
+    setEditing(null);
     if (next) {
       setSent(false);
       setName(current?.name ?? "");
@@ -148,6 +151,16 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
       setNote("");
       await refresh(current.id);
       toast.success("Saved a new version");
+    });
+
+  const saveNote = () =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud || !editing) return;
+      const next = await updateVersionNote(cloud, editing.id, editing.text);
+      setVersions((list) => list.map((v) => (v.id === editing.id ? { ...v, note: next } : v)));
+      setEditing(null);
+      toast.success("Note updated");
     });
 
   const confirmReplace = () => !hasUnsaved || window.confirm("Opening this replaces the changes you haven't saved. Continue?");
@@ -235,17 +248,53 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
                 <ul className="max-h-48 divide-y divide-border overflow-y-auto border border-border">
                   {versions.map((v, i) => (
                     <li key={v.id} className="flex items-center gap-2 px-2 py-1.5 text-xs">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate">{v.note ?? "No note"}</span>
-                        <span className="text-muted-foreground">
-                          {when(v.createdAt)}
-                          {i === 0 ? " · latest" : ""}
-                          {v.id === current.versionId ? " · open" : ""}
-                        </span>
-                      </span>
-                      <Button variant="ghost" size="sm" disabled={busy || v.id === current.versionId} onClick={() => open_(() => loadVersion(getCloud()!, v.id))}>
-                        Open
-                      </Button>
+                      {editing?.id === v.id ? (
+                        <form
+                          className="flex min-w-0 flex-1 items-center gap-1"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void saveNote();
+                          }}
+                        >
+                          <Input
+                            autoFocus
+                            aria-label="Version note"
+                            maxLength={200}
+                            value={editing.text}
+                            onChange={(e) => setEditing({ id: v.id, text: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") {
+                                e.stopPropagation();
+                                setEditing(null);
+                              }
+                            }}
+                            className="h-7 text-xs"
+                          />
+                          <Button type="submit" variant="ghost" size="icon" aria-label="Save note" disabled={busy}>
+                            <Check />
+                          </Button>
+                          <Button type="button" variant="ghost" size="icon" aria-label="Cancel" onClick={() => setEditing(null)}>
+                            <X />
+                          </Button>
+                        </form>
+                      ) : (
+                        <>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate">{v.note ?? "No note"}</span>
+                            <span className="text-muted-foreground">
+                              {when(v.createdAt)}
+                              {i === 0 ? " · latest" : ""}
+                              {v.id === current.versionId ? " · open" : ""}
+                            </span>
+                          </span>
+                          <Button variant="ghost" size="icon" aria-label="Edit note" disabled={busy} onClick={() => setEditing({ id: v.id, text: v.note ?? "" })} className="text-muted-foreground">
+                            <Pencil />
+                          </Button>
+                          <Button variant="ghost" size="sm" disabled={busy || v.id === current.versionId} onClick={() => open_(() => loadVersion(getCloud()!, v.id))}>
+                            Open
+                          </Button>
+                        </>
+                      )}
                     </li>
                   ))}
                 </ul>
