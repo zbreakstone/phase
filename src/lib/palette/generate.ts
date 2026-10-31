@@ -1,4 +1,4 @@
-import { type RGB, hexToLinear, luminanceOfLinear } from "../color/convert";
+import { type RGB, hexToLinear, luminanceOfLinear, normHue } from "../color/convert";
 import type { Gamut } from "../color/gamut";
 import { solveForLuminance } from "../color/solve";
 import { SPACES, type SpaceId } from "../color/spaces";
@@ -21,7 +21,9 @@ export function generateHue(spaceId: SpaceId, scale: ScaleConfig, hue: HueConfig
 
   for (const grade of sorted) {
     const t = positionFor(grade, sorted);
-    const want = curveAt(space, hue, t, anchor);
+    const curve = curveAt(space, hue, t, anchor);
+    const tweak = hue.stepTweaks?.[String(grade)];
+    const want = tweak ? { hue: normHue(curve.hue + tweak.dh), chroma: Math.max(0, curve.chroma * (1 + tweak.dc)) } : curve;
     const targetY = targetLuminance(scale, grade);
     const solved = solveForLuminance(space, targetY, want.hue, want.chroma, gamut);
     const isSource = source?.grade === grade;
@@ -40,6 +42,7 @@ export function generateHue(spaceId: SpaceId, scale: ScaleConfig, hue: HueConfig
       hue: want.hue,
       clipped: pinned ? false : solved.clipped,
       oklch: oklchOf(linear),
+      tweaked: tweak !== undefined,
       isSource,
       pinned,
     });

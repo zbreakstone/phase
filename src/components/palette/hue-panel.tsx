@@ -8,7 +8,7 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
-import type { GeneratedHue, HueConfig, ScaleConfig, Shade } from "@/lib/palette/types";
+import type { GeneratedHue, HueConfig, ScaleConfig, Shade, StepTweak } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
 import { SliderField } from "./fields";
 import { ChromaChart, HueCurveChart } from "./hue-charts";
@@ -56,6 +56,17 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
     [space, gamut, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
 
+  const tweak = chosen && !chosen.anchor ? hue.stepTweaks?.[String(chosen.grade)] ?? { dh: 0, dc: 0 } : null;
+  const setTweak = (grade: number, next: Partial<StepTweak>) => {
+    const key = String(grade);
+    const merged = { ...(hue.stepTweaks?.[key] ?? { dh: 0, dc: 0 }), ...next };
+    const rest = { ...hue.stepTweaks };
+    if (merged.dh === 0 && merged.dc === 0) delete rest[key];
+    else rest[key] = merged;
+    onChange({ stepTweaks: Object.keys(rest).length ? rest : undefined });
+  };
+  const tweakedCount = Object.keys(hue.stepTweaks ?? {}).length;
+
   const setChroma = (value: number) => {
     const factor = hue.chromaMid > 1e-9 ? value / hue.chromaMid : 0;
     if (hue.chromaMid > 1e-9) {
@@ -91,6 +102,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
               className={cn("relative h-10 flex-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset")}
               style={{ backgroundColor: display(s) }}
             >
+              {s.tweaked ? <span aria-label="Tweaked" className="pointer-events-none absolute bottom-1 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-white mix-blend-difference" /> : null}
               {s.grade === selectedGrade ? <span aria-hidden className="absolute inset-0 border-2 border-white mix-blend-difference" /> : null}
             </button>
           ))}
@@ -168,6 +180,52 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           decimals={def.chroma.decimals}
           onChange={setChroma}
         />
+      </section>
+
+      <section className="space-y-3 border-t border-border pt-4">
+        <div>
+          <h3 className="text-xs font-semibold tracking-wide uppercase">Tune one step</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Nudge a single step&apos;s hue or colourfulness without moving its neighbours. Lightness doesn&apos;t change, so the step keeps its contrast.
+          </p>
+        </div>
+        {chosen && tweak ? (
+          <>
+            <p className="text-xs">
+              Step <span className="font-semibold">{chosen.grade}</span>
+            </p>
+            <SliderField
+              id="tweak-hue"
+              label="Hue shift"
+              value={tweak.dh}
+              min={-60}
+              max={60}
+              step={1}
+              unit="°"
+              onChange={(v) => setTweak(chosen.grade, { dh: v })}
+            />
+            <SliderField
+              id="tweak-chroma"
+              label="Colourfulness"
+              value={Math.round(tweak.dc * 100)}
+              min={-100}
+              max={100}
+              step={5}
+              unit="%"
+              onChange={(v) => setTweak(chosen.grade, { dc: v / 100 })}
+            />
+            {chosen.clipped ? (
+              <p className="text-[11px] text-muted-foreground">This step is already at the most colour the screen can show, so more colourfulness has no effect.</p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">Click a swatch above to tune that step.</p>
+        )}
+        {tweakedCount > 0 ? (
+          <Button variant="ghost" size="sm" onClick={() => onChange({ stepTweaks: undefined })}>
+            Reset {tweakedCount === 1 ? "1 tweaked step" : `${tweakedCount} tweaked steps`}
+          </Button>
+        ) : null}
       </section>
     </div>
   );
