@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Layers, Link2, Plus, RotateCcw, SunMedium } from "lucide-react";
+import { Eye, Layers, Link2, Plus, Redo2, RotateCcw, SunMedium, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig } from "@/lib/palette/types";
 import { encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
+import { useHistory } from "@/lib/palette/use-history";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import { createShare, getShared } from "@/lib/cloud/palettes";
 import { getStorage } from "@/lib/storage";
@@ -33,8 +34,20 @@ import { ScaleDialog } from "./scale-dialog";
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
 
+/** Undo and redo restore the palette but leave your current swatch selected, as long as it still exists. */
+const keepSelection = (restored: PaletteState, current: PaletteState): PaletteState =>
+  restored.hues.some((h) => h.id === current.selectedHueId) ? { ...restored, selectedHueId: current.selectedHueId } : restored;
+
+/** Text fields keep the browser's own undo; everything else (sliders, buttons, the page) undoes the palette. */
+const isTextEntry = (el: EventTarget | null) => {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable || el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLInputElement) return !["range", "checkbox", "radio", "button", "submit", "reset", "file", "color"].includes(el.type);
+  return false;
+};
+
 export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
-  const [state, setState] = React.useState<PaletteState>(() => defaultState());
+  const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
   const [grade, setGrade] = React.useState<number | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
@@ -66,7 +79,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       const shared = fromCode ? null : stateFromHash(window.location.hash);
       if (fromCode) {
         if (!cancelled) {
-          setState({ ...fromCode, gamut: fromCode.gamut ?? DEFAULT_GAMUT });
+          loadState({ ...fromCode, gamut: fromCode.gamut ?? DEFAULT_GAMUT });
           // A shared snapshot isn't one of your saved palettes.
           setCurrent(null);
           try {
@@ -76,13 +89,13 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
           }
         }
       } else if (shared?.ok) {
-        setState(shared.state);
+        loadState(shared.state);
       } else {
         if (shared) toast.error(shared.error);
         try {
           const saved = await storage.get(AUTOSAVE_ID);
           // Autosaves from before the gamut control have no gamut and were always sRGB.
-          if (saved && !cancelled) setState({ ...saved.state, gamut: saved.state.gamut ?? DEFAULT_GAMUT });
+          if (saved && !cancelled) loadState({ ...saved.state, gamut: saved.state.gamut ?? DEFAULT_GAMUT });
         } catch {
           // Storage can be unavailable (private mode); start from the default palette.
         }
@@ -92,7 +105,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [storage, shareCode]);
+  }, [storage, shareCode, loadState]);
 
   const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
     setCurrent(next);
@@ -109,7 +122,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       const shared = stateFromHash(window.location.hash);
       if (!shared) return;
       if (shared.ok) {
-        setState(shared.state);
+        loadState(shared.state);
         setGrade(null);
       } else {
         toast.error(shared.error);
@@ -117,7 +130,23 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
-  }, []);
+  }, [loadState]);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || !(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      const isUndo = key === "z" && !e.shiftKey;
+      const isRedo = (key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey && e.ctrlKey);
+      if (!isUndo && !isRedo) return;
+      if (isTextEntry(e.target) || document.querySelector('[role="dialog"]')) return;
+      e.preventDefault();
+      if (isUndo) undo();
+      else redo();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
 
   React.useEffect(() => {
     if (!ready) return;
@@ -280,6 +309,14 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                 setGrade(null);
               }}
             />
+            <div className="flex items-center" role="group" aria-label="History">
+              <Button variant="ghost" size="icon-sm" className="rounded-none" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
+                <Undo2 />
+              </Button>
+              <Button variant="ghost" size="icon-sm" className="rounded-none" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⇧⌘Z)">
+                <Redo2 />
+              </Button>
+            </div>
             <Button variant="ghost" size="sm" className="rounded-none" onClick={reset} aria-label="Reset to starter palette">
               <RotateCcw />
               <span className="hidden sm:inline">Reset</span>
@@ -318,7 +355,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                     selectedHueId={selected?.hue.id ?? null}
                     selectedGrade={grade}
                     onSelect={(id, g) => {
-                      setState((s) => ({ ...s, selectedHueId: id }));
+                      selectSilently((s) => ({ ...s, selectedHueId: id }));
                       setGrade(g);
                     }}
                     onReorder={reorder}
@@ -332,7 +369,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                     gamut={state.gamut}
                     showApcaNote={overlay.metric === "apca"}
                     onSelect={(id, g) => {
-                      setState((s) => ({ ...s, selectedHueId: id }));
+                      selectSilently((s) => ({ ...s, selectedHueId: id }));
                       setGrade(g);
                     }}
                   />
