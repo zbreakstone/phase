@@ -43,7 +43,7 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
           aria-label="Pick a base color"
           value={hex || "#3b82f6"}
           onChange={(e) => apply(e.target.value)}
-          className="h-8 w-10 shrink-0 cursor-pointer rounded-none p-0.5"
+          className="h-8 w-10 shrink-0 cursor-pointer rounded-lg p-0.5"
         />
         <Input
           id="base-color"

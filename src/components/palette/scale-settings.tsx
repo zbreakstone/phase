@@ -160,9 +160,9 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
           spacing={0}
           aria-label="Luminance mode"
         >
-          <ToggleGroupItem value="envoy" className="rounded-none">Envoy</ToggleGroupItem>
-          <ToggleGroupItem value="uniform" className="rounded-none">Even contrast</ToggleGroupItem>
-          <ToggleGroupItem value="custom" className="rounded-none">Custom</ToggleGroupItem>
+          <ToggleGroupItem value="envoy">Envoy</ToggleGroupItem>
+          <ToggleGroupItem value="uniform">Even contrast</ToggleGroupItem>
+          <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
         </ToggleGroup>
         {custom ? (
           <Button variant="ghost" size="sm" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>

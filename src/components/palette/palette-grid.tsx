@@ -463,7 +463,7 @@ function Cell({
   return (
     <Popover open={tuner.open} onOpenChange={tuner.onOpenChange}>
       <PopoverTrigger render={<button {...buttonProps} />}>{face}</PopoverTrigger>
-      <PopoverContent align="center" className="w-72 rounded-none">
+      <PopoverContent align="center" className="w-72">
         <StepTuner
           idPrefix={`tune-${g.hue.id}-${shade.grade}`}
           hueName={g.hue.name || "Unnamed"}

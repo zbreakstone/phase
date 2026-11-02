@@ -62,11 +62,11 @@ export function StepTuner({
       ) : null}
       {here || others > 0 ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
-          <Button variant="outline" size="sm" className="rounded-none" disabled={!here} onClick={onResetStep}>
+          <Button variant="outline" size="sm" disabled={!here} onClick={onResetStep}>
             Reset this step
           </Button>
           {others > 0 ? (
-            <Button variant="ghost" size="sm" className="rounded-none" onClick={onResetAll}>
+            <Button variant="ghost" size="sm" onClick={onResetAll}>
               Reset all {tweakedCount} in {hueName}
             </Button>
           ) : null}

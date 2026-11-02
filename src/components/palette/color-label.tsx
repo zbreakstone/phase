@@ -55,7 +55,7 @@ export function ColorName({
       >
         <span className="truncate">{name || "Unnamed"}</span>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 rounded-none">
+      <PopoverContent align="start" className="w-60">
         <div className="space-y-1.5">
           <label htmlFor={inputId} className="text-xs font-medium">
             Color name
@@ -138,7 +138,7 @@ export function AddColorEnd({ index, actions, label = "Add color", variant = "gh
     <AddColorPopover
       onAddPreset={(p) => actions.onAddPreset(p, index)}
       onAddHex={(hex) => actions.onAddHex(hex, index)}
-      render={<Button variant={variant} size="sm" className="rounded-none text-muted-foreground hover:text-foreground" />}
+      render={<Button variant={variant} size="sm" className="text-muted-foreground hover:text-foreground" />}
     >
       <Plus />
       {label}
