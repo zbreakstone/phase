@@ -21,7 +21,7 @@ export function ScalePanel({ scale, onChange }: Props) {
           Luminance targets
         </h2>
         <p className="text-xs text-muted-foreground">
-          How bright each step is. The contrast rules that bound them are under Settings. To add, rename or delete a step, use the step numbers above the swatches.
+          How bright each step is. The contrast rules that bound them are in the sidebar under Settings. To add, rename or delete a step, use the Steps list there.
         </p>
       </div>
       <TargetCurve scale={scale} referenceY={1} onChange={onChange} />

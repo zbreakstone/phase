@@ -56,7 +56,7 @@ export function StepHeader({
   );
 }
 
-function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderActions }) {
+export function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderActions }) {
   const [open, setOpen] = React.useState(false);
   const [text, setText] = React.useState(String(grade));
   const result = parseStepName(text, actions.grades, grade);
@@ -82,7 +82,7 @@ function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderAction
           <button
             type="button"
             aria-label={`Step ${grade} options`}
-            className="rounded-sm px-1 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="-ml-1 rounded-sm px-1 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           />
         }
       >
