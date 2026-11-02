@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Layers, Redo2, SunMedium, Undo2 } from "lucide-react";
+import Image from "next/image";
+import { Eye, Redo2, SunMedium, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -292,12 +293,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex size-6 items-center justify-center bg-primary text-primary-foreground">
-              <Layers className="size-3.5" />
-            </span>
-            Phase
-          </div>
+          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto" />
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center" role="group" aria-label="History">
               <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
