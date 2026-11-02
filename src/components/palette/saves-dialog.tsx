@@ -2,10 +2,17 @@
 
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Cloud, CloudOff, LogOut, Mail, Pencil, Trash2, X } from "lucide-react";
+import { Check, Mail, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
@@ -36,6 +43,8 @@ export interface CurrentPalette {
 
 interface Props {
   state: PaletteState;
+  /** The palette's name, edited in the header. Saved along with each version. */
+  name: string;
   /** Encoded form of `state`, comparable with `CurrentPalette.savedKey`. */
   stateKey: string;
   current: CurrentPalette | null;
@@ -43,24 +52,43 @@ interface Props {
   hasUnsaved: boolean;
   onCurrent: (current: CurrentPalette | null) => void;
   onOpen: (loaded: LoadedVersion) => void;
+  /** Asks to throw the palette away for the starter one. The caller confirms. */
+  onReset: () => void;
 }
 
-const when = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(ms);
+const when = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(ms);
 
-export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, onOpen }: Props) {
+export function SavesDialog({
+  state,
+  name,
+  stateKey,
+  current,
+  hasUnsaved,
+  onCurrent,
+  onOpen,
+  onReset,
+}: Props) {
   const enabled = cloudEnabled();
   const [session, setSession] = React.useState<Session | null>(null);
   const [authReady, setAuthReady] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  /** The last save, open or load failed. Cleared by the next one that works. */
+  const [failed, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
-  const [name, setName] = React.useState("");
   const [note, setNote] = React.useState("");
   const [palettes, setPalettes] = React.useState<PaletteSummary[]>([]);
   const [versions, setVersions] = React.useState<VersionSummary[]>([]);
-  const [editing, setEditing] = React.useState<{ id: string; text: string } | null>(null);
+  const [editing, setEditing] = React.useState<{
+    id: string;
+    text: string;
+  } | null>(null);
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -69,7 +97,9 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
       setSession(data.session);
       setAuthReady(true);
     });
-    const { data } = cloud.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data } = cloud.auth.onAuthStateChange((_event, next) =>
+      setSession(next),
+    );
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -77,24 +107,35 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     const cloud = getCloud();
     if (!cloud) return;
     try {
-      const [p, v] = await Promise.all([listPalettes(cloud), paletteId ? listVersions(cloud, paletteId) : Promise.resolve([])]);
+      const [p, v] = await Promise.all([
+        listPalettes(cloud),
+        paletteId ? listVersions(cloud, paletteId) : Promise.resolve([]),
+      ]);
       setPalettes(p);
       setVersions(v);
+      setFailed(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't load your palettes.");
+      setFailed(true);
+      toast.error(
+        e instanceof Error ? e.message : "Couldn't load your palettes.",
+      );
     }
   }, []);
 
   if (!enabled) return null;
 
   const signedIn = Boolean(session);
-  const dirty = current !== null && current.savedKey !== stateKey;
+  const dirty =
+    current !== null &&
+    (current.savedKey !== stateKey || name.trim() !== current.name);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
     try {
       await task();
+      setFailed(false);
     } catch (e) {
+      setFailed(true);
       toast.error(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
@@ -107,7 +148,6 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     if (next) {
       setSent(false);
       setCode("");
-      setName(current?.name ?? "");
       setNote("");
       if (session) void refresh(current?.id ?? null);
     }
@@ -117,7 +157,12 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
-      const { error } = await cloud.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: `${window.location.origin}${window.location.pathname}` } });
+      const { error } = await cloud.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}${window.location.pathname}`,
+        },
+      });
       if (error) throw new Error(error.message);
       setSent(true);
     });
@@ -127,28 +172,32 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
-      const { error } = await cloud.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: "email" });
+      const { error } = await cloud.auth.verifyOtp({
+        email: email.trim(),
+        token: code.trim(),
+        type: "email",
+      });
       if (error) throw new Error(error.message);
       setCode("");
       await refresh(current?.id ?? null);
-    });
-
-  const signOut = () =>
-    run(async () => {
-      await getCloud()?.auth.signOut();
-      onCurrent(null);
-      setPalettes([]);
-      setVersions([]);
-      setOpen(false);
-      toast.success("Signed out. Your palettes are still in your account.");
     });
 
   const saveNew = () =>
     run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
-      const { paletteId, version } = await createPalette(cloud, name, state, note);
-      onCurrent({ id: paletteId, name: name.trim() || "Untitled", versionId: version.id, savedKey: stateKey });
+      const { paletteId, version } = await createPalette(
+        cloud,
+        name,
+        state,
+        note,
+      );
+      onCurrent({
+        id: paletteId,
+        name: name.trim() || "Untitled",
+        versionId: version.id,
+        savedKey: stateKey,
+      });
       setNote("");
       await refresh(paletteId);
       toast.success("Saved as a new palette");
@@ -158,9 +207,15 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     run(async () => {
       const cloud = getCloud();
       if (!cloud || !current) return;
-      if (name.trim() && name.trim() !== current.name) await renamePalette(cloud, current.id, name);
+      if (name.trim() && name.trim() !== current.name)
+        await renamePalette(cloud, current.id, name);
       const version = await saveVersion(cloud, current.id, state, note);
-      onCurrent({ ...current, name: name.trim() || current.name, versionId: version.id, savedKey: stateKey });
+      onCurrent({
+        ...current,
+        name: name.trim() || current.name,
+        versionId: version.id,
+        savedKey: stateKey,
+      });
       setNote("");
       await refresh(current.id);
       toast.success("Saved a new version");
@@ -171,26 +226,42 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
       const cloud = getCloud();
       if (!cloud || !editing) return;
       const next = await updateVersionNote(cloud, editing.id, editing.text);
-      setVersions((list) => list.map((v) => (v.id === editing.id ? { ...v, note: next } : v)));
+      setVersions((list) =>
+        list.map((v) => (v.id === editing.id ? { ...v, note: next } : v)),
+      );
       setEditing(null);
       toast.success("Note updated");
     });
 
-  const confirmReplace = () => !hasUnsaved || window.confirm("Opening this replaces the changes you haven't saved. Continue?");
+  const confirmReplace = () =>
+    !hasUnsaved ||
+    window.confirm(
+      "Opening this replaces the changes you haven't saved. Continue?",
+    );
 
   const open_ = (task: () => Promise<LoadedVersion>) => {
     if (!confirmReplace()) return;
     void run(async () => {
       const loaded = await task();
       onOpen(loaded);
-      onCurrent({ id: loaded.paletteId, name: loaded.paletteName, versionId: loaded.versionId, savedKey: encodeState(loaded.state) });
+      onCurrent({
+        id: loaded.paletteId,
+        name: loaded.paletteName,
+        versionId: loaded.versionId,
+        savedKey: encodeState(loaded.state),
+      });
       setOpen(false);
       toast.success(`Opened ${loaded.paletteName}`);
     });
   };
 
   const remove = (p: PaletteSummary) => {
-    if (!window.confirm(`Delete "${p.name}" and all of its versions? This can't be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${p.name}" and all of its versions? This can't be undone.`,
+      )
+    )
+      return;
     void run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
@@ -200,24 +271,54 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     });
   };
 
-  const label = !signedIn ? "Sign in" : current ? current.name : "Save";
+  const status = failed
+    ? { label: "The last save failed", color: "bg-red-500" }
+    : dirty
+      ? { label: "Unsaved changes", color: "bg-amber-400" }
+      : current
+        ? { label: "All changes saved", color: "bg-green-500" }
+        : null;
+  const label = !authReady
+    ? "Save"
+    : !signedIn
+      ? "Sign in"
+      : failed
+        ? "Save failed"
+        : dirty
+          ? "Unsaved"
+          : current
+            ? "Saved"
+            : "Not saved";
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" className="max-w-40" aria-label="Saved palettes" />}>
-        {signedIn || !authReady ? <Cloud /> : <CloudOff />}
-        <span className="hidden truncate sm:inline">{authReady ? label : "Save"}</span>
-        {dirty ? <span aria-label="Unsaved changes" className="size-1.5 shrink-0 rounded-full bg-amber-400" /> : null}
-      </DialogTrigger>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{signedIn ? "Saved palettes" : "Sign in to save"}</DialogTitle>
-          <DialogDescription>
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger
+        render={
+          <Button variant="ghost" size="sm" aria-label="Version history" />
+        }
+      >
+        {status ? (
+          <span
+            aria-hidden
+            className={`size-1.5 shrink-0 rounded-full ${status.color}`}
+          />
+        ) : null}
+        <span className="hidden sm:inline">{label}</span>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="max-h-[calc(100dvh-5rem)] w-[26rem] gap-4 overflow-y-auto p-4"
+      >
+        <PopoverHeader>
+          <PopoverTitle>
+            {signedIn ? "Versions" : "Sign in to save"}
+          </PopoverTitle>
+          <PopoverDescription>
             {signedIn
               ? "Every save adds a version you can come back to. Sign in on another browser to pick up where you left off."
               : "Saved palettes follow you across browsers. We email you a sign-in code, so there's no password."}
-          </DialogDescription>
-        </DialogHeader>
+          </PopoverDescription>
+        </PopoverHeader>
 
         {!signedIn ? (
           <form
@@ -227,40 +328,76 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
               if (email.trim()) void signIn();
             }}
           >
-            <Input type="email" required autoComplete="email" placeholder="you@example.com" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="you@example.com"
+              aria-label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
             <Button type="submit" disabled={busy || !email.trim()}>
               <Mail />
               {sent ? "Email me a new code" : "Email me a sign-in code"}
             </Button>
             {sent ? (
-              <p className="text-xs text-muted-foreground">Check your inbox, then enter the code below. Your current palette stays as it is.</p>
+              <p className="text-xs text-muted-foreground">
+                Check your inbox, then enter the code below. Your current
+                palette stays as it is.
+              </p>
             ) : null}
           </form>
         ) : (
           <div className="space-y-5">
             <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide uppercase">{current ? "This palette" : "Save this palette"}</h3>
-              <Input aria-label="Palette name" placeholder="Palette name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
-              <Input aria-label="Version note" placeholder="Note for this version (optional)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+              <h3 className="text-xs font-semibold tracking-wide uppercase">
+                {current ? name.trim() || current.name : "Save this palette"}
+              </h3>
+              <Input
+                aria-label="Version note"
+                placeholder="Note for this version (optional)"
+                maxLength={200}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
               <div className="flex flex-wrap gap-2">
                 {current ? (
                   <Button onClick={saveAgain} disabled={busy}>
                     Save new version
                   </Button>
                 ) : null}
-                <Button variant={current ? "outline" : "default"} onClick={saveNew} disabled={busy || !name.trim()}>
+                <Button
+                  variant={current ? "outline" : "default"}
+                  onClick={saveNew}
+                  disabled={busy || !name.trim()}
+                  title={
+                    name.trim()
+                      ? undefined
+                      : "Name the palette in the header first"
+                  }
+                >
                   {current ? "Save as new palette" : "Save palette"}
                 </Button>
               </div>
-              {current && !dirty ? <p className="text-[11px] text-muted-foreground">No changes since the last save.</p> : null}
+              {current && !dirty ? (
+                <p className="text-[11px] text-muted-foreground">
+                  No changes since the last save.
+                </p>
+              ) : null}
             </section>
 
             {current && versions.length > 0 ? (
               <section className="space-y-2">
-                <h3 className="text-xs font-semibold tracking-wide uppercase">Versions</h3>
+                <h3 className="text-xs font-semibold tracking-wide uppercase">
+                  Versions
+                </h3>
                 <ul className="max-h-48 divide-y divide-border overflow-y-auto border border-border">
                   {versions.map((v, i) => (
-                    <li key={v.id} className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                    <li
+                      key={v.id}
+                      className="flex items-center gap-2 px-2 py-1.5 text-xs"
+                    >
                       {editing?.id === v.id ? (
                         <form
                           className="flex min-w-0 flex-1 items-center gap-1"
@@ -274,7 +411,9 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
                             aria-label="Version note"
                             maxLength={200}
                             value={editing.text}
-                            onChange={(e) => setEditing({ id: v.id, text: e.target.value })}
+                            onChange={(e) =>
+                              setEditing({ id: v.id, text: e.target.value })
+                            }
                             onKeyDown={(e) => {
                               if (e.key === "Escape") {
                                 e.stopPropagation();
@@ -283,27 +422,57 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
                             }}
                             className="h-7 text-xs"
                           />
-                          <Button type="submit" variant="ghost" size="icon" aria-label="Save note" disabled={busy}>
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Save note"
+                            disabled={busy}
+                          >
                             <Check />
                           </Button>
-                          <Button type="button" variant="ghost" size="icon" aria-label="Cancel" onClick={() => setEditing(null)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Cancel"
+                            onClick={() => setEditing(null)}
+                          >
                             <X />
                           </Button>
                         </form>
                       ) : (
                         <>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate">{v.note ?? "No note"}</span>
+                            <span className="block truncate">
+                              {v.note ?? "No note"}
+                            </span>
                             <span className="text-muted-foreground">
                               {when(v.createdAt)}
                               {i === 0 ? " · latest" : ""}
                               {v.id === current.versionId ? " · open" : ""}
                             </span>
                           </span>
-                          <Button variant="ghost" size="icon" aria-label="Edit note" disabled={busy} onClick={() => setEditing({ id: v.id, text: v.note ?? "" })} className="text-muted-foreground">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Edit note"
+                            disabled={busy}
+                            onClick={() =>
+                              setEditing({ id: v.id, text: v.note ?? "" })
+                            }
+                            className="text-muted-foreground"
+                          >
                             <Pencil />
                           </Button>
-                          <Button variant="ghost" size="sm" disabled={busy || v.id === current.versionId} onClick={() => open_(() => loadVersion(getCloud()!, v.id))}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy || v.id === current.versionId}
+                            onClick={() =>
+                              open_(() => loadVersion(getCloud()!, v.id))
+                            }
+                          >
                             Open
                           </Button>
                         </>
@@ -315,21 +484,46 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
             ) : null}
 
             <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide uppercase">Your palettes</h3>
+              <h3 className="text-xs font-semibold tracking-wide uppercase">
+                Your palettes
+              </h3>
               {palettes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Nothing saved yet.</p>
+                <p className="text-xs text-muted-foreground">
+                  Nothing saved yet.
+                </p>
               ) : (
                 <ul className="max-h-48 divide-y divide-border overflow-y-auto border border-border">
                   {palettes.map((p) => (
-                    <li key={p.id} className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-2 px-2 py-1.5 text-xs"
+                    >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{p.name}</span>
-                        <span className="text-muted-foreground">{when(p.updatedAt)}</span>
+                        <span className="block truncate font-medium">
+                          {p.name}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {when(p.updatedAt)}
+                        </span>
                       </span>
-                      <Button variant="ghost" size="sm" disabled={busy} onClick={() => open_(() => loadLatest(getCloud()!, p.id))}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          open_(() => loadLatest(getCloud()!, p.id))
+                        }
+                      >
                         Open latest
                       </Button>
-                      <Button variant="ghost" size="icon" aria-label={`Delete ${p.name}`} disabled={busy} onClick={() => remove(p)} className="text-muted-foreground hover:text-destructive">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${p.name}`}
+                        disabled={busy}
+                        onClick={() => remove(p)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
                         <Trash2 />
                       </Button>
                     </li>
@@ -337,14 +531,6 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
                 </ul>
               )}
             </section>
-
-            <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-              <span className="truncate">{session?.user.email}</span>
-              <Button variant="ghost" size="sm" onClick={signOut} disabled={busy}>
-                <LogOut />
-                Sign out
-              </Button>
-            </div>
           </div>
         )}
 
@@ -370,7 +556,24 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
             </Button>
           </form>
         ) : null}
-      </DialogContent>
-    </Dialog>
+        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">
+            Start over from the starter palette.
+          </p>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              setOpen(false);
+              onReset();
+            }}
+          >
+            <RotateCcw />
+            Reset
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

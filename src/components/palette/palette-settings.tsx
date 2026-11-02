@@ -1,16 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -40,7 +30,6 @@ interface Props {
   onGamut: (gamut: Gamut) => void;
   onScale: (scale: ScaleConfig) => void;
   /** Replaces everything with the starter palette. Recorded in the undo history. */
-  onReset: () => void;
   /** More display rows, shown in the same group as color space / gamut / theme. */
   display?: React.ReactNode;
 }
@@ -98,10 +87,8 @@ export function PaletteSettings({
   onSpace,
   onGamut,
   onScale,
-  onReset,
   display,
 }: Props) {
-  const [confirming, setConfirming] = React.useState(false);
   const theme = React.useSyncExternalStore(
     subscribeTheme,
     readTheme,
@@ -179,50 +166,6 @@ export function PaletteSettings({
       >
         <RulesSettings scale={scale} onChange={onScale} />
       </CollapsibleSection>
-
-      <CollapsibleSection id="reset" title="Start over" defaultOpen={false}>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            Go back to the starter palette.
-          </p>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="shrink-0"
-            onClick={() => setConfirming(true)}
-          >
-            <RotateCcw />
-            Reset
-          </Button>
-        </div>
-      </CollapsibleSection>
-
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Reset to the starter palette?</DialogTitle>
-            <DialogDescription>
-              This replaces your current colors, steps, tweaks and contrast
-              rules. Your saved palettes aren&apos;t touched, and you can undo
-              it right after with ⌘Z.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setConfirming(false);
-                onReset();
-              }}
-            >
-              Reset palette
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
