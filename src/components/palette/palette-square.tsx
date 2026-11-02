@@ -11,6 +11,18 @@ import { cn } from "@/lib/utils";
 
 export type SquareMode = "smooth" | "cells";
 
+/** How neighbouring swatches are blended in Smooth mode. */
+export type Blend = "mitchell" | "catmull" | "bspline" | "lanczos" | "gaussian" | "bilinear" | "smoothstep";
+export const BLENDS: { id: Blend; label: string }[] = [
+  { id: "mitchell", label: "Balanced" },
+  { id: "bspline", label: "Smoothest" },
+  { id: "gaussian", label: "Soft" },
+  { id: "catmull", label: "Sharp" },
+  { id: "lanczos", label: "Crisp" },
+  { id: "bilinear", label: "Linear" },
+  { id: "smoothstep", label: "Eased (original)" },
+];
+
 interface Props {
   generated: GeneratedHue[];
   /** The color whose steps fill the square, or null to show every color. */
@@ -23,6 +35,7 @@ interface Props {
   mode: SquareMode;
   /** Visible film grain over the smooth gradient. A faint dither is always applied to hide banding. */
   grain: boolean;
+  blend: Blend;
   /** The shade other swatches are compared against when the overlay says "selected". */
   reference: Shade | null;
   onOpenHue: (hueId: string) => void;
@@ -36,7 +49,33 @@ interface Row {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 /** Eases a 0–1 blend so each swatch keeps a soft plateau at its center instead of a straight-line ramp. */
-const ease = (t: number) => t * t * (3 - 2 * t);
+/**
+ * Resampling kernels, each with support of at most 2 swatches either side. Unlike smoothstep, none of
+ * them drops to zero slope at a swatch center, so the grid doesn't show through as flat plateaus.
+ */
+const mitchell = (B: number) => {
+  const K = (1 - B) / 2;
+  return (x: number) => {
+    const t = Math.abs(x);
+    if (t < 1) return ((12 - 9 * B - 6 * K) * t ** 3 + (-18 + 12 * B + 6 * K) * t ** 2 + (6 - 2 * B)) / 6;
+    if (t < 2) return ((-B - 6 * K) * t ** 3 + (6 * B + 30 * K) * t ** 2 + (-12 * B - 48 * K) * t + (8 * B + 24 * K)) / 6;
+    return 0;
+  };
+};
+const sinc = (x: number) => (x === 0 ? 1 : Math.sin(Math.PI * x) / (Math.PI * x));
+const KERNELS: Record<Blend, (x: number) => number> = {
+  mitchell: mitchell(0.25),
+  catmull: mitchell(0),
+  bspline: mitchell(1),
+  lanczos: (x) => (Math.abs(x) < 2 ? sinc(x) * sinc(x / 2) : 0),
+  gaussian: (x) => (Math.abs(x) < 2 ? Math.exp(-(x * x) / (2 * 0.55 * 0.55)) : 0),
+  bilinear: (x) => Math.max(0, 1 - Math.abs(x)),
+  /** The original: bilinear eased with smoothstep. Flat at every swatch center, so the grid shows. */
+  smoothstep: (x) => {
+    const t = Math.abs(x);
+    return t < 1 ? 1 - t * t * (3 - 2 * t) : 0;
+  },
+};
 
 /**
  * One rounded square that stands in for the whole palette. With every color it is rows of hues; with
@@ -44,7 +83,7 @@ const ease = (t: number) => t * t * (3 - 2 * t);
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, reference, onOpenHue, onOpenStep }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: "all" | "hue" | "step" = focused ? (focusShade ? "step" : "hue") : "all";
@@ -102,7 +141,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
       >
         <div key={`${level}-${focusHueId}-${focusGrade}`} className="absolute inset-0 animate-in overflow-hidden rounded-[inherit] duration-300 fade-in">
           {mode === "smooth" ? (
-            <SmoothCanvas colors={colors} grain={grain} />
+            <SmoothCanvas colors={colors} grain={grain} blend={blend} />
           ) : (
             <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
               {rows.map((row, r) =>
@@ -251,7 +290,7 @@ const hash = (x: number, y: number) => {
  * Paints the colors as a soft gradient. Each swatch becomes one pixel of a tiny canvas (so the browser
  * parses any CSS color, including Display P3), then the pixels are blended smoothly into a larger one.
  */
-function SmoothCanvas({ colors, grain }: { colors: string[][]; grain: boolean }) {
+function SmoothCanvas({ colors, grain, blend }: { colors: string[][]; grain: boolean; blend: Blend }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
   React.useEffect(() => {
@@ -280,31 +319,51 @@ function SmoothCanvas({ colors, grain }: { colors: string[][]; grain: boolean })
     if (!ctx) return;
     const out = ctx.createImageData(SIZE, SIZE, { colorSpace: space });
 
-    const sample = (r: number, c: number, ch: number) => src[(r * C + c) * 4 + ch];
+    // For each output column / row: the four neighbouring swatch indices and their cubic weights.
+    const kernel = KERNELS[blend];
+    const taps = (n: number, count: number) => {
+      const idx = new Int32Array(n * 4);
+      const w = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) {
+        const v = ((i + 0.5) / n) * count - 0.5;
+        const base = Math.floor(v);
+        let total = 0;
+        const raw = [0, 0, 0, 0];
+        for (let k = 0; k < 4; k++) {
+          raw[k] = kernel(v - (base - 1 + k));
+          total += raw[k];
+        }
+        for (let k = 0; k < 4; k++) {
+          idx[i * 4 + k] = clamp(base - 1 + k, 0, count - 1);
+          w[i * 4 + k] = raw[k] / total;
+        }
+      }
+      return { idx, w };
+    };
+    const xs = taps(SIZE, C);
+    const ys = taps(SIZE, R);
+
     for (let y = 0; y < SIZE; y++) {
-      const v = ((y + 0.5) / SIZE) * R - 0.5;
-      const r0 = clamp(Math.floor(v), 0, R - 1);
-      const r1 = Math.min(r0 + 1, R - 1);
-      const fy = v < 0 ? 0 : ease(clamp(v - r0, 0, 1));
       for (let x = 0; x < SIZE; x++) {
-        const u = ((x + 0.5) / SIZE) * C - 0.5;
-        const c0 = clamp(Math.floor(u), 0, C - 1);
-        const c1 = Math.min(c0 + 1, C - 1);
-        const fx = u < 0 ? 0 : ease(clamp(u - c0, 0, 1));
         const i = (y * SIZE + x) * 4;
         // Dithering by up to one level hides the 8-bit steps that show as bands in slow, dark gradients.
         const dither = hash(x, y) + hash(x + 7919, y + 104729) - 1;
         const noise = dither + (grain ? (hash(x + 31, y + 57) - 0.5) * GRAIN : 0);
         for (let ch = 0; ch < 3; ch++) {
-          const top = sample(r0, c0, ch) * (1 - fx) + sample(r0, c1, ch) * fx;
-          const bottom = sample(r1, c0, ch) * (1 - fx) + sample(r1, c1, ch) * fx;
-          out.data[i + ch] = top * (1 - fy) + bottom * fy + noise;
+          let sum = 0;
+          for (let j = 0; j < 4; j++) {
+            const row = ys.idx[y * 4 + j] * C;
+            let line = 0;
+            for (let k = 0; k < 4; k++) line += src[(row + xs.idx[x * 4 + k]) * 4 + ch] * xs.w[x * 4 + k];
+            sum += line * ys.w[y * 4 + j];
+          }
+          out.data[i + ch] = sum + noise;
         }
         out.data[i + 3] = 255;
       }
     }
     ctx.putImageData(out, 0, 0);
-  }, [colors, grain]);
+  }, [colors, grain, blend]);
 
   return <canvas ref={ref} aria-hidden className="size-full" />;
 }

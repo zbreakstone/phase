@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
-import type { SquareMode } from "./palette-square";
+import { BLENDS, type Blend, type SquareMode } from "./palette-square";
 
 export type Panel = "curves" | "report" | "targets";
 
@@ -22,6 +22,8 @@ interface Props {
   onMode: (m: SquareMode) => void;
   grain: boolean;
   onGrain: (on: boolean) => void;
+  blend: Blend;
+  onBlend: (b: Blend) => void;
   /** The one panel open under the square, if any. */
   panel: Panel | null;
   onPanel: (p: Panel | null) => void;
@@ -58,6 +60,8 @@ export function DisplaySettings({
   onMode,
   grain,
   onGrain,
+  blend,
+  onBlend,
   panel,
   onPanel,
   curvesDisabled,
@@ -81,13 +85,25 @@ export function DisplaySettings({
         </ToggleGroup>
       </SettingRow>
       {mode === "smooth" ? (
-        <SettingRow id="display-grain" label="Grain">
-          <Switch
-            id="display-grain"
-            checked={grain}
-            onCheckedChange={onGrain}
-          />
-        </SettingRow>
+        <>
+          <SettingRow id="display-blend" label="Blend">
+            <Select items={BLENDS.map((b) => ({ value: b.id, label: b.label }))} value={blend} onValueChange={(v) => v && onBlend(v as Blend)}>
+              <SelectTrigger id="display-blend" size="sm" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BLENDS.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          <SettingRow id="display-grain" label="Grain">
+            <Switch id="display-grain" checked={grain} onCheckedChange={onGrain} />
+          </SettingRow>
+        </>
       ) : null}
       <SettingRow id="display-metric" label="Show">
         <Select

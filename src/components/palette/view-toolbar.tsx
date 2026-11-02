@@ -5,11 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Toggle } from "@/components/ui/toggle";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import type { Overlay } from "@/lib/palette/overlay";
+import { Crumbs, type Crumb } from "./crumbs";
 
 /** Quick ways to look at the square differently: as equal-luminance grays, or as someone with color blindness would. */
-export function ViewToolbar({ overlay, onOverlay }: { overlay: Overlay; onOverlay: (o: Overlay) => void }) {
+export function ViewToolbar({ overlay, onOverlay, crumbs }: { overlay: Overlay; onOverlay: (o: Overlay) => void; crumbs: Crumb[] }) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4">
+      <div className="min-w-0">
+        <Crumbs items={crumbs} />
+      </div>
       <div className="flex items-center gap-2">
         <Toggle
           variant="outline"

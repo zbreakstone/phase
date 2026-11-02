@@ -9,7 +9,6 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
-import { Crumbs } from "./crumbs";
 import { SliderField } from "./fields";
 import { PanelSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
@@ -23,12 +22,16 @@ interface Props {
   onRemove: () => void;
   onResetTweaks: () => void;
   onOpenStep: (grade: number) => void;
-  onBack: () => void;
   /** How swatches are painted under the current view (vision simulation, grayscale). */
   display: (shade: Shade) => string;
 }
 
-function hueGuide(space: SpaceId, gamut: Gamut, y: number, chroma: number): React.CSSProperties {
+function hueGuide(
+  space: SpaceId,
+  gamut: Gamut,
+  y: number,
+  chroma: number,
+): React.CSSProperties {
   const def = SPACES[space];
   const stops = Array.from({ length: 25 }, (_, i) => {
     const c = solveForLuminance(def, y, i * 15, chroma, gamut);
@@ -38,7 +41,16 @@ function hueGuide(space: SpaceId, gamut: Gamut, y: number, chroma: number): Reac
 }
 
 /** Everything about one color: its name, base color, hue and colorfulness, and a list of its steps. */
-export function HuePanel({ generated, space, gamut, onChange, onRemove, onResetTweaks, onOpenStep, onBack, display }: Props) {
+export function HuePanel({
+  generated,
+  space,
+  gamut,
+  onChange,
+  onRemove,
+  onResetTweaks,
+  onOpenStep,
+  display,
+}: Props) {
   const hue = generated.hue;
   const def = SPACES[space];
   const ramp = generated.shades.filter((s) => !s.anchor);
@@ -50,56 +62,92 @@ export function HuePanel({ generated, space, gamut, onChange, onRemove, onResetT
   const [confirming, setConfirming] = React.useState(false);
 
   const lightGuide = React.useMemo(
-    () => hueGuide(space, gamut, Math.min(first?.targetLuminance ?? 0.8, 0.8), Math.max(hue.chromaLight, def.chroma.max * 0.15)),
+    () =>
+      hueGuide(
+        space,
+        gamut,
+        Math.min(first?.targetLuminance ?? 0.8, 0.8),
+        Math.max(hue.chromaLight, def.chroma.max * 0.15),
+      ),
     [space, gamut, first?.targetLuminance, hue.chromaLight, def.chroma.max],
   );
   const darkGuide = React.useMemo(
-    () => hueGuide(space, gamut, Math.max(last?.targetLuminance ?? 0.02, 0.06), Math.max(hue.chromaDark, def.chroma.max * 0.15)),
+    () =>
+      hueGuide(
+        space,
+        gamut,
+        Math.max(last?.targetLuminance ?? 0.02, 0.06),
+        Math.max(hue.chromaDark, def.chroma.max * 0.15),
+      ),
     [space, gamut, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
 
   const setChroma = (value: number) => {
     const factor = hue.chromaMid > 1e-9 ? value / hue.chromaMid : 0;
     if (hue.chromaMid > 1e-9) {
-      onChange({ chromaLight: hue.chromaLight * factor, chromaMid: value, chromaDark: hue.chromaDark * factor });
+      onChange({
+        chromaLight: hue.chromaLight * factor,
+        chromaMid: value,
+        chromaDark: hue.chromaDark * factor,
+      });
     } else {
-      onChange({ chromaLight: value * 0.35, chromaMid: value, chromaDark: value * 0.75 });
+      onChange({
+        chromaLight: value * 0.35,
+        chromaMid: value,
+        chromaDark: value * 0.75,
+      });
     }
   };
 
   return (
     <>
       <PanelSection className="space-y-3">
-      <Crumbs items={[{ label: "Colors", onClick: onBack }, { label: hue.name || "Unnamed" }]} />
-
-      <div className="flex items-center gap-2">
-        <Input
-          aria-label="Color name"
-          value={hue.name}
-          maxLength={32}
-          placeholder="Unnamed"
-          onChange={(e) => onChange({ name: e.target.value })}
-          onFocus={(e) => e.target.select()}
-          className="h-9 text-base font-semibold md:text-base"
-        />
-        <Button variant="ghost" size="icon" aria-label={`Remove ${hue.name || "this color"}`} title="Remove color" onClick={onRemove}>
-          <Trash2 />
-        </Button>
-      </div>
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label="Color name"
+            value={hue.name}
+            maxLength={32}
+            placeholder="Unnamed"
+            onChange={(e) => onChange({ name: e.target.value })}
+            onFocus={(e) => e.target.select()}
+            className="h-9 text-base font-semibold md:text-base"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove ${hue.name || "this color"}`}
+            title="Remove color"
+            onClick={onRemove}
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </PanelSection>
 
       <PanelSection>
-        <SourceEditor source={hue.source} analysis={generated.source} onChange={(source) => onChange({ source })} />
+        <SourceEditor
+          source={hue.source}
+          analysis={generated.source}
+          onChange={(source) => onChange({ source })}
+        />
       </PanelSection>
 
       <PanelSection className="space-y-3">
         <h3 className="text-sm font-semibold">Hue</h3>
-        <p className="text-[11px] text-muted-foreground">Tints start at the lightest hue and end at the darkest one, so yellows can turn orange instead of muddy olive. See the curve below the square.</p>
+        <p className="text-[11px] text-muted-foreground">
+          Tints start at the lightest hue and end at the darkest one, so yellows
+          can turn orange instead of muddy olive. See the curve below the
+          square.
+        </p>
         <SliderField
           id="hue-light"
           label="Lightest shade"
           disabled={lockedLight}
-          hint={lockedLight ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it." : undefined}
+          hint={
+            lockedLight
+              ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it."
+              : undefined
+          }
           value={hue.hueLight}
           min={0}
           max={360}
@@ -112,7 +160,11 @@ export function HuePanel({ generated, space, gamut, onChange, onRemove, onResetT
           id="hue-dark"
           label="Darkest shade"
           disabled={lockedDark}
-          hint={lockedDark ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it." : undefined}
+          hint={
+            lockedDark
+              ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it."
+              : undefined
+          }
           value={hue.hueDark}
           min={0}
           max={360}
@@ -138,13 +190,21 @@ export function HuePanel({ generated, space, gamut, onChange, onRemove, onResetT
         />
       </PanelSection>
 
-      <PanelSection role="region" aria-labelledby="hue-steps" className="space-y-2">
+      <PanelSection
+        role="region"
+        aria-labelledby="hue-steps"
+        className="space-y-2"
+      >
         <div className="flex items-center justify-between gap-2">
           <h3 id="hue-steps" className="text-sm font-semibold">
             Steps
           </h3>
           {tuned > 0 ? (
-            <Button variant="destructive" size="xs" onClick={() => setConfirming(true)}>
+            <Button
+              variant="destructive"
+              size="xs"
+              onClick={() => setConfirming(true)}
+            >
               Reset {tuned} tuned
             </Button>
           ) : null}
@@ -157,19 +217,37 @@ export function HuePanel({ generated, space, gamut, onChange, onRemove, onResetT
                 onClick={() => onOpenStep(s.grade)}
                 className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
-                <span aria-hidden className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15" style={{ backgroundColor: display(s) }}>
-                  {s.tweaked ? <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-white mix-blend-difference" /> : null}
+                <span
+                  aria-hidden
+                  className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15"
+                  style={{ backgroundColor: display(s) }}
+                >
+                  {s.tweaked ? (
+                    <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-white mix-blend-difference" />
+                  ) : null}
                 </span>
-                <span className="w-9 font-mono text-xs tabular-nums">{s.grade}</span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">{s.hex}</span>
-                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{contrastFromLuminance(1, s.luminance).toFixed(2)}</span>
+                <span className="w-9 font-mono text-xs tabular-nums">
+                  {s.grade}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                  {s.hex}
+                </span>
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                  {contrastFromLuminance(1, s.luminance).toFixed(2)}
+                </span>
               </button>
             </li>
           ))}
         </ul>
       </PanelSection>
 
-      <ResetTweaksDialog open={confirming} onOpenChange={setConfirming} name={hue.name || "Unnamed"} count={tuned} onConfirm={onResetTweaks} />
+      <ResetTweaksDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        name={hue.name || "Unnamed"}
+        count={tuned}
+        onConfirm={onResetTweaks}
+      />
     </>
   );
 }

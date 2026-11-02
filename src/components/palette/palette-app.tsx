@@ -27,7 +27,7 @@ import { ColorsList } from "./colors-list";
 import { CurvesPanel } from "./curves-panel";
 import { HuePanel } from "./hue-panel";
 import { PaletteSettings } from "./palette-settings";
-import { PaletteSquare, type SquareMode } from "./palette-square";
+import { PaletteSquare, type Blend, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
@@ -62,6 +62,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
   const [grain, setGrain] = React.useState(true);
+  const [blend, setBlend] = React.useState<Blend>("mitchell");
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
@@ -421,12 +422,23 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                     gamut={state.gamut}
                     mode={mode}
                     grain={grain}
+                    blend={blend}
                     reference={reference}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
                   />
                   <div className="absolute inset-x-0 bottom-full mb-4">
-                    <ViewToolbar overlay={overlay} onOverlay={setOverlay} />
+                    <ViewToolbar
+                      overlay={overlay}
+                      onOverlay={setOverlay}
+                      crumbs={
+                        focused && focusShade
+                          ? [{ label: "Colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
+                          : focused
+                            ? [{ label: "Colors", onClick: up }, { label: focused.hue.name || "Unnamed" }]
+                            : [{ label: "Colors" }]
+                      }
+                    />
                   </div>
                 </div>
                 {openPanel ? <div className="mt-16 space-y-6" /> : null}
@@ -453,8 +465,6 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                   onTweak={(patch) => tweakStep(focused.hue.id, focusShade.grade, patch)}
                   onResetStep={() => resetTweaks(focused.hue.id, focusShade.grade)}
                   onResetAll={() => resetTweaks(focused.hue.id)}
-                  onBackToColors={up}
-                  onBackToHue={() => openHue(focused.hue.id)}
                   onPrevious={goStep(-1)}
                   onNext={goStep(1)}
                 />
@@ -468,17 +478,16 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                   onRemove={() => remove(focused.hue.id)}
                   onResetTweaks={() => resetTweaks(focused.hue.id)}
                   onOpenStep={(g) => openStep(focused.hue.id, g)}
-                  onBack={up}
                   display={(shade) => displayShade(shade, overlay, state.gamut)}
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} blend={blend} onBlend={setBlend} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} />
                 </>
               )}
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} blend={blend} onBlend={setBlend} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
             </ScrollFade>
           )}
         </aside>
