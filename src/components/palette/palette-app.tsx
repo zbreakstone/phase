@@ -35,12 +35,15 @@ import { DisplaySettings, type Panel } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
 import { displayShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
+import { AccountMenu } from "./account-menu";
+import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
+const NAME_KEY = "phase:name:v1";
 
 /** Undo and redo restore the palette but leave your current swatch selected, as long as it still exists. */
 const keepSelection = (restored: PaletteState, current: PaletteState): PaletteState =>
@@ -60,12 +63,15 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
+  const [resetOpen, setResetOpen] = React.useState(false);
   const [grain, setGrain] = React.useState(true);
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
   const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
+  /** The palette's name, edited in the header. A saved palette is renamed on its next save. */
+  const [name, setName] = React.useState("");
   const stateKey = React.useMemo(() => encodeState(state), [state]);
 
   React.useEffect(() => {
@@ -73,7 +79,14 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     (async () => {
       try {
         const raw = window.localStorage.getItem(CURRENT_KEY);
-        if (raw && !canceled) setCurrent(JSON.parse(raw) as CurrentPalette);
+        const savedName = window.localStorage.getItem(NAME_KEY);
+        if (raw && !canceled) {
+          const pointer = JSON.parse(raw) as CurrentPalette;
+          setCurrent(pointer);
+          setName(savedName ?? pointer.name);
+        } else if (savedName && !canceled) {
+          setName(savedName);
+        }
       } catch {
         // Unreadable pointer: treat the palette as unsaved.
       }
@@ -119,15 +132,25 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     };
   }, [storage, shareCode, loadState]);
 
+  const updateName = React.useCallback((next: string) => {
+    setName(next);
+    try {
+      window.localStorage.setItem(NAME_KEY, next);
+    } catch {
+      // Private mode: the name just won't survive a reload.
+    }
+  }, []);
+
   const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
     setCurrent(next);
+    if (next) updateName(next.name);
     try {
       if (next) window.localStorage.setItem(CURRENT_KEY, JSON.stringify(next));
       else window.localStorage.removeItem(CURRENT_KEY);
     } catch {
       // Private mode: the pointer just won't survive a reload.
     }
-  }, []);
+  }, [updateName]);
 
   React.useEffect(() => {
     const onHashChange = () => {
@@ -331,9 +354,22 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border bg-white dark:bg-black">
-        <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
+        <div className="mx-auto grid h-14 max-w-[88rem] grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3 px-4">
           <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
-          <div className="ml-auto flex items-center gap-2">
+          <input
+            aria-label="Palette name"
+            value={name}
+            maxLength={80}
+            placeholder="Untitled palette"
+            onChange={(e) => updateName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+            size={Math.max(12, name.length + 1)}
+            className="h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex items-center justify-end gap-2">
             <div className="flex items-center" role="group" aria-label="History">
               <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
                 <Undo2 />
@@ -344,16 +380,20 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             </div>
             <SavesDialog
               state={state}
+              name={name}
               stateKey={stateKey}
               current={current}
-              hasUnsaved={current !== null && current.savedKey !== stateKey}
+              hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
               onCurrent={updateCurrent}
+              onReset={() => setResetOpen(true)}
               onOpen={(loaded) => {
                 setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
                 setFocus({ hueId: null, grade: null });
               }}
             />
             <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
+            <AccountMenu onSignedOut={() => updateCurrent(null)} />
+            <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
             <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
           </div>
         </div>
@@ -449,7 +489,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} />
                 </>
