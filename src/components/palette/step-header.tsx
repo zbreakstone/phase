@@ -88,7 +88,7 @@ function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderAction
       >
         {grade}
       </PopoverTrigger>
-      <PopoverContent align="center" className="w-60 rounded-none">
+      <PopoverContent align="center" className="w-60">
         <PopoverHeader>
           <PopoverTitle>Step {grade}</PopoverTitle>
           <PopoverDescription className="text-xs">The number is also where it sits between white and black.</PopoverDescription>
@@ -113,7 +113,7 @@ function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderAction
               onFocus={(e) => e.target.select()}
               className="h-8 font-mono text-xs md:text-xs"
             />
-            <Button type="submit" size="sm" className="rounded-none" disabled={!changed}>
+            <Button type="submit" size="sm" disabled={!changed}>
               Rename
             </Button>
           </div>

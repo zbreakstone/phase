@@ -34,7 +34,7 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={render}>{children}</PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-72 space-y-3 rounded-none">
+      <PopoverContent align={align} side={side} className="w-72 space-y-3">
         <form
           className="space-y-1.5"
           onSubmit={(e) => {
@@ -47,7 +47,7 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
           </label>
           <div className="flex gap-2">
             <Input id={hexId} placeholder="#3b82f6" value={text} onChange={(e) => setText(e.target.value)} aria-invalid={text && !parsed ? true : undefined} className="h-8 font-mono text-xs md:text-xs" />
-            <Button type="submit" size="sm" className="rounded-none" disabled={!parsed}>
+            <Button type="submit" size="sm" disabled={!parsed}>
               Add
             </Button>
           </div>

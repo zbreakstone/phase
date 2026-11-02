@@ -241,14 +241,14 @@ import { analyzeSource, nearestGrade, sourceAnchor } from "@/lib/palette/source"
 import { hueFromSource } from "@/lib/palette/defaults";
 import { coordsOf } from "@/lib/palette/source";
 import { sanitizeState, decodeState, encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
-import { toCss, toTailwindV4, toTokensJson } from "@/lib/export/formats";
+import { toCss, toCssDual, toFigmaVariables, toTailwindV4, toTokensJson, toTokensJsonDual } from "@/lib/export/formats";
 
 describe("step names and anchors", () => {
-  it("defaults to 50..900 with white 0 and black 1000 on every hue", () => {
+  it("defaults to 50..950 with white 0 and black 1000 on every hue", () => {
     const state = defaultState();
-    expect(state.scale.grades).toEqual([50, 100, 200, 300, 400, 500, 600, 700, 800, 900]);
+    expect(state.scale.grades).toEqual([50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]);
     for (const g of generatePalette(state.space, state.scale, state.hues)) {
-      expect(g.shades.map((s) => s.grade)).toEqual([0, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]);
+      expect(g.shades.map((s) => s.grade)).toEqual([0, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950, 1000]);
       expect(g.shades[0].hex).toBe("#ffffff");
       expect(g.shades[g.shades.length - 1].hex).toBe("#000000");
     }
@@ -268,19 +268,50 @@ describe("step names and anchors", () => {
       }
     }
   });
-  it("exports white and black inside every color set", () => {
+  it("exports white and black once, not inside every color set", () => {
     const state = defaultState();
     const gen = generatePalette(state.space, state.scale, state.hues);
     const css = toCss(gen, "hex");
+    expect(css).toContain("--white: #ffffff;");
+    expect(css).toContain("--black: #000000;");
     for (const h of ["gray", "red", "yellow", "green", "blue", "violet"]) {
-      expect(css).toContain(`--${h}-0: #ffffff;`);
-      expect(css).toContain(`--${h}-1000: #000000;`);
+      expect(css).not.toContain(`--${h}-0:`);
+      expect(css).not.toContain(`--${h}-1000:`);
       expect(css).toContain(`--${h}-500:`);
     }
-    expect(toTailwindV4(gen, "hex")).toContain("--color-blue-1000: #000000;");
+    const tw = toTailwindV4(gen, "hex");
+    expect(tw).toContain("--color-white: #ffffff;");
+    expect(tw).toContain("--color-black: #000000;");
+    expect(tw).not.toContain("--color-blue-1000");
     const json = JSON.parse(toTokensJson(state, gen, "hex"));
-    expect(json.color.red["0"].$value).toBe("#ffffff");
-    expect(json.color.red["1000"].$value).toBe("#000000");
+    expect(json.color.white.$value).toBe("#ffffff");
+    expect(json.color.black.$value).toBe("#000000");
+    expect(json.color.red["0"]).toBeUndefined();
+    expect(json.color.red["1000"]).toBeUndefined();
+    expect(json.color.red["500"].$value).toMatch(/^#/);
+  });
+  it("keeps a hue named white or black from colliding with the shared tokens", () => {
+    const state = defaultState();
+    const hues = state.hues.slice(0, 2).map((h, i) => ({ ...h, name: i === 0 ? "White" : "Black" }));
+    const gen = generatePalette(state.space, state.scale, hues);
+    const json = JSON.parse(toTokensJson(state, gen, "hex"));
+    expect(json.color.white.$value).toBe("#ffffff");
+    expect(json.color["white-2"]["500"]).toBeDefined();
+    expect(json.color["black-2"]["500"]).toBeDefined();
+  });
+  it("puts white and black in the base block only when exporting both gamuts", () => {
+    const state = defaultState();
+    const srgb = generatePalette(state.space, state.scale, state.hues, "srgb");
+    const p3 = generatePalette(state.space, state.scale, state.hues, "p3");
+    const css = toCssDual(srgb, p3, "oklch");
+    expect(css.match(/--white:/g)).toHaveLength(1);
+    expect(css.match(/--black:/g)).toHaveLength(1);
+    const json = JSON.parse(toTokensJsonDual(state, srgb, p3, "oklch"));
+    expect(json.color.white.$extensions).toBeUndefined();
+    const figma = JSON.parse(toFigmaVariables(srgb));
+    const colors = figma[0]["Phase palette"].modes.Default.colors;
+    expect(colors.white.$value).toBe("#ffffff");
+    expect(colors.red["0"]).toBeUndefined();
   });
 });
 

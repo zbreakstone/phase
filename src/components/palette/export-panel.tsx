@@ -4,12 +4,12 @@ import * as React from "react";
 import { Copy, Download, FileCode2, PackageOpen } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   COLOR_FORMATS,
@@ -30,16 +30,16 @@ import {
 import { GAMUTS } from "@/lib/color/gamut";
 import { generatePalette } from "@/lib/palette/generate";
 import type { GeneratedHue, PaletteState } from "@/lib/palette/types";
+import type { ExportKind } from "./share-menu";
 
 interface Props {
   state: PaletteState;
   generated: GeneratedHue[];
+  /** Which format to show; the controls below follow it. */
+  tab: ExportKind;
 }
 
-type Tab = "css" | "json" | "tailwind" | "figma";
-
-export function ExportPanel({ state, generated }: Props) {
-  const [tab, setTab] = React.useState<Tab>("css");
+export function ExportPanel({ state, generated, tab }: Props) {
   const [format, setFormat] = React.useState<ColorFormat>("hex");
   const [twVersion, setTwVersion] = React.useState<"v4" | "v3">("v4");
   const [prefix, setPrefix] = React.useState("");
@@ -113,7 +113,8 @@ export function ExportPanel({ state, generated }: Props) {
   };
 
   return (
-    <div className="space-y-4">
+    <>
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-wrap items-start gap-4">
           {tab !== "figma" ? (
@@ -153,14 +154,14 @@ export function ExportPanel({ state, generated }: Props) {
             </div>
           ) : null}
           {tab === "json" ? (
-            <div className="grid gap-1.5">
-              <Label htmlFor="json-metadata" className="text-sm">
-                Phase metadata
-              </Label>
-              <div className="flex h-8 items-center gap-2">
-                <Switch id="json-metadata" checked={metadata} onCheckedChange={setMetadata} />
-                <span className="max-w-64 text-xs text-muted-foreground">Adds gamut, contrast rules and luminance. Only needed to audit the file or rebuild it in Phase.</span>
+            <div className="flex w-full items-start justify-between gap-6">
+              <div className="grid gap-0.5">
+                <Label htmlFor="json-metadata" className="text-sm">
+                  Phase metadata
+                </Label>
+                <p className="max-w-md text-xs text-muted-foreground">Adds gamut, contrast rules and luminance. Only needed to audit the file or rebuild it in Phase.</p>
               </div>
+              <Switch id="json-metadata" checked={metadata} onCheckedChange={setMetadata} className="mt-0.5 shrink-0" />
             </div>
           ) : null}
           {tab === "tailwind" ? (
@@ -173,21 +174,11 @@ export function ExportPanel({ state, generated }: Props) {
             </div>
           ) : null}
         </div>
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" onClick={download}>
-            <Download />
-            Download
-          </Button>
-          <Button onClick={copy}>
-            <Copy />
-            Copy
-          </Button>
-        </div>
       </div>
 
       {tab === "figma" ? (
         <p className="text-xs text-muted-foreground">
-          In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;.
+          In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;, plus colors/white and colors/black.
           {dual
             ? " It has two modes, sRGB and Display P3, each solved for the same contrast. Figma reads hex, so the P3 mode holds sRGB fallback values unless the file's color space is Display P3."
             : state.gamut === "p3"
@@ -210,29 +201,28 @@ export function ExportPanel({ state, generated }: Props) {
         </p>
       ) : null}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="css">CSS variables</TabsTrigger>
-          <TabsTrigger value="json">JSON tokens</TabsTrigger>
-          <TabsTrigger value="tailwind">Tailwind</TabsTrigger>
-          <TabsTrigger value="figma">Figma variables</TabsTrigger>
-        </TabsList>
-        {(["css", "json", "tailwind", "figma"] as const).map((t) => (
-          <TabsContent key={t} value={t}>
-            <div className="relative border border-border bg-muted/30">
-              <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
-                <FileCode2 className="size-3.5" />
-                {outputs[t].file}
-              </div>
-              <ScrollArea className="h-80">
-                <pre className="p-3 font-mono text-xs leading-relaxed">
-                  <code>{outputs[t].text}</code>
-                </pre>
-              </ScrollArea>
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+      <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+        <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
+          <FileCode2 className="size-3.5" />
+          {current.file}
+        </div>
+        <ScrollArea className="h-80">
+          <pre className="p-3 font-mono text-xs leading-relaxed">
+            <code>{current.text}</code>
+          </pre>
+        </ScrollArea>
+      </div>
     </div>
+    <DialogFooter>
+      <Button variant="outline" onClick={download}>
+        <Download />
+        Download
+      </Button>
+      <Button onClick={copy}>
+        <Copy />
+        Copy
+      </Button>
+    </DialogFooter>
+    </>
   );
 }

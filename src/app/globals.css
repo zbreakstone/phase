@@ -127,4 +127,33 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 resets buttons to the default arrow. Anything clickable should say so. */
+  button:not(:disabled),
+  summary,
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"]:not([data-disabled]),
+  [role="combobox"]:not([data-disabled]),
+  [role="tab"]:not([data-disabled]),
+  input[type="color"]:not(:disabled),
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+  /* Slider handles are dragged, not clicked. */
+  [data-slot="slider-thumb"]:not([data-disabled]) {
+    cursor: grab;
+  }
+  [data-slot="slider-thumb"]:not([data-disabled]):active {
+    cursor: grabbing;
+  }
+  /* While a row is being dragged, keep the grabbing cursor everywhere, even over buttons. */
+  html.is-dragging,
+  html.is-dragging * {
+    cursor: grabbing !important;
+  }
 }

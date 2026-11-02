@@ -204,7 +204,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" className="max-w-40 rounded-none" aria-label="Saved palettes" />}>
+      <DialogTrigger render={<Button variant="ghost" size="sm" className="max-w-40" aria-label="Saved palettes" />}>
         {signedIn || !authReady ? <Cloud /> : <CloudOff />}
         <span className="hidden truncate sm:inline">{authReady ? label : "Save"}</span>
         {dirty ? <span aria-label="Unsaved changes" className="size-1.5 shrink-0 rounded-full bg-amber-400" /> : null}

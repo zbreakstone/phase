@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Layers, Link2, Redo2, RotateCcw, SunMedium, Undo2 } from "lucide-react";
+import Image from "next/image";
+import { Eye, Redo2, SunMedium, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,9 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ContrastReport } from "./contrast-report";
-import { DEFAULT_GAMUT, GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
+import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
-import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
+import { type SpaceId } from "@/lib/color/spaces";
 import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig, StepTweak } from "@/lib/palette/types";
@@ -25,12 +26,13 @@ import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import { createShare, getShared } from "@/lib/cloud/palettes";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
-import { HelpTip } from "./fields";
 import { AddColorEnd } from "./color-label";
 import { HuePanel } from "./hue-panel";
 import { PaletteGrid, displayShade, type Against, type Metric, type Overlay } from "./palette-grid";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
+import { SettingsMenu } from "./settings-menu";
+import { ShareMenu, type ExportKind } from "./share-menu";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -165,6 +167,8 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     return () => clearTimeout(t);
   }, [state, ready, storage]);
 
+  const [exportKind, setExportKind] = React.useState<ExportKind | null>(null);
+
   const share = async () => {
     let url = `${window.location.origin}${window.location.pathname}${hashForState(state)}`;
     let short = false;
@@ -280,7 +284,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const reset = () => {
     setState(defaultState());
     setGrade(null);
-    toast.success("Back to the starter palette");
+    toast.success("Back to the starter palette", { action: { label: "Undo", onClick: undo } });
   };
 
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
@@ -289,51 +293,16 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex size-6 items-center justify-center bg-primary text-primary-foreground">
-              <Layers className="size-3.5" />
-            </span>
-            Phase
-          </div>
-          <div className="ml-2 flex items-center gap-1.5">
-            <Select
-              items={SPACE_ORDER.map((id) => ({ value: id, label: SPACES[id].label }))}
-              value={state.space}
-              onValueChange={(v) => setSpace(v as SpaceId)}
-            >
-              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Color space">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SPACE_ORDER.map((id) => (
-                  <SelectItem key={id} value={id}>
-                    {SPACES[id].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <HelpTip>{SPACES[state.space].description}</HelpTip>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Select
-              items={GAMUT_ORDER.map((id) => ({ value: id, label: GAMUTS[id].label }))}
-              value={state.gamut}
-              onValueChange={(v) => setGamut(v as Gamut)}
-            >
-              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Color gamut">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GAMUT_ORDER.map((id) => (
-                  <SelectItem key={id} value={id}>
-                    {GAMUTS[id].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <HelpTip>{GAMUTS[state.gamut].description}</HelpTip>
-          </div>
+          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto" />
           <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center" role="group" aria-label="History">
+              <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
+                <Undo2 />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⇧⌘Z)">
+                <Redo2 />
+              </Button>
+            </div>
             <SavesDialog
               state={state}
               stateKey={stateKey}
@@ -345,33 +314,19 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                 setGrade(null);
               }}
             />
-            <div className="flex items-center" role="group" aria-label="History">
-              <Button variant="ghost" size="icon-sm" className="rounded-none" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
-                <Undo2 />
-              </Button>
-              <Button variant="ghost" size="icon-sm" className="rounded-none" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⇧⌘Z)">
-                <Redo2 />
-              </Button>
-            </div>
-            <Button variant="ghost" size="sm" className="rounded-none" onClick={reset} aria-label="Reset to starter palette">
-              <RotateCcw />
-              <span className="hidden sm:inline">Reset</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="rounded-none" onClick={share} disabled={!ready} aria-label="Copy a share link">
-              <Link2 />
-              <span className="hidden sm:inline">Share</span>
-            </Button>
-            <ExportDialog state={state} generated={generated} />
+            <SettingsMenu space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} />
+            <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
+            <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
           </div>
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        <section className="min-w-0 space-y-3 lg:overflow-y-auto">
+        <section className="-ml-4 min-w-0 space-y-3 pl-4 lg:overflow-y-auto">
           {!ready ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading your palette">
-              <Skeleton className="h-9 w-full rounded-none" />
-              <Skeleton className="h-72 w-full rounded-none" />
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-72 w-full" />
             </div>
           ) : (
             <>
@@ -462,10 +417,10 @@ function Toolbar({
           spacing={0}
           aria-label="What to show on each swatch"
         >
-          <ToggleGroupItem value="contrast" className="rounded-none">Contrast</ToggleGroupItem>
-          <ToggleGroupItem value="apca" className="rounded-none" title="APCA Lc, the WCAG 3 draft contrast model. Informational: WCAG 2 ratios still decide pass or fail.">APCA</ToggleGroupItem>
-          <ToggleGroupItem value="luminance" className="rounded-none">Luminance</ToggleGroupItem>
-          <ToggleGroupItem value="off" className="rounded-none">Off</ToggleGroupItem>
+          <ToggleGroupItem value="contrast">Contrast</ToggleGroupItem>
+          <ToggleGroupItem value="apca" title="APCA Lc, the WCAG 3 draft contrast model. Informational: WCAG 2 ratios still decide pass or fail.">APCA</ToggleGroupItem>
+          <ToggleGroupItem value="luminance">Luminance</ToggleGroupItem>
+          <ToggleGroupItem value="off">Off</ToggleGroupItem>
         </ToggleGroup>
       </div>
       {overlay.metric === "contrast" || overlay.metric === "apca" ? (
@@ -479,9 +434,9 @@ function Toolbar({
             spacing={0}
             aria-label="Contrast against"
           >
-            <ToggleGroupItem value="white" className="rounded-none">White</ToggleGroupItem>
-            <ToggleGroupItem value="black" className="rounded-none">Black</ToggleGroupItem>
-            <ToggleGroupItem value="selected" className="rounded-none">Selected</ToggleGroupItem>
+            <ToggleGroupItem value="white">White</ToggleGroupItem>
+            <ToggleGroupItem value="black">Black</ToggleGroupItem>
+            <ToggleGroupItem value="selected">Selected</ToggleGroupItem>
           </ToggleGroup>
         </div>
       ) : null}
@@ -490,7 +445,7 @@ function Toolbar({
         <Toggle
           variant="outline"
           size="sm"
-          className="rounded-none"
+         
           pressed={overlay.grayscale}
           onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
           aria-label="Show swatches as grays of equal luminance"
@@ -504,7 +459,7 @@ function Toolbar({
           value={overlay.vision}
           onValueChange={(v) => v && onOverlay({ ...overlay, vision: v as VisionId, grayscale: false })}
         >
-          <SelectTrigger size="sm" className="w-40 rounded-none" aria-label="Simulate color vision">
+          <SelectTrigger size="sm" className="w-40" aria-label="Simulate color vision">
             <Eye />
             <SelectValue />
           </SelectTrigger>

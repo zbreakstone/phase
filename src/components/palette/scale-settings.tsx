@@ -148,7 +148,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
         <ToggleGroup
           value={[scale.luminanceMode]}
           onValueChange={(v) => {
@@ -160,9 +160,9 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
           spacing={0}
           aria-label="Luminance mode"
         >
-          <ToggleGroupItem value="envoy" className="rounded-none">Envoy</ToggleGroupItem>
-          <ToggleGroupItem value="uniform" className="rounded-none">Even contrast</ToggleGroupItem>
-          <ToggleGroupItem value="custom" className="rounded-none">Custom</ToggleGroupItem>
+          <ToggleGroupItem value="envoy">Envoy</ToggleGroupItem>
+          <ToggleGroupItem value="uniform">Even contrast</ToggleGroupItem>
+          <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
         </ToggleGroup>
         {custom ? (
           <Button variant="ghost" size="sm" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>
@@ -173,7 +173,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
       </div>
       <p className="text-[11px] text-muted-foreground">
         {custom
-          ? "Drag a step or type a luminance. The band behind each slider is the window that keeps every rule intact."
+          ? "Drag a step or type a luminance. The green band is the window that keeps every rule intact. Its ends and middle have marks the handle snaps to."
           : scale.luminanceMode === "envoy"
             ? "Tuned from Katie Riley's Envoy ranges: brighter mid-dark shades, with 800 and 900 kept close to black. Switch to Custom to move individual steps."
             : "Each step multiplies contrast by the same factor, so ratio depends only on how far apart two steps are. Switch to Custom to move individual steps."}
@@ -199,8 +199,13 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
       <div className="space-y-0.5">
         <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 text-[10px] text-muted-foreground">
           <span>Step</span>
-          <span>dark ← luminance → light</span>
-          <span className="text-right">Y</span>
+          <span className="flex justify-between">
+            <span>← Lighter</span>
+            <span>Darker →</span>
+          </span>
+          <span className="text-right" title="Relative luminance (WCAG Y): 1 is white, 0 is black. Contrast between two steps comes from the ratio of their luminance.">
+            Luminance
+          </span>
           <span className="text-right">vs white</span>
         </div>
         {grades.map((g) => (
@@ -215,8 +220,12 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
   const y = targetLuminance(scale, grade);
   const range = feasibleRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
-  const left = (1 - toPos(range.min)) * 100;
-  const right = (1 - toPos(range.max)) * 100;
+  // Lighter is on the left, like the grid above: white (Y = 1) sits at 0 and black at 1.
+  const left = toPos(range.max) * 100;
+  const right = toPos(range.min) * 100;
+  // Quick stops inside the allowed window: lightest, middle, darkest.
+  const stops = range.max - range.min > 1e-6 ? [toPos(range.max), (toPos(range.max) + toPos(range.min)) / 2, toPos(range.min)] : [toPos(range.min)];
+  const SNAP = 0.012;
   const [draft, setDraft] = React.useState<string | null>(null);
 
   return (
@@ -229,14 +238,23 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
           className={`absolute top-1/2 h-2 -translate-y-1/2 ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
           style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
         />
+        {stops.map((p, i) => (
+          <div key={i} aria-hidden className="pointer-events-none absolute top-1/2 h-3.5 w-px -translate-y-1/2 bg-foreground/50" style={{ left: `${p * 100}%` }} />
+        ))}
         <Slider
           aria-label={`Luminance target for step ${grade}`}
-          value={[1 - toPos(y)]}
+          value={[toPos(y)]}
           min={0}
           max={1}
           step={0.002}
           disabled={!custom}
-          onValueChange={(v) => onChange(fromPos(1 - (Array.isArray(v) ? v[0] : v)))}
+          // Center alignment puts the handle exactly at value% of the width, which is where the band and ticks are drawn.
+          thumbAlignment="center"
+          onValueChange={(v) => {
+            const raw = Array.isArray(v) ? v[0] : v;
+            const near = stops.find((p) => Math.abs(p - raw) <= SNAP);
+            onChange(fromPos(near ?? raw));
+          }}
           className="relative [&_[data-slot=slider-track]]:bg-transparent [&_[data-slot=slider-range]]:bg-transparent"
         />
       </div>
