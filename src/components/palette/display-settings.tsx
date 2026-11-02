@@ -8,10 +8,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
-import { BLENDS, type Blend, type SquareMode } from "./palette-square";
+import type { SquareMode } from "./palette-square";
 
 export type Panel = "curves" | "report" | "targets";
 
@@ -19,11 +18,8 @@ interface Props {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
   mode: SquareMode;
-  onMode: (m: SquareMode) => void;
   grain: boolean;
   onGrain: (on: boolean) => void;
-  blend: Blend;
-  onBlend: (b: Blend) => void;
   /** The one panel open under the square, if any. */
   panel: Panel | null;
   onPanel: (p: Panel | null) => void;
@@ -57,11 +53,8 @@ export function DisplaySettings({
   overlay,
   onOverlay,
   mode,
-  onMode,
   grain,
   onGrain,
-  blend,
-  onBlend,
   panel,
   onPanel,
   curvesDisabled,
@@ -71,37 +64,14 @@ export function DisplaySettings({
     overlay.metric === "contrast" || overlay.metric === "apca";
   const rows = (
     <>
-      <SettingRow label="Square">
-        <ToggleGroup
-          value={[mode]}
-          onValueChange={(v) => v[0] && onMode(v[0] as SquareMode)}
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label="How the square is drawn"
-        >
-          <ToggleGroupItem value="smooth">Smooth</ToggleGroupItem>
-          <ToggleGroupItem value="cells">Cells</ToggleGroupItem>
-        </ToggleGroup>
-      </SettingRow>
       {mode === "smooth" ? (
         <>
-          <SettingRow id="display-blend" label="Blend">
-            <Select items={BLENDS.map((b) => ({ value: b.id, label: b.label }))} value={blend} onValueChange={(v) => v && onBlend(v as Blend)}>
-              <SelectTrigger id="display-blend" size="sm" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {BLENDS.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </SettingRow>
           <SettingRow id="display-grain" label="Grain">
-            <Switch id="display-grain" checked={grain} onCheckedChange={onGrain} />
+            <Switch
+              id="display-grain"
+              checked={grain}
+              onCheckedChange={onGrain}
+            />
           </SettingRow>
         </>
       ) : null}

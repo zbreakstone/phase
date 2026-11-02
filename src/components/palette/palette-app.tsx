@@ -27,7 +27,7 @@ import { ColorsList } from "./colors-list";
 import { CurvesPanel } from "./curves-panel";
 import { HuePanel } from "./hue-panel";
 import { PaletteSettings } from "./palette-settings";
-import { PaletteSquare, type Blend, type SquareMode } from "./palette-square";
+import { PaletteSquare, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
@@ -35,6 +35,8 @@ import { DisplaySettings, type Panel } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
 import { displayShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
+import { AccountMenu } from "./account-menu";
+import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
@@ -61,8 +63,8 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
+  const [resetOpen, setResetOpen] = React.useState(false);
   const [grain, setGrain] = React.useState(true);
-  const [blend, setBlend] = React.useState<Blend>("mitchell");
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
@@ -383,25 +385,28 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
               current={current}
               hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
               onCurrent={updateCurrent}
+              onReset={() => setResetOpen(true)}
               onOpen={(loaded) => {
                 setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
                 setFocus({ hueId: null, grade: null });
               }}
             />
             <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
+            <AccountMenu onSignedOut={() => updateCurrent(null)} />
+            <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
             <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
           </div>
         </div>
       </header>
 
       <main
-        className="mx-auto lg:[container-type:size] grid w-full max-w-[88rem] flex-1 gap-6 px-4 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-hidden lg:py-0"
+        className="mx-auto lg:[container-type:size] grid w-full max-w-[88rem] flex-1 gap-6 px-4 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0"
       >
-        <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:px-8 lg:py-6">
+        <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:-mx-10 lg:px-10 lg:py-6">
           <div className="my-auto space-y-6">
             {!ready ? (
               <div aria-busy="true" aria-label="Loading your palette" className="mx-auto">
-                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-29.5rem,100cqh-7rem)]" />
+                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-7rem)]" />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
@@ -412,7 +417,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             ) : (
               <>
                 {/* The square is 16px taller than the sidebar, and the toolbar hangs above it so it never moves the square off center. */}
-                <div className="relative mx-auto w-full lg:w-[min(100cqw-29.5rem,100cqh-7rem)]">
+                <div className="relative mx-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-7rem)]">
                   <PaletteSquare
                     generated={generated}
                     focusHueId={focused?.hue.id ?? null}
@@ -422,7 +427,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                     gamut={state.gamut}
                     mode={mode}
                     grain={grain}
-                    blend={blend}
+                    blend="mitchell"
                     reference={reference}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
@@ -431,12 +436,14 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                     <ViewToolbar
                       overlay={overlay}
                       onOverlay={setOverlay}
+                      mode={mode}
+                      onMode={setMode}
                       crumbs={
                         focused && focusShade
-                          ? [{ label: "Colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
+                          ? [{ label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
                           : focused
-                            ? [{ label: "Colors", onClick: up }, { label: focused.hue.name || "Unnamed" }]
-                            : [{ label: "Colors" }]
+                            ? [{ label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed" }]
+                            : [{ label: "All colors" }]
                       }
                     />
                   </div>
@@ -452,7 +459,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
           </div>
         </section>
 
-        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-29.5rem,100cqh-7rem)-1rem)] lg:pb-0">
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-7rem)-1rem)] lg:pb-0">
           {!ready ? null : (
             <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
               {focused && focusShade ? (
@@ -482,12 +489,12 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} blend={blend} onBlend={setBlend} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} />
                 </>
               )}
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} blend={blend} onBlend={setBlend} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
             </ScrollFade>
           )}
         </aside>
