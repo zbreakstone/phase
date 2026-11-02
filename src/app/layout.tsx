@@ -19,9 +19,9 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_PROJECT_P
 
 export const metadata: Metadata = {
   metadataBase: siteUrl ? new URL(siteUrl.startsWith("http") ? siteUrl : `https://${siteUrl}`) : undefined,
-  title: "Phase: contrast-safe colour scales",
+  title: "Phase: contrast-safe color scales",
   description:
-    "Generate perceptually uniform colour palettes in OKLCH, LCH, CIELAB or HSLuv where shade numbers guarantee contrast, so any hue can sit on any other.",
+    "Generate perceptually uniform color palettes in OKLCH, LCH, CIELAB or HSLuv where shade numbers guarantee contrast, so any hue can sit on any other.",
 };
 
 export const viewport: Viewport = {

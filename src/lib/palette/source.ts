@@ -10,7 +10,7 @@ import type { HueConfig, ScaleConfig } from "./types";
 export interface SourceCoords {
   hex: string;
   luminance: number;
-  /** Lightness, chroma and hue in the active colour space. */
+  /** Lightness, chroma and hue in the active color space. */
   L: number;
   C: number;
   h: number;
@@ -25,7 +25,7 @@ export interface SourceAnalysis {
   targetLuminance: number;
   /** Same hue and chroma as the original, lightness solved to the step's luminance target. */
   adjusted: SourceCoords & { clipped: boolean };
-  /** Contrast ratio between the original and the adjusted colour (1 = identical luminance). */
+  /** Contrast ratio between the original and the adjusted color (1 = identical luminance). */
   shift: number;
   /** The original already sits on the step (within rounding). */
   onStep: boolean;
@@ -41,7 +41,7 @@ export function coordsOf(spaceId: SpaceId, hex: string): SourceCoords {
   return coordsOfLinear(spaceId, hex, hexToLinear(hex));
 }
 
-/** Nearest step in contrast terms, so dark steps are not favoured over light ones. */
+/** Nearest step in contrast terms, so dark steps are not favored over light ones. */
 export function nearestGrade(luminance: number, scale: ScaleConfig): number {
   let best = scale.grades[0];
   let bestD = Infinity;

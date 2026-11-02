@@ -1,14 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
-import type { GeneratedHue, HueConfig, ScaleConfig, Shade, StepTweak } from "@/lib/palette/types";
+import type { GeneratedHue, HueConfig, ScaleConfig, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
 import { SliderField } from "./fields";
 import { ChromaChart, HueCurveChart } from "./hue-charts";
@@ -22,8 +19,7 @@ interface Props {
   selectedGrade: number | null;
   onSelectGrade: (grade: number) => void;
   onChange: (patch: Partial<HueConfig>) => void;
-  onRemove: () => void;
-  /** How swatches are painted under the current view (vision simulation, greyscale). */
+  /** How swatches are painted under the current view (vision simulation, grayscale). */
   display: (shade: Shade) => string;
 }
 
@@ -36,7 +32,7 @@ function hueGuide(space: SpaceId, gamut: Gamut, y: number, chroma: number): Reac
   return { background: `linear-gradient(to right, ${stops.join(", ")})` };
 }
 
-export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSelectGrade, onChange, onRemove, display }: Props) {
+export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSelectGrade, onChange, display }: Props) {
   const hue = generated.hue;
   const def = SPACES[space];
   const ramp = generated.shades.filter((s) => !s.anchor);
@@ -56,17 +52,6 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
     [space, gamut, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
 
-  const tweak = chosen && !chosen.anchor ? hue.stepTweaks?.[String(chosen.grade)] ?? { dh: 0, dc: 0 } : null;
-  const setTweak = (grade: number, next: Partial<StepTweak>) => {
-    const key = String(grade);
-    const merged = { ...(hue.stepTweaks?.[key] ?? { dh: 0, dc: 0 }), ...next };
-    const rest = { ...hue.stepTweaks };
-    if (merged.dh === 0 && merged.dc === 0) delete rest[key];
-    else rest[key] = merged;
-    onChange({ stepTweaks: Object.keys(rest).length ? rest : undefined });
-  };
-  const tweakedCount = Object.keys(hue.stepTweaks ?? {}).length;
-
   const setChroma = (value: number) => {
     const factor = hue.chromaMid > 1e-9 ? value / hue.chromaMid : 0;
     if (hue.chromaMid > 1e-9) {
@@ -78,17 +63,9 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <Input
-          aria-label="Hue name"
-          value={hue.name}
-          maxLength={32}
-          onChange={(e) => onChange({ name: e.target.value })}
-          className="h-9 border-transparent bg-transparent px-1 text-lg font-semibold hover:border-input focus-visible:border-ring"
-        />
-        <Button variant="ghost" size="icon" aria-label={`Remove ${hue.name}`} onClick={onRemove} className="text-muted-foreground hover:text-destructive">
-          <Trash2 />
-        </Button>
+      <div>
+        <h2 className="truncate text-lg font-semibold">{hue.name || "Unnamed"}</h2>
+        <p className="text-[11px] text-muted-foreground">Rename or remove it from its name in the grid. Click a swatch there to tune that step.</p>
       </div>
 
       <div className="space-y-1.5">
@@ -128,7 +105,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           id="hue-light"
           label="Lightest shade"
           disabled={lockedLight}
-          hint={lockedLight ? "Locked: your base colour sits on the lightest step, so this end of the curve is fixed to its hue. Move the base colour to a darker step to adjust it." : undefined}
+          hint={lockedLight ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it." : undefined}
           value={hue.hueLight}
           min={0}
           max={360}
@@ -141,7 +118,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           id="hue-dark"
           label="Darkest shade"
           disabled={lockedDark}
-          hint={lockedDark ? "Locked: your base colour sits on the darkest step, so this end of the curve is fixed to its hue. Move the base colour to a lighter step to adjust it." : undefined}
+          hint={lockedDark ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it." : undefined}
           value={hue.hueDark}
           min={0}
           max={360}
@@ -151,7 +128,7 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           trackStyle={darkGuide}
         />
         {lockedLight || lockedDark ? (
-          <p className="text-[11px] text-muted-foreground">The base colour sets this end. Remove it or let it land on another step to edit.</p>
+          <p className="text-[11px] text-muted-foreground">The base color sets this end. Remove it or let it land on another step to edit.</p>
         ) : null}
       </section>
 
@@ -159,19 +136,19 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
         <div>
           <h3 className="text-xs font-semibold tracking-wide uppercase">Chroma</h3>
           <p className="text-[11px] text-muted-foreground">
-            How colourful the scale is. Hatched areas can&apos;t be shown on screen; colours there are toned down automatically.
+            How colorful the scale is. Hatched areas can&apos;t be shown on screen; colors there are toned down automatically.
           </p>
         </div>
         <ChromaChart generated={generated} scale={scale} space={space} gamut={gamut} />
         {toned.length > 0 ? (
           <p className="text-[11px] text-muted-foreground">
-            {toned.length === 1 ? "Step" : "Steps"} {toned.join(", ")} {toned.length === 1 ? "is" : "are"} a little less colourful than asked, because
-            screens can&apos;t show that much colour at {toned.length === 1 ? "that" : "those"} lightness{toned.length === 1 ? "" : "es"}. Hue and contrast are unchanged.
+            {toned.length === 1 ? "Step" : "Steps"} {toned.join(", ")} {toned.length === 1 ? "is" : "are"} a little less colorful than asked, because
+            screens can&apos;t show that much color at {toned.length === 1 ? "that" : "those"} lightness{toned.length === 1 ? "" : "es"}. Hue and contrast are unchanged.
           </p>
         ) : null}
         <SliderField
           id="chroma"
-          label="Colourfulness"
+          label="Colorfulness"
           disabled={lockedLight && lockedDark}
           value={hue.chromaMid}
           min={0}
@@ -180,52 +157,6 @@ export function HuePanel({ generated, space, gamut, scale, selectedGrade, onSele
           decimals={def.chroma.decimals}
           onChange={setChroma}
         />
-      </section>
-
-      <section className="space-y-3 border-t border-border pt-4">
-        <div>
-          <h3 className="text-xs font-semibold tracking-wide uppercase">Tune one step</h3>
-          <p className="text-[11px] text-muted-foreground">
-            Nudge a single step&apos;s hue or colourfulness without moving its neighbours. Lightness doesn&apos;t change, so the step keeps its contrast.
-          </p>
-        </div>
-        {chosen && tweak ? (
-          <>
-            <p className="text-xs">
-              Step <span className="font-semibold">{chosen.grade}</span>
-            </p>
-            <SliderField
-              id="tweak-hue"
-              label="Hue shift"
-              value={tweak.dh}
-              min={-60}
-              max={60}
-              step={1}
-              unit="°"
-              onChange={(v) => setTweak(chosen.grade, { dh: v })}
-            />
-            <SliderField
-              id="tweak-chroma"
-              label="Colourfulness"
-              value={Math.round(tweak.dc * 100)}
-              min={-100}
-              max={100}
-              step={5}
-              unit="%"
-              onChange={(v) => setTweak(chosen.grade, { dc: v / 100 })}
-            />
-            {chosen.clipped ? (
-              <p className="text-[11px] text-muted-foreground">This step is already at the most colour the screen can show, so more colourfulness has no effect.</p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-[11px] text-muted-foreground">Click a swatch above to tune that step.</p>
-        )}
-        {tweakedCount > 0 ? (
-          <Button variant="ghost" size="sm" onClick={() => onChange({ stepTweaks: undefined })}>
-            Reset {tweakedCount === 1 ? "1 tweaked step" : `${tweakedCount} tweaked steps`}
-          </Button>
-        ) : null}
       </section>
     </div>
   );

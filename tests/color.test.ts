@@ -98,14 +98,14 @@ describe("WCAG contrast", () => {
   it("black on white is 21:1", () => {
     expect(wcagContrast("#000000", "#ffffff")).toBeCloseTo(21, 6);
   });
-  it("is symmetric and 1:1 for equal colours", () => {
+  it("is symmetric and 1:1 for equal colors", () => {
     expect(wcagContrast("#777777", "#777777")).toBe(1);
     expect(wcagContrast("#123456", "#fedcba")).toBeCloseTo(wcagContrast("#fedcba", "#123456"), 10);
   });
   it("matches a known pair (#767676 on white = 4.54:1)", () => {
     expect(wcagContrast("#767676", "#ffffff")).toBeCloseTo(4.54, 2);
   });
-  it("relative luminance of mid grey", () => {
+  it("relative luminance of mid gray", () => {
     expect(relativeLuminance("#808080")).toBeCloseTo(0.2159, 3);
   });
 });
@@ -115,7 +115,7 @@ describe("APCA", () => {
     expect(apcaContrast("#000000", "#ffffff")).toBeCloseTo(106.04, 1);
     expect(apcaContrast("#ffffff", "#000000")).toBeCloseTo(-107.88, 1);
   });
-  it("is zero for identical colours", () => {
+  it("is zero for identical colors", () => {
     expect(apcaContrast("#888888", "#888888")).toBe(0);
   });
 });
@@ -138,7 +138,7 @@ describe("luminance solver", () => {
     expect(solved.clipped).toBe(true);
     expect(solved.chroma).toBeLessThan(0.3);
   });
-  it("does not flag colours that fit", () => {
+  it("does not flag colors that fit", () => {
     expect(solveForLuminance(SPACES.oklch, 0.2, 260, 0.05).clipped).toBe(false);
   });
   it("returns white and black at the extremes", () => {
@@ -178,13 +178,13 @@ describe("OKLCH reference values (Ottosson / CSS Color 4)", () => {
     expect(b.L).toBeCloseTo(0, 6);
     expect(b.C).toBeLessThan(1e-6);
   });
-  it("neutral greys have zero chroma", () => {
+  it("neutral grays have zero chroma", () => {
     for (const hex of ["#111111", "#777777", "#cccccc"]) expect(coordsOf("oklch", hex).C).toBeLessThan(2e-4);
   });
-  it("OKLab mid grey has the expected lightness (#777777 = L 0.5693)", () => {
+  it("OKLab mid gray has the expected lightness (#777777 = L 0.5693)", () => {
     expect(coordsOf("oklch", "#777777").L).toBeCloseTo(0.5693, 3);
   });
-  it("round-trips every 8-bit grey and a colour sweep through OKLCH", () => {
+  it("round-trips every 8-bit gray and a color sweep through OKLCH", () => {
     for (let v = 0; v < 256; v += 5) {
       const hex = "#" + v.toString(16).padStart(2, "0").repeat(3);
       const c = coordsOf("oklch", hex);
@@ -240,7 +240,7 @@ describe("oklch() formatting follows CSS conventions", () => {
 });
 
 describe("hex parsing", () => {
-  it("normalises shorthand and case", () => {
+  it("normalizes shorthand and case", () => {
     expect(parseHex("#ABC")).toBe("#aabbcc");
     expect(parseHex("336699")).toBe("#336699");
     expect(parseHex("#12345")).toBeNull();

@@ -85,7 +85,7 @@ export const luminanceForWhiteContrast = (ratio: number) => (WHITE_Y + 0.05) / r
 
 /**
  * Envoy target for a step. Steps between the table's rows (150, 850 ...) are
- * interpolated in contrast space between their neighbours.
+ * interpolated in contrast space between their neighbors.
  */
 export function envoyLuminance(grade: number): number {
   if (grade <= 0) return WHITE_Y;
@@ -122,7 +122,7 @@ export function targetLuminance(scale: ScaleConfig, grade: number): number {
 
 /**
  * Changes the step list without moving the steps you already have. Custom luminance targets are kept
- * for every step that survives; a new step starts between its nearest existing neighbours (spaced
+ * for every step that survives; a new step starts between its nearest existing neighbors (spaced
  * evenly in contrast terms, like the Envoy in-between steps) so it lands where you would expect.
  * Envoy and even scales have no per-step values, so they just take the new list.
  */

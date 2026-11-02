@@ -129,7 +129,7 @@ function fromBase64Url(text: string): string {
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }
 
-/** Five decimals keeps every colour identical after a round trip while keeping links short. */
+/** Five decimals keeps every color identical after a round trip while keeping links short. */
 const roundForLink = (_key: string, v: unknown) => (typeof v === "number" ? Math.round(v * 1e5) / 1e5 : v);
 
 export function encodeState(state: PaletteState): string {

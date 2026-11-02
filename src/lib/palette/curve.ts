@@ -31,7 +31,7 @@ export interface CurvePoint {
 }
 
 /**
- * A source colour bends the curve so it passes exactly through the source's hue
+ * A source color bends the curve so it passes exactly through the source's hue
  * and chroma at the grade it landed on, fading back to the endpoints either side.
  */
 export interface SourceAnchor {
@@ -50,7 +50,7 @@ export function anchorWeight(anchor: SourceAnchor, t: number): number {
   return t <= tg ? t / tg : (1 - t) / (1 - tg);
 }
 
-/** The curve from the hue's own endpoints, ignoring any source colour. */
+/** The curve from the hue's own endpoints, ignoring any source color. */
 export function baseCurveAt(space: SpaceDef, h: HueConfig, t: number): CurvePoint {
   const e = easeT(t, h.hueBias);
   const chroma = chromaCurve(h, t);

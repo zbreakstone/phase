@@ -51,7 +51,7 @@ export function ContrastReport({ report, rules, gamut, showApcaNote, onSelect }:
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
       </summary>
       <p className="mt-1 text-muted-foreground">
-        {showApcaNote ? "Swatches show APCA Lc (informational); this list uses WCAG 2 ratios. " : null}Measured on the colours as shown in {GAMUTS[gamut].label}, so switching gamut can change this list. Click a row to select the lighter swatch.
+        {showApcaNote ? "Swatches show APCA Lc (informational); this list uses WCAG 2 ratios. " : null}Measured on the colors as shown in {GAMUTS[gamut].label}, so switching gamut can change this list. Click a row to select the lighter swatch.
       </p>
       <ul className="mt-2 max-h-56 divide-y divide-border overflow-y-auto border border-border">
         {sorted.map((f, i) => (

@@ -15,9 +15,9 @@ const clampToGamut = (rgb: RGB, gamut: Gamut): RGB =>
   gamut === "srgb" ? clampRgb(rgb) : fromGamutSpace(clampRgb(toGamutSpace(rgb, gamut)), gamut);
 
 export interface SolvedColor {
-  /** 8-bit sRGB hex. In a P3 palette this is the clipped sRGB fallback, not the real colour. */
+  /** 8-bit sRGB hex. In a P3 palette this is the clipped sRGB fallback, not the real color. */
   hex: string;
-  /** The final colour in linear-light sRGB coordinates. Outside 0–1 for P3 colours sRGB can't show. */
+  /** The final color in linear-light sRGB coordinates. Outside 0–1 for P3 colors sRGB can't show. */
   linear: RGB;
   /** Lightness coordinate in the chosen space that hit the target. */
   L: number;
@@ -31,9 +31,9 @@ export interface SolvedColor {
 }
 
 /**
- * Finds the colour with the requested hue whose relative luminance equals `targetY`.
+ * Finds the color with the requested hue whose relative luminance equals `targetY`.
  * Chroma is reduced (never lightness or hue) when the request falls outside `gamut`,
- * so the luminance target is always honoured.
+ * so the luminance target is always honored.
  */
 export function solveForLuminance(
   space: SpaceDef,
@@ -79,7 +79,7 @@ export function solveForLuminance(
   const hex = linearToHex(rgb);
   return {
     hex,
-    // sRGB colours are 8-bit, so read back what the hex really is. P3 colours keep their full precision.
+    // sRGB colors are 8-bit, so read back what the hex really is. P3 colors keep their full precision.
     linear: gamut === "srgb" ? hexToLinear(hex) : clampToGamut(rgb, gamut),
     L,
     chroma: used,
@@ -95,7 +95,7 @@ export function maxChromaAt(space: SpaceDef, targetY: number, hue: number, gamut
   return solveForLuminance(space, targetY, hue, cap, gamut).chroma;
 }
 
-/** Builds a displayable colour from coordinates in a space, shrinking chroma (never lightness) if it falls outside `gamut`. */
+/** Builds a displayable color from coordinates in a space, shrinking chroma (never lightness) if it falls outside `gamut`. */
 export function colorFromCoords(
   space: SpaceDef,
   L: number,

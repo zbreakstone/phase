@@ -7,19 +7,19 @@ import type { SourceAnchor } from "./curve";
 export type HueDirection = "shortest" | "increasing" | "decreasing";
 
 export interface SourceColor {
-  /** The colour the user entered, as #rrggbb. */
+  /** The color the user entered, as #rrggbb. */
   hex: string;
   /** Grade to land on, or null to use the nearest step by luminance. */
   grade: number | null;
-  /** Keep the exact entered colour in the scale instead of adjusting it to the step. */
+  /** Keep the exact entered color in the scale instead of adjusting it to the step. */
   pinned: boolean;
 }
 
-/** A nudge to one step's colour. Lightness is untouched, so the step keeps its contrast. */
+/** A nudge to one step's color. Lightness is untouched, so the step keeps its contrast. */
 export interface StepTweak {
   /** Hue shift in degrees, added to the curve's hue at this step. */
   dh: number;
-  /** Chroma change as a fraction of the curve's chroma at this step: 0.25 is 25% more colourful, -0.5 is half. */
+  /** Chroma change as a fraction of the curve's chroma at this step: 0.25 is 25% more colorful, -0.5 is half. */
   dc: number;
 }
 
@@ -69,7 +69,7 @@ export interface ContrastReference {
 
 export interface PaletteState {
   space: SpaceId;
-  /** The colours the palette may use. Chroma is limited to fit inside it. */
+  /** The colors the palette may use. Chroma is limited to fit inside it. */
   gamut: Gamut;
   reference: ContrastReference;
   scale: ScaleConfig;
@@ -79,13 +79,13 @@ export interface PaletteState {
 
 export interface Shade {
   grade: number;
-  /** 8-bit sRGB hex. In a P3 palette this is the clipped sRGB fallback; use `linear` for the real colour. */
+  /** 8-bit sRGB hex. In a P3 palette this is the clipped sRGB fallback; use `linear` for the real color. */
   hex: string;
-  /** The final colour in linear-light sRGB coordinates. Outside 0–1 for P3 colours sRGB can't show. */
+  /** The final color in linear-light sRGB coordinates. Outside 0–1 for P3 colors sRGB can't show. */
   linear: RGB;
   /** Luminance the grade was aiming for. */
   targetLuminance: number;
-  /** Luminance of the final colour. */
+  /** Luminance of the final color. */
   luminance: number;
   anchor: boolean;
   /** Chroma requested by the curve at this grade. */
@@ -94,13 +94,13 @@ export interface Shade {
   chroma: number;
   hue: number;
   clipped: boolean;
-  /** The final colour read back in OKLCH, whichever space generated it. */
+  /** The final color read back in OKLCH, whichever space generated it. */
   oklch: { L: number; C: number; h: number };
   /** True when a per-step tweak moved this shade off the curve. */
   tweaked?: boolean;
-  /** True for the shade a source colour landed on. */
+  /** True for the shade a source color landed on. */
   isSource?: boolean;
-  /** True when the exact source colour was kept (pinned) instead of the solved one. */
+  /** True when the exact source color was kept (pinned) instead of the solved one. */
   pinned?: boolean;
 }
 

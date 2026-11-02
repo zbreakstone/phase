@@ -2,13 +2,18 @@
 
 import * as React from "react";
 import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apcaContrastLinear, contrastFromLuminance, readableOn } from "@/lib/color/contrast";
 import type { RGB } from "@/lib/color/convert";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { luminanceGrayLinear, simulateVisionLinear, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "@/lib/palette/scale";
-import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
+import { tweakAt } from "@/lib/palette/tweaks";
+import type { ContrastRule, GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
+import { AddColorSlot, ColorName, type ColorActions } from "./color-label";
+import { StepHeader, type StepHeaderActions } from "./step-header";
+import { StepTuner } from "./step-tuner";
 
 export type Metric = "contrast" | "apca" | "luminance" | "off";
 export type Against = "white" | "black" | "selected";
@@ -16,12 +21,12 @@ export type Against = "white" | "black" | "selected";
 export interface Overlay {
   metric: Metric;
   against: Against;
-  /** Paint each swatch as the grey of equal luminance. */
+  /** Paint each swatch as the gray of equal luminance. */
   grayscale: boolean;
   vision: VisionId;
 }
 
-/** Greyscale and vision views, worked from the shade's true linear colour (not its clipped hex) so P3 luminance stays exact. */
+/** Grayscale and vision views, worked from the shade's true linear color (not its clipped hex) so P3 luminance stays exact. */
 export function displayHex(shade: Shade, overlay: Overlay): string {
   return overlay.grayscale ? luminanceGrayLinear(shade.linear) : simulateVisionLinear(shade.linear, overlay.vision);
 }
@@ -45,6 +50,14 @@ interface Props {
   onSelect: (hueId: string, grade: number | null) => void;
   /** Move a hue so it ends up at `toIndex` in the list. */
   onReorder: (hueId: string, toIndex: number) => void;
+  /** Add, rename and delete steps, from the step numbers above the columns. */
+  steps: StepHeaderActions;
+  /** Add, rename and remove colors, from the names beside the rows. */
+  colors: ColorActions;
+  /** Nudge one step's hue or colorfulness, from the swatch itself. */
+  onTweakStep: (hueId: string, grade: number, patch: Partial<StepTweak>) => void;
+  /** Clear the nudge on one step, or on every step of the color when no grade is given. */
+  onResetTweaks: (hueId: string, grade?: number) => void;
 }
 
 /** APCA Lc as a whole number; the sign only says dark-on-light or light-on-dark, which the toggle already fixes. */
@@ -66,11 +79,14 @@ interface DragHandle {
 /** Movement (px) before a press on a row name becomes a drag rather than a click. */
 const DRAG_THRESHOLD = 4;
 
-export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, selectedGrade, onSelect, onReorder }: Props) {
+export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, selectedGrade, onSelect, onReorder, steps: stepActions, colors, onTweakStep, onResetTweaks }: Props) {
   const steps = generated[0]?.shades ?? [];
   const selectedHue = generated.find((g) => g.hue.id === selectedHueId);
   const anchorShade = selectedHue?.shades.find((s) => s.grade === selectedGrade) ?? null;
   const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 1fr))`;
+
+  /** The swatch whose tuner is open, as `hueId:grade`. One at a time. */
+  const [tuning, setTuning] = React.useState<string | null>(null);
 
   const handles = React.useRef(new Map<string, HTMLElement>());
   const suppressClick = React.useRef(false);
@@ -164,10 +180,14 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
     <div className="overflow-x-auto">
       <div className="grid min-w-[44rem]" style={{ gridTemplateColumns: cols }} role="grid" aria-label="Palette: hues as rows, steps as columns">
         <div />
-        {steps.map((s) => (
-          <div key={s.grade} className="pb-1.5 text-center font-mono text-[11px] text-muted-foreground tabular-nums">
-            {s.grade}
-          </div>
+        {steps.map((s, i) => (
+          <StepHeader
+            key={s.grade}
+            grade={s.grade}
+            editable={!s.anchor}
+            previous={i > 0 ? steps[i - 1].grade : null}
+            actions={stepActions}
+          />
         ))}
 
         {generated.map((g, i) => {
@@ -184,6 +204,12 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
               reference={anchorShade}
               onSelect={onSelect}
               edge={generated.length === 1 ? "only" : i === 0 ? "top" : i === generated.length - 1 ? "bottom" : null}
+              index={i}
+              colors={colors}
+              tuning={tuning}
+              onTuning={setTuning}
+              onTweakStep={onTweakStep}
+              onResetTweaks={onResetTweaks}
               handle={handleFor(g.hue.id)}
               dragging={drag?.id === g.hue.id}
               dropSide={dropSideFor(i)}
@@ -233,6 +259,12 @@ function Row({
   reference,
   onSelect,
   edge,
+  index,
+  colors,
+  tuning,
+  onTuning,
+  onTweakStep,
+  onResetTweaks,
   handle,
   dragging,
   dropSide,
@@ -247,6 +279,12 @@ function Row({
   reference: Shade | null;
   onSelect: (hueId: string, grade: number | null) => void;
   edge: "top" | "bottom" | "only" | null;
+  index: number;
+  colors: ColorActions;
+  tuning: string | null;
+  onTuning: (key: string | null) => void;
+  onTweakStep: Props["onTweakStep"];
+  onResetTweaks: Props["onResetTweaks"];
   handle: DragHandle;
   dragging: boolean;
   dropSide: DropSide | null;
@@ -283,17 +321,9 @@ function Row({
         >
           <GripVertical className="size-3.5" />
         </button>
-        <button
-          type="button"
-          onClick={() => onSelect(g.hue.id, selectedGrade)}
-          aria-pressed={rowSelected}
-          className={cn(
-            "flex h-full min-w-0 flex-1 items-center pr-2 text-left text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-            rowSelected ? "font-semibold text-foreground" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <span className="truncate">{g.hue.name || "Unnamed"}</span>
-        </button>
+        <ColorName hueId={g.hue.id} name={g.hue.name} selected={rowSelected} onSelect={() => onSelect(g.hue.id, selectedGrade)} actions={colors} />
+        <AddColorSlot index={index} actions={colors} />
+        {edge === "bottom" || edge === "only" ? <AddColorSlot index={index + 1} edge="bottom" actions={colors} /> : null}
         {indicator}
       </div>
       {g.shades.map((s, i, all) => (
@@ -313,6 +343,19 @@ function Row({
           selected={rowSelected && selectedGrade === s.grade}
           reference={reference}
           onSelect={() => onSelect(g.hue.id, s.grade)}
+          tuner={
+            s.anchor
+              ? null
+              : {
+                  open: tuning === `${g.hue.id}:${s.grade}`,
+                  onOpenChange: (o) => onTuning(o ? `${g.hue.id}:${s.grade}` : null),
+                  tweak: tweakAt(g.hue, s.grade),
+                  count: g.shades.filter((x) => x.tweaked).length,
+                  onTweak: (patch) => onTweakStep(g.hue.id, s.grade, patch),
+                  onResetStep: () => onResetTweaks(g.hue.id, s.grade),
+                  onResetAll: () => onResetTweaks(g.hue.id),
+                }
+          }
           dimmed={dragging}
           indicator={indicator}
         />
@@ -330,6 +373,7 @@ function Cell({
   selected,
   reference,
   onSelect,
+  tuner,
   corner,
   dimmed,
   indicator,
@@ -344,17 +388,27 @@ function Cell({
   selected: boolean;
   reference: Shade | null;
   onSelect: () => void;
+  /** Anchors (white and black) can't be nudged, so they have none. */
+  tuner: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    tweak: StepTweak;
+    count: number;
+    onTweak: (patch: Partial<StepTweak>) => void;
+    onResetStep: () => void;
+    onResetAll: () => void;
+  } | null;
   dimmed: boolean;
   indicator: React.ReactNode;
 }) {
   const shown = displayShade(shade, overlay, gamut);
   const fg = readableOn(displayHex(shade, overlay));
-  const colour = cssColor(shade.hex, shade.linear, gamut);
+  const color = cssColor(shade.hex, shade.linear, gamut);
   let label = "";
   let status: "pass" | "fail" | "none" | "self" | null = null;
 
   if (overlay.metric === "luminance") label = fmtLuminance(shade.luminance);
-  // APCA is one-directional: the "against" colour is the text and the swatch is the background.
+  // APCA is one-directional: the "against" color is the text and the swatch is the background.
   else if (overlay.metric === "apca" && overlay.against === "white") label = fmtLc(apcaContrastLinear(WHITE, shade.linear));
   else if (overlay.metric === "apca" && overlay.against === "black") label = fmtLc(apcaContrastLinear(BLACK, shade.linear));
   else if (overlay.metric === "apca" && reference) label = reference === shade ? "" : fmtLc(apcaContrastLinear(reference.linear, shade.linear));
@@ -372,19 +426,8 @@ function Cell({
     }
   }
 
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-label={`${g.hue.name} ${shade.grade}, ${colour}${label ? `, ${label}` : ""}`}
-      title={`${g.hue.name} ${shade.grade} · ${colour}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`}
-      className={cn(
-        "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
-        (status === "none" || dimmed) && "opacity-40",
-        corner,
-      )}
-      style={{ backgroundColor: shown, color: fg }}
-    >
+  const face = (
+    <>
       {status === "pass" ? <Check className="mr-0.5 size-3" aria-label="Meets its rule" /> : null}
       {status === "fail" ? <X className="mr-0.5 size-3" aria-label="Breaks its rule" /> : null}
       {label}
@@ -392,10 +435,47 @@ function Cell({
       {selected ? <span aria-hidden className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] border-2 border-white mix-blend-difference" /> : null}
       {shade.isSource ? (
         <span className="pointer-events-none absolute top-0.5 right-0.5 opacity-80">
-          {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source colour" /> : <Crosshair className="size-2.5" aria-label="Source colour landed here" />}
+          {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
         </span>
       ) : null}
+      {tuner && (tuner.tweak.dh !== 0 || tuner.tweak.dc !== 0) ? (
+        <span aria-hidden title="Tuned" className="pointer-events-none absolute bottom-0.5 left-0.5 size-1.5 rounded-full bg-current opacity-80" />
+      ) : null}
       {indicator}
-    </button>
+    </>
+  );
+
+  const buttonProps = {
+    type: "button" as const,
+    onClick: onSelect,
+    "aria-label": `${g.hue.name} ${shade.grade}, ${color}${label ? `, ${label}` : ""}`,
+    title: `${g.hue.name} ${shade.grade} · ${color}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`,
+    className: cn(
+      "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
+      (status === "none" || dimmed) && "opacity-40",
+      corner,
+    ),
+    style: { backgroundColor: shown, color: fg },
+  };
+
+  if (!tuner) return <button {...buttonProps}>{face}</button>;
+
+  return (
+    <Popover open={tuner.open} onOpenChange={tuner.onOpenChange}>
+      <PopoverTrigger render={<button {...buttonProps} />}>{face}</PopoverTrigger>
+      <PopoverContent align="center" className="w-72 rounded-none">
+        <StepTuner
+          idPrefix={`tune-${g.hue.id}-${shade.grade}`}
+          hueName={g.hue.name || "Unnamed"}
+          shade={shade}
+          gamut={gamut}
+          tweak={tuner.tweak}
+          tweakedCount={tuner.count}
+          onTweak={tuner.onTweak}
+          onResetStep={tuner.onResetStep}
+          onResetAll={tuner.onResetAll}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

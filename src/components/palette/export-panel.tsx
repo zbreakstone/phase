@@ -119,7 +119,7 @@ export function ExportPanel({ state, generated }: Props) {
           {tab !== "figma" ? (
           <div className="grid gap-1.5">
             <Label htmlFor="export-format" className="text-sm">
-              Colour format
+              Color format
             </Label>
             <Select items={COLOR_FORMATS.map((f) => ({ value: f.id, label: formatLabel(f.id, labelGamut) }))} value={format} onValueChange={(v) => setFormat(v as ColorFormat)}>
               <SelectTrigger id="export-format" className="w-32">
@@ -189,24 +189,24 @@ export function ExportPanel({ state, generated }: Props) {
         <p className="text-xs text-muted-foreground">
           In Figma, open the Variables panel and choose Import to load this file. Variables are named colors/&lt;hue&gt;/&lt;grade&gt;.
           {dual
-            ? " It has two modes, sRGB and Display P3, each solved for the same contrast. Figma reads hex, so the P3 mode holds sRGB fallback values unless the file's colour space is Display P3."
+            ? " It has two modes, sRGB and Display P3, each solved for the same contrast. Figma reads hex, so the P3 mode holds sRGB fallback values unless the file's color space is Display P3."
             : state.gamut === "p3"
-              ? " Figma reads hex, so Display P3 colours are clipped to sRGB."
+              ? " Figma reads hex, so Display P3 colors are clipped to sRGB."
               : ""}
         </p>
       ) : dual && tab === "json" ? (
         <p className="text-xs text-muted-foreground">
-          <code>$value</code> is the sRGB colour, so standard token tools read this file as-is. The Display P3 colour ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
+          <code>$value</code> is the sRGB color, so standard token tools read this file as-is. The Display P3 color ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
           <code>$extensions.gamut[&quot;display-p3&quot;]</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
         </p>
       ) : dual ? (
         <p className="text-xs text-muted-foreground">
-          The base values are the palette solved in sRGB, which any screen can show. Inside <code>@media (color-gamut: p3)</code>, only the colours that differ are overridden with the palette solved in P3
+          The base values are the palette solved in sRGB, which any screen can show. Inside <code>@media (color-gamut: p3)</code>, only the colors that differ are overridden with the palette solved in P3
           {format === "oklch" ? " (OKLCH)" : " (Display P3)"}. Both hit the same luminance targets, so contrast holds on either.
         </p>
       ) : formatClipsGamut(format, state.gamut) ? (
         <p className="text-xs text-muted-foreground">
-          Hex and HSL can only describe sRGB, so the extra Display P3 colours are clipped. Choose OKLCH or Display P3 to keep them.
+          Hex and HSL can only describe sRGB, so the extra Display P3 colors are clipped. Choose OKLCH or Display P3 to keep them.
         </p>
       ) : null}
 

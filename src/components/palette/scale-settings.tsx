@@ -1,26 +1,22 @@
 "use client";
 
 import * as React from "react";
-import { CircleAlert, CircleCheck, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
+import { CircleCheck, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { makeRules, uid } from "@/lib/palette/defaults";
 import {
-  GRADE_PRESETS,
   RULE_PRESETS,
   checkTargets,
   feasibleRange,
-  parseGrades,
   ruleFeasibility,
   systemGrades,
   targetLuminance,
-  withGrades,
 } from "@/lib/palette/scale";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
@@ -30,91 +26,6 @@ const fromPos = (p: number) => 1.05 * Math.pow(0.05 / 1.05, p) - 0.05;
 interface ScaleProps {
   scale: ScaleConfig;
   onChange: (next: ScaleConfig) => void;
-}
-
-export function StepsSettings({ scale, onChange }: ScaleProps) {
-  const gradesKey = scale.grades.join(", ");
-  const [text, setText] = React.useState(gradesKey);
-  const [syncedKey, setSyncedKey] = React.useState(gradesKey);
-  const [error, setError] = React.useState<string | null>(null);
-  if (syncedKey !== gradesKey) {
-    setSyncedKey(gradesKey);
-    setText(gradesKey);
-    setError(null);
-  }
-
-  const apply = (value: string) => {
-    const res = parseGrades(value);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    setError(null);
-    onChange(withGrades(scale, res.grades));
-  };
-
-  const presetId = GRADE_PRESETS.find((p) => p.grades.join() === scale.grades.join())?.id ?? "custom";
-  const items = [...GRADE_PRESETS.map((p) => ({ value: p.id, label: p.label })), { value: "custom", label: "Custom list" }];
-
-  return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label htmlFor="grade-preset" className="text-xs">
-          Shade count
-        </Label>
-        <Select
-          items={items}
-          value={presetId}
-          onValueChange={(v) => {
-            const p = GRADE_PRESETS.find((x) => x.id === v);
-            if (p) onChange(withGrades(scale, [...p.grades]));
-          }}
-        >
-          <SelectTrigger id="grade-preset" size="sm" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((i) => (
-              <SelectItem key={i.value} value={i.value} disabled={i.value === "custom"}>
-                {i.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="grade-list" className="text-xs">
-          Step names
-        </Label>
-        <Input
-          id="grade-list"
-          value={text}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? "grade-error" : undefined}
-          onChange={(e) => {
-            setText(e.target.value);
-            const res = parseGrades(e.target.value);
-            setError(res.ok ? null : res.error);
-          }}
-          onBlur={() => apply(text)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") apply(text);
-          }}
-          className="h-8 font-mono text-xs"
-        />
-        {error ? (
-          <p id="grade-error" className="flex items-start gap-1.5 text-xs text-destructive">
-            <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
-            {error}
-          </p>
-        ) : (
-          <p className="text-[11px] text-muted-foreground">
-            3 to 16 whole numbers from 1 to 999, Enter to apply. White (0) and black (1000) always bookend every hue.
-          </p>
-        )}
-      </div>
-    </div>
-  );
 }
 
 export function RulesSettings({ scale, onChange }: ScaleProps) {
@@ -286,7 +197,7 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
       ) : null}
 
       <div className="space-y-0.5">
-        <div className="grid grid-cols-[2.25rem_1fr_3.75rem_3rem] items-center gap-2 px-1 text-[10px] text-muted-foreground">
+        <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 text-[10px] text-muted-foreground">
           <span>Step</span>
           <span>dark ← luminance → light</span>
           <span className="text-right">Y</span>
@@ -309,7 +220,7 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
   const [draft, setDraft] = React.useState<string | null>(null);
 
   return (
-    <div className="grid grid-cols-[2.25rem_1fr_3.75rem_3rem] items-center gap-2 px-1 py-0.5 hover:bg-muted/40">
+    <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 py-0.5 hover:bg-muted/40">
       <span className="font-mono text-xs tabular-nums">{grade}</span>
       <div className="relative py-1.5">
         <div aria-hidden className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 bg-muted" />
@@ -343,7 +254,7 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
           if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
           setDraft(null);
         }}
-        className="h-7 px-1.5 text-right font-mono text-[11px] tabular-nums"
+        className="h-7 px-1.5 text-right font-mono text-[11px] tabular-nums md:text-[11px]"
       />
       <span className="text-right font-mono text-[11px] tabular-nums text-muted-foreground">{contrastFromLuminance(referenceY, y).toFixed(2)}</span>
     </div>

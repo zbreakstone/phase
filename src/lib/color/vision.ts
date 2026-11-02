@@ -55,19 +55,19 @@ export const VISIONS: { id: VisionId; label: string; note: string }[] = [
   { id: "deuteranopia", label: "Deuteranopia", note: "No green" },
   { id: "protanopia", label: "Protanopia", note: "No red" },
   { id: "tritanopia", label: "Tritanopia", note: "No blue" },
-  { id: "achromatomaly", label: "Achromatomaly", note: "Weak colour" },
-  { id: "achromatopsia", label: "Achromatopsia", note: "No colour" },
+  { id: "achromatomaly", label: "Achromatomaly", note: "Weak color" },
+  { id: "achromatopsia", label: "Achromatopsia", note: "No color" },
 ];
 
 const gray = (y: number): RGB => [y, y, y];
 
-/** How a colour appears under the given colour vision. */
+/** How a color appears under the given color vision. */
 export function simulateVision(hex: string, vision: VisionId): string {
   if (vision === "normal") return hex;
   return simulateVisionLinear(hexToLinear(hex), vision);
 }
 
-/** Same, from linear light, so wide-gamut colours keep their true luminance instead of their clipped hex. */
+/** Same, from linear light, so wide-gamut colors keep their true luminance instead of their clipped hex. */
 export function simulateVisionLinear(rgb: RGB, vision: VisionId): string {
   if (vision === "normal") return linearToHex(rgb);
   if (vision === "achromatopsia") return linearToHex(gray(luminanceOfLinear(rgb)));
@@ -79,7 +79,7 @@ export function simulateVisionLinear(rgb: RGB, vision: VisionId): string {
   return linearToHex(m.map((row) => row[0] * rgb[0] + row[1] * rgb[1] + row[2] * rgb[2]) as RGB);
 }
 
-/** The neutral grey with the same relative luminance, for checking that steps line up across hues. */
+/** The neutral gray with the same relative luminance, for checking that steps line up across hues. */
 export function luminanceGray(hex: string): string {
   return luminanceGrayLinear(hexToLinear(hex));
 }

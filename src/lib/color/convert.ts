@@ -28,7 +28,7 @@ export function linearToHex(rgb: RGB): string {
 
 export function hexToLinear(hex: string): RGB {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) throw new Error(`Invalid hex colour: ${hex}`);
+  if (!m) throw new Error(`Invalid hex color: ${hex}`);
   const n = parseInt(m[1], 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
     srgbToLinear(v / 255),
@@ -189,7 +189,7 @@ export function rectToPolar(a: number, b: number): [number, number] {
 
 export const normHue = (h: number) => ((h % 360) + 360) % 360;
 
-/** Accepts #rgb, rgb, #rrggbb or rrggbb and returns normalised #rrggbb, or null. */
+/** Accepts #rgb, rgb, #rrggbb or rrggbb and returns normalized #rrggbb, or null. */
 export function parseHex(text: string): string | null {
   const t = text.trim().replace(/^#/, "").toLowerCase();
   if (/^[0-9a-f]{3}$/.test(t)) return "#" + t.split("").map((c) => c + c).join("");
