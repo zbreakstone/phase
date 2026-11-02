@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   COLOR_FORMATS,
@@ -30,16 +29,16 @@ import {
 import { GAMUTS } from "@/lib/color/gamut";
 import { generatePalette } from "@/lib/palette/generate";
 import type { GeneratedHue, PaletteState } from "@/lib/palette/types";
+import type { ExportKind } from "./share-menu";
 
 interface Props {
   state: PaletteState;
   generated: GeneratedHue[];
+  /** Which format to show; the controls below follow it. */
+  tab: ExportKind;
 }
 
-type Tab = "css" | "json" | "tailwind" | "figma";
-
-export function ExportPanel({ state, generated }: Props) {
-  const [tab, setTab] = React.useState<Tab>("css");
+export function ExportPanel({ state, generated, tab }: Props) {
   const [format, setFormat] = React.useState<ColorFormat>("hex");
   const [twVersion, setTwVersion] = React.useState<"v4" | "v3">("v4");
   const [prefix, setPrefix] = React.useState("");
@@ -210,29 +209,17 @@ export function ExportPanel({ state, generated }: Props) {
         </p>
       ) : null}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="css">CSS variables</TabsTrigger>
-          <TabsTrigger value="json">JSON tokens</TabsTrigger>
-          <TabsTrigger value="tailwind">Tailwind</TabsTrigger>
-          <TabsTrigger value="figma">Figma variables</TabsTrigger>
-        </TabsList>
-        {(["css", "json", "tailwind", "figma"] as const).map((t) => (
-          <TabsContent key={t} value={t}>
-            <div className="relative border border-border bg-muted/30">
-              <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
-                <FileCode2 className="size-3.5" />
-                {outputs[t].file}
-              </div>
-              <ScrollArea className="h-80">
-                <pre className="p-3 font-mono text-xs leading-relaxed">
-                  <code>{outputs[t].text}</code>
-                </pre>
-              </ScrollArea>
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+      <div className="relative border border-border bg-muted/30">
+        <div className="flex items-center gap-1.5 border-b px-3 py-1.5 text-xs text-muted-foreground">
+          <FileCode2 className="size-3.5" />
+          {current.file}
+        </div>
+        <ScrollArea className="h-80">
+          <pre className="p-3 font-mono text-xs leading-relaxed">
+            <code>{current.text}</code>
+          </pre>
+        </ScrollArea>
+      </div>
     </div>
   );
 }
