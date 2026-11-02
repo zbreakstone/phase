@@ -7,6 +7,7 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type SquareMode = "smooth" | "cells";
@@ -248,31 +249,31 @@ function Dot({
   chipSide: "right" | "top";
   onOpen: () => void;
 }) {
+  // Controlled: the square decides when a dot is "active" (the pointer is over its cell or column), not the
+  // dot's own hover. The tooltip renders in a portal, so the dot's hover scale doesn't distort it.
   return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        onOpen();
-      }}
-      className={cn(
-        "absolute z-10 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white opacity-0 shadow-md transition-[opacity,transform] duration-150 group-hover/square:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:opacity-100",
-        active && "scale-150 opacity-100",
-      )}
-      style={{ left: `${x}%`, top: `${y}%`, backgroundColor: color }}
-    >
-      {active ? (
-        <span
-          className={cn(
-            "pointer-events-none absolute rounded-md bg-black/75 px-2 py-0.5 font-sans text-[11px] font-medium whitespace-nowrap text-white backdrop-blur",
-            chipSide === "right" ? "top-1/2 left-full ml-2.5 -translate-y-1/2 scale-[0.67] origin-left" : "bottom-full left-1/2 mb-2.5 -translate-x-1/2 scale-[0.67] origin-bottom",
-          )}
-        >
-          {chip}
-        </span>
-      ) : null}
-    </button>
+    <Tooltip open={active}>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label={label}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+            className={cn(
+              "absolute z-10 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white opacity-0 shadow-md transition-[opacity,transform] duration-150 group-hover/square:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:opacity-100",
+              active && "scale-150 opacity-100",
+            )}
+            style={{ left: `${x}%`, top: `${y}%`, backgroundColor: color }}
+          />
+        }
+      />
+      <TooltipContent side={chipSide} sideOffset={8}>
+        {chip}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

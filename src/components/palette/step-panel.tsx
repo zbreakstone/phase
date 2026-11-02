@@ -14,6 +14,7 @@ import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
 import { PanelSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
+import { Hint } from "./hint";
 
 interface Props {
   generated: GeneratedHue;
@@ -101,26 +102,28 @@ export function StepPanel({
             </p>
           </div>
           <div className="ml-auto flex shrink-0 items-center">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Previous step"
-              title="Previous step"
-              disabled={!onPrevious}
-              onClick={() => onPrevious?.()}
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Next step"
-              title="Next step"
-              disabled={!onNext}
-              onClick={() => onNext?.()}
-            >
-              <ChevronRight />
-            </Button>
+            <Hint label="Previous step">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Previous step"
+                disabled={!onPrevious}
+                onClick={() => onPrevious?.()}
+              >
+                <ChevronLeft />
+              </Button>
+            </Hint>
+            <Hint label="Next step">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Next step"
+                disabled={!onNext}
+                onClick={() => onNext?.()}
+              >
+                <ChevronRight />
+              </Button>
+            </Hint>
           </div>
         </div>
       </PanelSection>
@@ -136,15 +139,16 @@ export function StepPanel({
               <dd className="flex min-w-0 items-center gap-1.5 font-mono tabular-nums">
                 <span className="truncate">{r.value}</span>
                 {r.copy ? (
-                  <button
-                    type="button"
-                    aria-label={`Copy ${r.label}`}
-                    title={`Copy ${r.label}`}
-                    onClick={() => copy(r.copy as string)}
-                    className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  >
-                    <Copy className="size-3" />
-                  </button>
+                  <Hint label={`Copy ${r.label}`}>
+                    <button
+                      type="button"
+                      aria-label={`Copy ${r.label}`}
+                      onClick={() => copy(r.copy as string)}
+                      className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </Hint>
                 ) : null}
               </dd>
             </div>

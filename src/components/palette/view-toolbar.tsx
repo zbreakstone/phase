@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, SunMedium, SquaresUnite, SwatchBook } from "lucide-react";
+import { Contrast, Eye, SunMedium, SwatchBook } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -14,6 +14,7 @@ import { VISIONS, type VisionId } from "@/lib/color/vision";
 import type { Overlay } from "@/lib/palette/overlay";
 import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
+import { Hint } from "./hint";
 
 /** Quick ways to look at the square differently: as equal-luminance grays, or as someone with color blindness would. */
 export function ViewToolbar({
@@ -35,18 +36,18 @@ export function ViewToolbar({
         <Crumbs items={crumbs} />
       </div>
       <div className="flex items-center gap-2">
-        <Toggle
-          variant="outline"
-          size="sm"
-
-          pressed={overlay.grayscale}
-          onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
-          aria-label="Show swatches as grays of equal luminance"
-          title="Show each swatch as the gray with the same luminance, so you can check that steps line up across hues"
-        >
-          <SunMedium />
-          Luminance
-        </Toggle>
+        <Hint label="Show each swatch as the gray with the same luminance, so you can check that steps line up across hues">
+          <Toggle
+            variant="outline"
+            size="sm"
+            pressed={overlay.grayscale}
+            onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
+            aria-label="Show swatches as grays of equal luminance"
+          >
+            <SunMedium />
+            Luminance
+          </Toggle>
+        </Hint>
         <Select
           items={VISIONS.map((v) => ({
             value: v.id,
@@ -91,20 +92,16 @@ export function ViewToolbar({
           spacing={0}
           aria-label="How the square is drawn"
         >
-          <ToggleGroupItem
-            value="smooth"
-            aria-label="Smooth"
-            title="Smooth: colors melt into each other"
-          >
-            <SquaresUnite />
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="cells"
-            aria-label="Cells"
-            title="Cells: every swatch stays crisp"
-          >
-            <SwatchBook />
-          </ToggleGroupItem>
+          <Hint label="Smooth: colors melt into each other">
+            <ToggleGroupItem value="smooth" aria-label="Smooth">
+              <Contrast />
+            </ToggleGroupItem>
+          </Hint>
+          <Hint label="Cells: every swatch stays crisp">
+            <ToggleGroupItem value="cells" aria-label="Cells">
+              <SwatchBook />
+            </ToggleGroupItem>
+          </Hint>
         </ToggleGroup>
       </div>
     </div>
