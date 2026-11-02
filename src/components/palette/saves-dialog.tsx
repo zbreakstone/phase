@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Cloud, CloudOff, LogOut, Mail, Pencil, Trash2, X } from "lucide-react";
+import { Check, LogOut, Mail, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
@@ -36,6 +36,8 @@ export interface CurrentPalette {
 
 interface Props {
   state: PaletteState;
+  /** The palette's name, edited in the header. Saved along with each version. */
+  name: string;
   /** Encoded form of `state`, comparable with `CurrentPalette.savedKey`. */
   stateKey: string;
   current: CurrentPalette | null;
@@ -47,16 +49,17 @@ interface Props {
 
 const when = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(ms);
 
-export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, onOpen }: Props) {
+export function SavesDialog({ state, name, stateKey, current, hasUnsaved, onCurrent, onOpen }: Props) {
   const enabled = cloudEnabled();
   const [session, setSession] = React.useState<Session | null>(null);
   const [authReady, setAuthReady] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  /** The last save, open or load failed. Cleared by the next one that works. */
+  const [failed, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
-  const [name, setName] = React.useState("");
   const [note, setNote] = React.useState("");
   const [palettes, setPalettes] = React.useState<PaletteSummary[]>([]);
   const [versions, setVersions] = React.useState<VersionSummary[]>([]);
@@ -80,7 +83,9 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
       const [p, v] = await Promise.all([listPalettes(cloud), paletteId ? listVersions(cloud, paletteId) : Promise.resolve([])]);
       setPalettes(p);
       setVersions(v);
+      setFailed(false);
     } catch (e) {
+      setFailed(true);
       toast.error(e instanceof Error ? e.message : "Couldn't load your palettes.");
     }
   }, []);
@@ -88,13 +93,15 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
   if (!enabled) return null;
 
   const signedIn = Boolean(session);
-  const dirty = current !== null && current.savedKey !== stateKey;
+  const dirty = current !== null && (current.savedKey !== stateKey || name.trim() !== current.name);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
     try {
       await task();
+      setFailed(false);
     } catch (e) {
+      setFailed(true);
       toast.error(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
@@ -107,7 +114,6 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     if (next) {
       setSent(false);
       setCode("");
-      setName(current?.name ?? "");
       setNote("");
       if (session) void refresh(current?.id ?? null);
     }
@@ -200,24 +206,30 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
     });
   };
 
-  const label = !signedIn ? "Sign in" : current ? current.name : "Save";
+  const status = failed
+    ? { label: "The last save failed", color: "bg-red-500" }
+    : dirty
+      ? { label: "Unsaved changes", color: "bg-amber-400" }
+      : current
+        ? { label: "All changes saved", color: "bg-green-500" }
+        : null;
+  const label = !authReady ? "Save" : !signedIn ? "Sign in" : failed ? "Save failed" : dirty ? "Unsaved" : current ? "Saved" : "Not saved";
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant="ghost" size="sm" className="max-w-40" aria-label="Saved palettes" />}>
-        {signedIn || !authReady ? <Cloud /> : <CloudOff />}
-        <span className="hidden truncate sm:inline">{authReady ? label : "Save"}</span>
-        {dirty ? <span aria-label="Unsaved changes" className="size-1.5 shrink-0 rounded-full bg-amber-400" /> : null}
-      </DialogTrigger>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{signedIn ? "Saved palettes" : "Sign in to save"}</DialogTitle>
-          <DialogDescription>
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger render={<Button variant="ghost" size="sm" aria-label="Version history" />}>
+        {status ? <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${status.color}`} /> : null}
+        <span className="hidden sm:inline">{label}</span>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="max-h-[calc(100dvh-5rem)] w-[26rem] gap-4 overflow-y-auto p-4">
+        <PopoverHeader>
+          <PopoverTitle>{signedIn ? "Versions" : "Sign in to save"}</PopoverTitle>
+          <PopoverDescription>
             {signedIn
               ? "Every save adds a version you can come back to. Sign in on another browser to pick up where you left off."
               : "Saved palettes follow you across browsers. We email you a sign-in code, so there's no password."}
-          </DialogDescription>
-        </DialogHeader>
+          </PopoverDescription>
+        </PopoverHeader>
 
         {!signedIn ? (
           <form
@@ -239,8 +251,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
         ) : (
           <div className="space-y-5">
             <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide uppercase">{current ? "This palette" : "Save this palette"}</h3>
-              <Input aria-label="Palette name" placeholder="Palette name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+              <h3 className="text-xs font-semibold tracking-wide uppercase">{current ? name.trim() || current.name : "Save this palette"}</h3>
               <Input aria-label="Version note" placeholder="Note for this version (optional)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
               <div className="flex flex-wrap gap-2">
                 {current ? (
@@ -248,7 +259,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
                     Save new version
                   </Button>
                 ) : null}
-                <Button variant={current ? "outline" : "default"} onClick={saveNew} disabled={busy || !name.trim()}>
+                <Button variant={current ? "outline" : "default"} onClick={saveNew} disabled={busy || !name.trim()} title={name.trim() ? undefined : "Name the palette in the header first"}>
                   {current ? "Save as new palette" : "Save palette"}
                 </Button>
               </div>
@@ -370,7 +381,7 @@ export function SavesDialog({ state, stateKey, current, hasUnsaved, onCurrent, o
             </Button>
           </form>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </PopoverContent>
+    </Popover>
   );
 }

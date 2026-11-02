@@ -2,16 +2,12 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Eye, Redo2, SunMedium, Undo2 } from "lucide-react";
+import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
-import { VISIONS, type VisionId } from "@/lib/color/vision";
 import { type SpaceId } from "@/lib/color/spaces";
 import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
@@ -27,15 +23,25 @@ import { createShare, getShared } from "@/lib/cloud/palettes";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { AddColorEnd } from "./color-label";
+import { ColorsList } from "./colors-list";
+import { CurvesPanel } from "./curves-panel";
 import { HuePanel } from "./hue-panel";
-import { PaletteGrid, displayShade, type Against, type Metric, type Overlay } from "./palette-grid";
+import { PaletteSettings } from "./palette-settings";
+import { PaletteSquare, type SquareMode } from "./palette-square";
+import { StepPanel } from "./step-panel";
+import { StepsEditor } from "./steps-editor";
+import { ScrollFade } from "./scroll-fade";
+import { DisplaySettings, type Panel } from "./display-settings";
+import { ViewToolbar } from "./view-toolbar";
+import { displayShade, type Overlay } from "@/lib/palette/overlay";
+import { tweakAt } from "@/lib/palette/tweaks";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
-import { SettingsMenu } from "./settings-menu";
 import { ShareMenu, type ExportKind } from "./share-menu";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
+const NAME_KEY = "phase:name:v1";
 
 /** Undo and redo restore the palette but leave your current swatch selected, as long as it still exists. */
 const keepSelection = (restored: PaletteState, current: PaletteState): PaletteState =>
@@ -52,11 +58,17 @@ const isTextEntry = (el: EventTarget | null) => {
 export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
-  const [grade, setGrade] = React.useState<number | null>(null);
+  /** Which color and step fill the square. Both null is the resting state showing every color. */
+  const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
+  const [mode, setMode] = React.useState<SquareMode>("smooth");
+  const [grain, setGrain] = React.useState(true);
+  const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
   const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
+  /** The palette's name, edited in the header. A saved palette is renamed on its next save. */
+  const [name, setName] = React.useState("");
   const stateKey = React.useMemo(() => encodeState(state), [state]);
 
   React.useEffect(() => {
@@ -64,7 +76,14 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     (async () => {
       try {
         const raw = window.localStorage.getItem(CURRENT_KEY);
-        if (raw && !canceled) setCurrent(JSON.parse(raw) as CurrentPalette);
+        const savedName = window.localStorage.getItem(NAME_KEY);
+        if (raw && !canceled) {
+          const pointer = JSON.parse(raw) as CurrentPalette;
+          setCurrent(pointer);
+          setName(savedName ?? pointer.name);
+        } else if (savedName && !canceled) {
+          setName(savedName);
+        }
       } catch {
         // Unreadable pointer: treat the palette as unsaved.
       }
@@ -110,15 +129,25 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     };
   }, [storage, shareCode, loadState]);
 
+  const updateName = React.useCallback((next: string) => {
+    setName(next);
+    try {
+      window.localStorage.setItem(NAME_KEY, next);
+    } catch {
+      // Private mode: the name just won't survive a reload.
+    }
+  }, []);
+
   const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
     setCurrent(next);
+    if (next) updateName(next.name);
     try {
       if (next) window.localStorage.setItem(CURRENT_KEY, JSON.stringify(next));
       else window.localStorage.removeItem(CURRENT_KEY);
     } catch {
       // Private mode: the pointer just won't survive a reload.
     }
-  }, []);
+  }, [updateName]);
 
   React.useEffect(() => {
     const onHashChange = () => {
@@ -126,7 +155,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       if (!shared) return;
       if (shared.ok) {
         loadState(shared.state);
-        setGrade(null);
+        setFocus({ hueId: null, grade: null });
       } else {
         toast.error(shared.error);
       }
@@ -150,6 +179,18 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [undo, redo]);
+
+  const up = React.useCallback(() => setFocus((f) => (f.grade !== null ? { ...f, grade: null } : { hueId: null, grade: null })), []);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
+      up();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [up]);
 
   React.useEffect(() => {
     if (!ready) return;
@@ -198,7 +239,17 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
 
   const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues, state.gamut), [state.space, state.scale, state.hues, state.gamut]);
   const report = React.useMemo(() => validatePalette(generated, state.scale.rules), [generated, state.scale.rules]);
-  const selected = generated.find((g) => g.hue.id === state.selectedHueId) ?? generated[0] ?? null;
+  // A removed color can't stay open, so fall back to the level above.
+  const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
+  const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
+  const openHue = (hueId: string) => {
+    selectSilently((s) => ({ ...s, selectedHueId: hueId }));
+    setFocus({ hueId, grade: null });
+  };
+  const openStep = (hueId: string, grade: number) => {
+    selectSilently((s) => ({ ...s, selectedHueId: hueId }));
+    setFocus({ hueId, grade });
+  };
 
   const setSpace = (space: SpaceId) =>
     setState((s) => (space === s.space ? s : { ...s, space, hues: s.hues.map((h) => convertHue(h, s.scale, s.space, space, s.gamut)) }));
@@ -251,17 +302,17 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     const added = midpointGrade(lower, upper);
     setState((s) => addStepBetween(s, lower, upper));
     // Land on the new step so it can be tuned straight away.
-    if (added !== null) setGrade(added);
+    if (added !== null) setFocus((f) => (f.hueId && f.grade !== null ? { ...f, grade: added } : f));
   };
 
   const removeStepAt = (removed: number) => {
     setState((s) => removeStep(s, removed));
-    setGrade((g) => (g === removed ? null : g));
+    setFocus((f) => (f.grade === removed ? { ...f, grade: null } : f));
   };
 
   const renameStepTo = (from: number, to: number) => {
     setState((s) => renameStep(s, from, to));
-    setGrade((g) => (g === from ? to : g));
+    setFocus((f) => (f.grade === from ? { ...f, grade: to } : f));
   };
 
   const stepLimit = state.scale.grades.length >= MAX_GRADES ? "max" : state.scale.grades.length <= MIN_GRADES ? "min" : null;
@@ -283,18 +334,39 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
 
   const reset = () => {
     setState(defaultState());
-    setGrade(null);
+    setFocus({ hueId: null, grade: null });
     toast.success("Back to the starter palette", { action: { label: "Undo", onClick: undo } });
   };
 
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
+  const reference = focusShade ?? null;
+  const level = focused ? (focusShade ? "step" : "hue") : "all";
+  const stepIndex = focused && focusShade ? focused.shades.findIndex((s) => s.grade === focusShade.grade) : -1;
+  const goStep = (offset: number) => {
+    const next = focused?.shades[stepIndex + offset];
+    return next && focused ? () => openStep(focused.hue.id, next.grade) : null;
+  };
+  const openPanel: Panel | null = panel === "curves" && !focused ? null : panel;
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border">
-        <div className="mx-auto flex h-14 max-w-[88rem] items-center gap-3 px-4">
-          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto" />
-          <div className="ml-auto flex items-center gap-2">
+        <div className="mx-auto grid h-14 max-w-[88rem] grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3 px-4">
+          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
+          <input
+            aria-label="Palette name"
+            value={name}
+            maxLength={80}
+            placeholder="Untitled palette"
+            onChange={(e) => updateName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+            onFocus={(e) => e.currentTarget.select()}
+            size={Math.max(12, name.length + 1)}
+            className="h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div className="flex items-center justify-end gap-2">
             <div className="flex items-center" role="group" aria-label="History">
               <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
                 <Undo2 />
@@ -305,176 +377,124 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             </div>
             <SavesDialog
               state={state}
+              name={name}
               stateKey={stateKey}
               current={current}
-              hasUnsaved={current !== null && current.savedKey !== stateKey}
+              hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
               onCurrent={updateCurrent}
               onOpen={(loaded) => {
                 setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
-                setGrade(null);
+                setFocus({ hueId: null, grade: null });
               }}
             />
-            <SettingsMenu space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} />
             <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
             <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        <section className="-ml-4 min-w-0 space-y-3 pl-4 lg:overflow-y-auto">
-          {!ready ? (
-            <div className="space-y-3" aria-busy="true" aria-label="Loading your palette">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-72 w-full" />
-            </div>
-          ) : (
-            <>
-              <Toolbar overlay={overlay} onOverlay={setOverlay} />
-              {generated.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 border border-dashed border-border p-12 text-center">
-                  <p className="font-medium">No colors yet</p>
-                  <p className="max-w-sm text-sm text-muted-foreground">Type a hex or pick a preset and a full scale from white to black appears.</p>
-                  <AddColorEnd index={0} actions={colorActions} label="Add your first color" variant="secondary" />
-                </div>
-              ) : (
-                <>
-                  <PaletteGrid
+      <main
+        className="mx-auto lg:[container-type:size] grid w-full max-w-[88rem] flex-1 gap-6 px-4 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-hidden lg:py-0"
+      >
+        <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:px-8 lg:py-6">
+          <div className="my-auto space-y-6">
+            {!ready ? (
+              <div aria-busy="true" aria-label="Loading your palette" className="mx-auto">
+                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-29.5rem,100cqh-7rem)]" />
+              </div>
+            ) : generated.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
+                <p className="font-medium">No colors yet</p>
+                <p className="max-w-sm text-sm text-muted-foreground">Type a hex or pick a preset and a full scale from white to black appears.</p>
+                <AddColorEnd index={0} actions={colorActions} label="Add your first color" variant="secondary" />
+              </div>
+            ) : (
+              <>
+                {/* The square is 16px taller than the sidebar, and the toolbar hangs above it so it never moves the square off center. */}
+                <div className="relative mx-auto w-full lg:w-[min(100cqw-29.5rem,100cqh-7rem)]">
+                  <PaletteSquare
                     generated={generated}
+                    focusHueId={focused?.hue.id ?? null}
+                    focusGrade={focusShade?.grade ?? null}
                     rules={state.scale.rules}
                     overlay={overlay}
                     gamut={state.gamut}
-                    selectedHueId={selected?.hue.id ?? null}
-                    selectedGrade={grade}
-                    onSelect={(id, g) => {
-                      selectSilently((s) => ({ ...s, selectedHueId: id }));
-                      setGrade(g);
-                    }}
-                    onReorder={reorder}
-                    steps={stepActions}
-                    colors={colorActions}
-                    onTweakStep={tweakStep}
-                    onResetTweaks={resetTweaks}
+                    mode={mode}
+                    grain={grain}
+                    reference={reference}
+                    onOpenHue={openHue}
+                    onOpenStep={openStep}
                   />
-                  {(overlay.metric === "contrast" || overlay.metric === "apca") && overlay.against === "selected" && grade === null ? (
-                    <p className="text-xs text-muted-foreground">Click a swatch to compare every other swatch against it.</p>
-                  ) : null}
-                  <ContrastReport
-                    report={report}
-                    rules={rules}
-                    gamut={state.gamut}
-                    showApcaNote={overlay.metric === "apca"}
-                    onSelect={(id, g) => {
-                      selectSilently((s) => ({ ...s, selectedHueId: id }));
-                      setGrade(g);
-                    }}
-                  />
-                </>
-              )}
-              <ScalePanel scale={state.scale} onChange={setScale} />
-            </>
-          )}
+                  <div className="absolute inset-x-0 bottom-full mb-4">
+                    <ViewToolbar overlay={overlay} onOverlay={setOverlay} />
+                  </div>
+                </div>
+                {openPanel ? <div className="mt-16 space-y-6" /> : null}
+                {openPanel === "curves" && focused ? <CurvesPanel generated={focused} scale={state.scale} space={state.space} gamut={state.gamut} /> : null}
+                {openPanel === "report" ? (
+                  <ContrastReport report={report} rules={rules} gamut={state.gamut} showApcaNote={overlay.metric === "apca"} onSelect={openStep} />
+                ) : null}
+                {openPanel === "targets" ? <ScalePanel scale={state.scale} onChange={setScale} /> : null}
+              </>
+            )}
+          </div>
         </section>
 
-        <aside aria-label="Selected hue" className="min-w-0 pb-20 lg:overflow-y-auto lg:border-l lg:border-border lg:pl-8">
-          {ready && selected ? (
-            <HuePanel
-              key={selected.hue.id}
-              generated={selected}
-              space={state.space}
-              gamut={state.gamut}
-              scale={state.scale}
-              selectedGrade={grade}
-              onSelectGrade={setGrade}
-              onChange={(patch) => updateHue(selected.hue.id, patch)}
-              display={(shade) => displayShade(shade, overlay, state.gamut)}
-            />
-          ) : ready ? (
-            <p className="text-sm text-muted-foreground">Add a color to edit its hue and chroma here.</p>
-          ) : null}
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-29.5rem,100cqh-7rem)-1rem)] lg:pb-0">
+          {!ready ? null : (
+            <ScrollFade className="rounded-3xl bg-card shadow-(--shadow-border) lg:h-full" innerClassName="divide-y divide-border">
+              {focused && focusShade ? (
+                <StepPanel
+                  key={`${focused.hue.id}:${focusShade.grade}`}
+                  generated={focused}
+                  shade={focusShade}
+                  gamut={state.gamut}
+                  tweak={tweakAt(focused.hue, focusShade.grade)}
+                  onTweak={(patch) => tweakStep(focused.hue.id, focusShade.grade, patch)}
+                  onResetStep={() => resetTweaks(focused.hue.id, focusShade.grade)}
+                  onResetAll={() => resetTweaks(focused.hue.id)}
+                  onBackToColors={up}
+                  onBackToHue={() => openHue(focused.hue.id)}
+                  onPrevious={goStep(-1)}
+                  onNext={goStep(1)}
+                />
+              ) : focused ? (
+                <HuePanel
+                  key={focused.hue.id}
+                  generated={focused}
+                  space={state.space}
+                  gamut={state.gamut}
+                  onChange={(patch) => updateHue(focused.hue.id, patch)}
+                  onRemove={() => remove(focused.hue.id)}
+                  onResetTweaks={() => resetTweaks(focused.hue.id)}
+                  onOpenStep={(g) => openStep(focused.hue.id, g)}
+                  onBack={up}
+                  display={(shade) => displayShade(shade, overlay, state.gamut)}
+                />
+              ) : (
+                <>
+                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} />
+                  <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
+                  <StepsEditor actions={stepActions} />
+                </>
+              )}
+              {generated.length > 0 ? (
+                <DisplaySettings
+                  overlay={overlay}
+                  onOverlay={setOverlay}
+                  mode={mode}
+                  onMode={setMode}
+                  grain={grain}
+                  onGrain={setGrain}
+                  panel={openPanel}
+                  onPanel={setPanel}
+                  curvesDisabled={!focused}
+                />
+              ) : null}
+            </ScrollFade>
+          )}
         </aside>
       </main>
-    </div>
-  );
-}
-
-function Toolbar({
-  overlay,
-  onOverlay,
-}: {
-  overlay: Overlay;
-  onOverlay: (o: Overlay) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Show</span>
-        <ToggleGroup
-          value={[overlay.metric]}
-          onValueChange={(v) => v[0] && onOverlay({ ...overlay, metric: v[0] as Metric })}
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label="What to show on each swatch"
-        >
-          <ToggleGroupItem value="contrast">Contrast</ToggleGroupItem>
-          <ToggleGroupItem value="apca" title="APCA Lc, the WCAG 3 draft contrast model. Informational: WCAG 2 ratios still decide pass or fail.">APCA</ToggleGroupItem>
-          <ToggleGroupItem value="luminance">Luminance</ToggleGroupItem>
-          <ToggleGroupItem value="off">Off</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
-      {overlay.metric === "contrast" || overlay.metric === "apca" ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{overlay.metric === "apca" ? "text color" : "against"}</span>
-          <ToggleGroup
-            value={[overlay.against]}
-            onValueChange={(v) => v[0] && onOverlay({ ...overlay, against: v[0] as Against })}
-            variant="outline"
-            size="sm"
-            spacing={0}
-            aria-label="Contrast against"
-          >
-            <ToggleGroupItem value="white">White</ToggleGroupItem>
-            <ToggleGroupItem value="black">Black</ToggleGroupItem>
-            <ToggleGroupItem value="selected">Selected</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
-      ) : null}
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">View</span>
-        <Toggle
-          variant="outline"
-          size="sm"
-         
-          pressed={overlay.grayscale}
-          onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
-          aria-label="Show swatches as grays of equal luminance"
-          title="Show each swatch as the gray with the same luminance, so you can check that steps line up across hues"
-        >
-          <SunMedium />
-          Luminance
-        </Toggle>
-        <Select
-          items={VISIONS.map((v) => ({ value: v.id, label: v.id === "normal" ? "Vision" : v.label }))}
-          value={overlay.vision}
-          onValueChange={(v) => v && onOverlay({ ...overlay, vision: v as VisionId, grayscale: false })}
-        >
-          <SelectTrigger size="sm" className="w-40" aria-label="Simulate color vision">
-            <Eye />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {VISIONS.map((v) => (
-              <SelectItem key={v.id} value={v.id}>
-                <span className="flex flex-col">
-                  <span>{v.label}</span>
-                  {v.note ? <span className="text-[11px] text-muted-foreground">{v.note}</span> : null}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
     </div>
   );
 }
