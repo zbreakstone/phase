@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Check, Crosshair, GripVertical, Pin, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apcaContrastLinear, contrastFromLuminance, readableOn } from "@/lib/color/contrast";
 import type { RGB } from "@/lib/color/convert";
@@ -83,10 +85,15 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
   const steps = generated[0]?.shades ?? [];
   const selectedHue = generated.find((g) => g.hue.id === selectedHueId);
   const anchorShade = selectedHue?.shades.find((s) => s.grade === selectedGrade) ?? null;
-  const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 1fr))`;
+  const cols = `7rem repeat(${steps.length}, minmax(3.25rem, 5rem))`;
 
   /** The swatch whose tuner is open, as `hueId:grade`. One at a time. */
   const [tuning, setTuning] = React.useState<string | null>(null);
+  /** A "reset all tweaks" waiting for confirmation, since it clears every nudge on a color at once. */
+  const [confirmReset, setConfirmReset] = React.useState<{ hueId: string; name: string; count: number } | null>(null);
+  // Keep the last request so the dialog's text doesn't blank while it animates closed.
+  const [lastReset, setLastReset] = React.useState(confirmReset);
+  if (confirmReset && confirmReset !== lastReset) setLastReset(confirmReset);
 
   const handles = React.useRef(new Map<string, HTMLElement>());
   const suppressClick = React.useRef(false);
@@ -119,7 +126,7 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
       if (!active) {
         if (Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
         active = true;
-        document.body.style.cursor = "grabbing";
+        document.documentElement.classList.add("is-dragging");
       }
       const next = insertionAt(ev.clientY);
       if (next !== insert) {
@@ -131,7 +138,7 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
-      document.body.style.cursor = "";
+      document.documentElement.classList.remove("is-dragging");
       if (active) {
         suppressClick.current = true;
         if (commit) {
@@ -177,7 +184,7 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
   };
 
   return (
-    <div className="overflow-x-auto">
+    <div className="-ml-4 overflow-x-auto pt-3 pl-4">
       <div className="grid min-w-[44rem]" style={{ gridTemplateColumns: cols }} role="grid" aria-label="Palette: hues as rows, steps as columns">
         <div />
         {steps.map((s, i) => (
@@ -208,6 +215,7 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
               colors={colors}
               tuning={tuning}
               onTuning={setTuning}
+              onRequestResetAll={setConfirmReset}
               onTweakStep={onTweakStep}
               onResetTweaks={onResetTweaks}
               handle={handleFor(g.hue.id)}
@@ -245,6 +253,30 @@ export function PaletteGrid({ generated, rules, overlay, gamut, selectedHueId, s
           </>
         ) : null}
       </div>
+      <Dialog open={confirmReset !== null} onOpenChange={(open) => !open && setConfirmReset(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              Reset {lastReset?.count} tuned {lastReset?.count === 1 ? "step" : "steps"} in {lastReset?.name}?
+            </DialogTitle>
+            <DialogDescription>Every hue and colorfulness nudge on {lastReset?.name} goes back to its curve. You can undo it right after with ⌘Z.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmReset(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirmReset) onResetTweaks(confirmReset.hueId);
+                setConfirmReset(null);
+              }}
+            >
+              Reset {lastReset?.count === 1 ? "step" : "steps"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -263,6 +295,7 @@ function Row({
   colors,
   tuning,
   onTuning,
+  onRequestResetAll,
   onTweakStep,
   onResetTweaks,
   handle,
@@ -283,6 +316,7 @@ function Row({
   colors: ColorActions;
   tuning: string | null;
   onTuning: (key: string | null) => void;
+  onRequestResetAll: (request: { hueId: string; name: string; count: number }) => void;
   onTweakStep: Props["onTweakStep"];
   onResetTweaks: Props["onResetTweaks"];
   handle: DragHandle;
@@ -299,7 +333,7 @@ function Row({
       <div
         {...handle}
         className={cn(
-          "group/row sticky left-0 z-10 flex h-11 cursor-grab touch-none items-center bg-background select-none active:cursor-grabbing",
+          "group/row sticky left-0 z-10 flex touch-none items-center bg-background select-none",
           dragging && "opacity-40",
         )}
       >
@@ -317,7 +351,7 @@ function Row({
               onMove(1);
             }
           }}
-          className="flex h-full w-5 shrink-0 items-center justify-center text-muted-foreground/0 group-hover/row:text-muted-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="absolute inset-y-0 -left-4 flex w-4 cursor-grab items-center justify-center active:cursor-grabbing text-muted-foreground/0 group-hover/row:text-muted-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <GripVertical className="size-3.5" />
         </button>
@@ -353,7 +387,10 @@ function Row({
                   count: g.shades.filter((x) => x.tweaked).length,
                   onTweak: (patch) => onTweakStep(g.hue.id, s.grade, patch),
                   onResetStep: () => onResetTweaks(g.hue.id, s.grade),
-                  onResetAll: () => onResetTweaks(g.hue.id),
+                  onResetAll: () => {
+                    onTuning(null);
+                    onRequestResetAll({ hueId: g.hue.id, name: g.hue.name || "Unnamed", count: g.shades.filter((x) => x.tweaked).length });
+                  },
                 }
           }
           dimmed={dragging}
@@ -451,7 +488,7 @@ function Cell({
     "aria-label": `${g.hue.name} ${shade.grade}, ${color}${label ? `, ${label}` : ""}`,
     title: `${g.hue.name} ${shade.grade} · ${color}\nOKLCH ${shade.oklch.L.toFixed(3)} ${shade.oklch.C.toFixed(3)} ${Math.round(shade.oklch.h)}°`,
     className: cn(
-      "relative flex h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
+      "relative flex aspect-[5/4] min-h-11 items-center justify-center font-mono text-[11px] tabular-nums focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset",
       (status === "none" || dimmed) && "opacity-40",
       corner,
     ),

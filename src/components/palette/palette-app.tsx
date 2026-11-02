@@ -326,7 +326,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       </header>
 
       <main className="mx-auto grid w-full max-w-[88rem] flex-1 gap-8 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden">
-        <section className="min-w-0 space-y-3 lg:overflow-y-auto">
+        <section className="-ml-4 min-w-0 space-y-3 pl-4 lg:overflow-y-auto">
           {!ready ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading your palette">
               <Skeleton className="h-9 w-full" />

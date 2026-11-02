@@ -66,7 +66,7 @@ export function StepTuner({
             Reset this step
           </Button>
           {others > 0 ? (
-            <Button variant="ghost" size="sm" onClick={onResetAll}>
+            <Button variant="destructive" size="sm" onClick={onResetAll}>
               Reset all {tweakedCount} in {hueName}
             </Button>
           ) : null}
