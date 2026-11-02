@@ -1,10 +1,16 @@
 "use client";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
-import { PanelSection, SettingRow } from "./panel-section";
+import { CollapsibleSection, SettingRow } from "./panel-section";
 import type { SquareMode } from "./palette-square";
 
 export type Panel = "curves" | "report" | "targets";
@@ -20,6 +26,8 @@ interface Props {
   panel: Panel | null;
   onPanel: (p: Panel | null) => void;
   curvesDisabled: boolean;
+  /** Render just the rows, to sit inside another section. */
+  bare?: boolean;
 }
 
 const METRICS: { id: Metric; label: string }[] = [
@@ -43,24 +51,52 @@ const PANELS: { id: Panel | "none"; label: string }[] = [
 ];
 
 /** How the square is drawn, what's printed on it, and which secondary panel sits under it. Shown at every level of the sidebar. */
-export function DisplaySettings({ overlay, onOverlay, mode, onMode, grain, onGrain, panel, onPanel, curvesDisabled }: Props) {
-  const printsContrast = overlay.metric === "contrast" || overlay.metric === "apca";
-  return (
-    <PanelSection className="space-y-3">
-      <h2 className="text-sm font-semibold">Display</h2>
+export function DisplaySettings({
+  overlay,
+  onOverlay,
+  mode,
+  onMode,
+  grain,
+  onGrain,
+  panel,
+  onPanel,
+  curvesDisabled,
+  bare,
+}: Props) {
+  const printsContrast =
+    overlay.metric === "contrast" || overlay.metric === "apca";
+  const rows = (
+    <>
       <SettingRow label="Square">
-        <ToggleGroup value={[mode]} onValueChange={(v) => v[0] && onMode(v[0] as SquareMode)} variant="outline" size="sm" spacing={0} aria-label="How the square is drawn">
+        <ToggleGroup
+          value={[mode]}
+          onValueChange={(v) => v[0] && onMode(v[0] as SquareMode)}
+          variant="outline"
+          size="sm"
+          spacing={0}
+          aria-label="How the square is drawn"
+        >
           <ToggleGroupItem value="smooth">Smooth</ToggleGroupItem>
           <ToggleGroupItem value="cells">Cells</ToggleGroupItem>
         </ToggleGroup>
       </SettingRow>
       {mode === "smooth" ? (
         <SettingRow id="display-grain" label="Grain">
-          <Switch id="display-grain" checked={grain} onCheckedChange={onGrain} />
+          <Switch
+            id="display-grain"
+            checked={grain}
+            onCheckedChange={onGrain}
+          />
         </SettingRow>
       ) : null}
       <SettingRow id="display-metric" label="Show">
-        <Select items={METRICS.map((m) => ({ value: m.id, label: m.label }))} value={overlay.metric} onValueChange={(v) => v && onOverlay({ ...overlay, metric: v as Metric })}>
+        <Select
+          items={METRICS.map((m) => ({ value: m.id, label: m.label }))}
+          value={overlay.metric}
+          onValueChange={(v) =>
+            v && onOverlay({ ...overlay, metric: v as Metric })
+          }
+        >
           <SelectTrigger id="display-metric" size="sm" className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -74,8 +110,17 @@ export function DisplaySettings({ overlay, onOverlay, mode, onMode, grain, onGra
         </Select>
       </SettingRow>
       {printsContrast ? (
-        <SettingRow id="display-against" label={overlay.metric === "apca" ? "Text color" : "Against"}>
-          <Select items={AGAINST.map((m) => ({ value: m.id, label: m.label }))} value={overlay.against} onValueChange={(v) => v && onOverlay({ ...overlay, against: v as Against })}>
+        <SettingRow
+          id="display-against"
+          label={overlay.metric === "apca" ? "Text color" : "Against"}
+        >
+          <Select
+            items={AGAINST.map((m) => ({ value: m.id, label: m.label }))}
+            value={overlay.against}
+            onValueChange={(v) =>
+              v && onOverlay({ ...overlay, against: v as Against })
+            }
+          >
             <SelectTrigger id="display-against" size="sm" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -90,20 +135,40 @@ export function DisplaySettings({ overlay, onOverlay, mode, onMode, grain, onGra
         </SettingRow>
       ) : null}
       <SettingRow id="display-panel" label="Below">
-        <Select items={PANELS.map((m) => ({ value: m.id, label: m.label }))} value={panel ?? "none"} onValueChange={(v) => onPanel(!v || v === "none" ? null : (v as Panel))}>
+        <Select
+          items={PANELS.map((m) => ({ value: m.id, label: m.label }))}
+          value={panel ?? "none"}
+          onValueChange={(v) =>
+            onPanel(!v || v === "none" ? null : (v as Panel))
+          }
+        >
           <SelectTrigger id="display-panel" size="sm" className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {PANELS.map((m) => (
-              <SelectItem key={m.id} value={m.id} disabled={m.id === "curves" && curvesDisabled}>
+              <SelectItem
+                key={m.id}
+                value={m.id}
+                disabled={m.id === "curves" && curvesDisabled}
+              >
                 {m.label}
-                {m.id === "curves" && curvesDisabled ? <span className="ml-1 text-[11px] text-muted-foreground">open a color first</span> : null}
+                {m.id === "curves" && curvesDisabled ? (
+                  <span className="ml-1 text-[11px] text-muted-foreground">
+                    open a color first
+                  </span>
+                ) : null}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </SettingRow>
-    </PanelSection>
+    </>
+  );
+  if (bare) return rows;
+  return (
+    <CollapsibleSection id="display-view" title="Display" className="space-y-3">
+      {rows}
+    </CollapsibleSection>
   );
 }

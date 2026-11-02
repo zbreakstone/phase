@@ -350,7 +350,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <header className="border-b border-border">
+      <header className="border-b border-border bg-white dark:bg-black">
         <div className="mx-auto grid h-14 max-w-[88rem] grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3 px-4">
           <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
           <input
@@ -442,7 +442,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-29.5rem,100cqh-7rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="rounded-3xl bg-card shadow-(--shadow-border) lg:h-full" innerClassName="divide-y divide-border">
+            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -473,24 +473,12 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} onReset={reset} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} />
                 </>
               )}
-              {generated.length > 0 ? (
-                <DisplaySettings
-                  overlay={overlay}
-                  onOverlay={setOverlay}
-                  mode={mode}
-                  onMode={setMode}
-                  grain={grain}
-                  onGrain={setGrain}
-                  panel={openPanel}
-                  onPanel={setPanel}
-                  curvesDisabled={!focused}
-                />
-              ) : null}
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} onMode={setMode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
             </ScrollFade>
           )}
         </aside>

@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { midpointGrade } from "@/lib/palette/steps";
-import { PanelSection } from "./panel-section";
+import { CollapsibleSection } from "./panel-section";
 import { StepMenu, type StepHeaderActions } from "./step-header";
 
 /**
@@ -12,26 +12,37 @@ import { StepMenu, type StepHeaderActions } from "./step-header";
 export function StepsEditor({ actions }: { actions: StepHeaderActions }) {
   const { grades } = actions;
   return (
-    <PanelSection role="region" aria-labelledby="steps-heading" className="space-y-2">
-      <div className="space-y-0.5">
-        <h2 id="steps-heading" className="text-sm font-semibold">
-          Steps
-        </h2>
-        <p className="text-[11px] text-muted-foreground">Shared by every color. The number is where a step sits between white and black.</p>
-      </div>
+    <CollapsibleSection id="steps" title="Steps" className="space-y-2 pt-2">
+      <p className="text-[11px] text-muted-foreground">
+        Shared by every color. The number is where a step sits between white and
+        black.
+      </p>
       <ul>
         {grades.map((grade, i) => {
           const next = grades[i + 1] ?? 1000;
           const mid = midpointGrade(grade, next);
           return (
-            <li key={grade} className="group/step -mx-2 flex items-center justify-between rounded-lg px-2 py-0.5 font-mono text-sm tabular-nums hover:bg-muted">
+            <li
+              key={grade}
+              className="group/step -mx-2 flex items-center justify-between rounded-lg px-2 py-0.5 font-mono text-sm tabular-nums hover:bg-muted"
+            >
               <StepMenu grade={grade} actions={actions} />
               <button
                 type="button"
                 disabled={actions.stepLimit === "max" || mid === null}
                 onClick={() => actions.onAddStep(grade, next)}
-                aria-label={mid === null ? `No room after ${grade}` : `Add step ${mid}, between ${grade} and ${next}`}
-                title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : mid === null ? undefined : `Add step ${mid}`}
+                aria-label={
+                  mid === null
+                    ? `No room after ${grade}`
+                    : `Add step ${mid}, between ${grade} and ${next}`
+                }
+                title={
+                  actions.stepLimit === "max"
+                    ? "A scale can have at most 16 steps."
+                    : mid === null
+                      ? undefined
+                      : `Add step ${mid}`
+                }
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground/0 group-hover/step:text-muted-foreground hover:bg-background hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-0"
               >
                 <Plus className="size-3.5" />
@@ -40,6 +51,6 @@ export function StepsEditor({ actions }: { actions: StepHeaderActions }) {
           );
         })}
       </ul>
-    </PanelSection>
+    </CollapsibleSection>
   );
 }

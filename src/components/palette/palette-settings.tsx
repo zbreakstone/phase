@@ -1,15 +1,35 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import type { ScaleConfig } from "@/lib/palette/types";
-import { applyTheme, readTheme, subscribeTheme, THEME_EVENT, THEME_KEY, type Theme } from "@/lib/theme";
-import { PanelSection, SettingRow } from "./panel-section";
+import {
+  applyTheme,
+  readTheme,
+  subscribeTheme,
+  THEME_EVENT,
+  THEME_KEY,
+  type Theme,
+} from "@/lib/theme";
+import { CollapsibleSection, SettingRow } from "./panel-section";
 import { RulesSettings } from "./scale-settings";
 
 interface Props {
@@ -21,6 +41,8 @@ interface Props {
   onScale: (scale: ScaleConfig) => void;
   /** Replaces everything with the starter palette. Recorded in the undo history. */
   onReset: () => void;
+  /** More display rows, shown in the same group as color space / gamut / theme. */
+  display?: React.ReactNode;
 }
 
 const THEMES: { id: Theme; label: string }[] = [
@@ -30,9 +52,23 @@ const THEMES: { id: Theme; label: string }[] = [
 ];
 
 /** A select whose options each explain themselves, so the sidebar doesn't need paragraphs under it. */
-function DescribedSelect<T extends string>({ id, value, options, onChange }: { id: string; value: T; options: { id: T; label: string; description?: string }[]; onChange: (v: T) => void }) {
+function DescribedSelect<T extends string>({
+  id,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  value: T;
+  options: { id: T; label: string; description?: string }[];
+  onChange: (v: T) => void;
+}) {
   return (
-    <Select items={options.map((o) => ({ value: o.id, label: o.label }))} value={value} onValueChange={(v) => onChange(v as T)}>
+    <Select
+      items={options.map((o) => ({ value: o.id, label: o.label }))}
+      value={value}
+      onValueChange={(v) => onChange(v as T)}
+    >
       <SelectTrigger id={id} size="sm" className="w-full">
         <SelectValue />
       </SelectTrigger>
@@ -41,7 +77,11 @@ function DescribedSelect<T extends string>({ id, value, options, onChange }: { i
           <SelectItem key={o.id} value={o.id}>
             <span className="flex flex-col">
               <span>{o.label}</span>
-              {o.description ? <span className="max-w-60 text-[11px] whitespace-normal text-muted-foreground">{o.description}</span> : null}
+              {o.description ? (
+                <span className="max-w-60 text-[11px] whitespace-normal text-muted-foreground">
+                  {o.description}
+                </span>
+              ) : null}
             </span>
           </SelectItem>
         ))}
@@ -51,9 +91,22 @@ function DescribedSelect<T extends string>({ id, value, options, onChange }: { i
 }
 
 /** The settings you pick once per project: how colors are computed, which screens they target, and the contrast rules. */
-export function PaletteSettings({ space, gamut, scale, onSpace, onGamut, onScale, onReset }: Props) {
+export function PaletteSettings({
+  space,
+  gamut,
+  scale,
+  onSpace,
+  onGamut,
+  onScale,
+  onReset,
+  display,
+}: Props) {
   const [confirming, setConfirming] = React.useState(false);
-  const theme = React.useSyncExternalStore(subscribeTheme, readTheme, () => "system" as Theme);
+  const theme = React.useSyncExternalStore(
+    subscribeTheme,
+    readTheme,
+    () => "system" as Theme,
+  );
 
   React.useEffect(() => {
     if (theme !== "system") return;
@@ -76,46 +129,82 @@ export function PaletteSettings({ space, gamut, scale, onSpace, onGamut, onScale
 
   return (
     <>
-      <PanelSection className="space-y-3">
+      <CollapsibleSection id="display" title="Display" className="space-y-3">
         <SettingRow id="settings-space" label="Color space">
-          <DescribedSelect id="settings-space" value={space} onChange={onSpace} options={SPACE_ORDER.map((id) => ({ id, label: SPACES[id].label, description: SPACES[id].description }))} />
+          <DescribedSelect
+            id="settings-space"
+            value={space}
+            onChange={onSpace}
+            options={SPACE_ORDER.map((id) => ({
+              id,
+              label: SPACES[id].label,
+              description: SPACES[id].description,
+            }))}
+          />
         </SettingRow>
         <SettingRow id="settings-gamut" label="Gamut">
-          <DescribedSelect id="settings-gamut" value={gamut} onChange={onGamut} options={GAMUT_ORDER.map((id) => ({ id, label: GAMUTS[id].label, description: GAMUTS[id].description }))} />
+          <DescribedSelect
+            id="settings-gamut"
+            value={gamut}
+            onChange={onGamut}
+            options={GAMUT_ORDER.map((id) => ({
+              id,
+              label: GAMUTS[id].label,
+              description: GAMUTS[id].description,
+            }))}
+          />
         </SettingRow>
         <SettingRow id="settings-theme" label="Theme">
-          <DescribedSelect id="settings-theme" value={theme} onChange={pickTheme} options={THEMES} />
+          <DescribedSelect
+            id="settings-theme"
+            value={theme}
+            onChange={pickTheme}
+            options={THEMES}
+          />
         </SettingRow>
-      </PanelSection>
+        {display}
+      </CollapsibleSection>
 
-      <PanelSection>
-        <details className="group">
-          <summary className="flex min-h-8 cursor-pointer list-none items-center justify-between text-sm text-muted-foreground hover:text-foreground">
-            <span>
-              Contrast rules <span className="tabular-nums">({scale.rules.length})</span>
+      <CollapsibleSection
+        id="rules"
+        title={
+          <>
+            Contrast rules{" "}
+            <span className="font-normal text-muted-foreground tabular-nums">
+              ({scale.rules.length})
             </span>
-            <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="pt-3">
-            <RulesSettings scale={scale} onChange={onScale} />
-          </div>
-        </details>
-      </PanelSection>
+          </>
+        }
+        defaultOpen={false}
+      >
+        <RulesSettings scale={scale} onChange={onScale} />
+      </CollapsibleSection>
 
-      <PanelSection className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Start over</p>
-        <Button variant="destructive" size="sm" className="shrink-0" onClick={() => setConfirming(true)}>
-          <RotateCcw />
-          Reset
-        </Button>
-      </PanelSection>
+      <CollapsibleSection id="reset" title="Start over" defaultOpen={false}>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Go back to the starter palette.
+          </p>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setConfirming(true)}
+          >
+            <RotateCcw />
+            Reset
+          </Button>
+        </div>
+      </CollapsibleSection>
 
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Reset to the starter palette?</DialogTitle>
             <DialogDescription>
-              This replaces your current colors, steps, tweaks and contrast rules. Your saved palettes aren&apos;t touched, and you can undo it right after with ⌘Z.
+              This replaces your current colors, steps, tweaks and contrast
+              rules. Your saved palettes aren&apos;t touched, and you can undo
+              it right after with ⌘Z.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

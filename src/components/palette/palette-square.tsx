@@ -98,7 +98,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           const at = locate(e);
           if (at) open(at.row, at.col);
         }}
-        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-canvas)", level !== "step" && "cursor-pointer")}
+        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-extra-large)", level !== "step" && "cursor-pointer")}
       >
         <div key={`${level}-${focusHueId}-${focusGrade}`} className="absolute inset-0 animate-in overflow-hidden rounded-[inherit] duration-300 fade-in">
           {mode === "smooth" ? (
