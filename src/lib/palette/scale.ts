@@ -4,11 +4,11 @@ import { contrastFromLuminance } from "../color/contrast";
 export const MIN_GRADES = 3;
 export const MAX_GRADES = 16;
 
-/** Steps run from 0 (white) to SCALE_MAX (black), named like Tailwind: 50, 100, 200 ... 900. */
+/** Steps run from 0 (white) to SCALE_MAX (black), named like Tailwind: 50, 100, 200 ... 950. */
 export const SCALE_MAX = 1000;
 
 export const GRADE_PRESETS: { id: string; label: string; grades: number[] }[] = [
-  { id: "default", label: "50 to 900 (10 steps)", grades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] },
+  { id: "default", label: "50 to 950 (11 steps)", grades: [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] },
   { id: "hundreds", label: "100 to 900 (9 steps)", grades: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
   { id: "fine", label: "Fine (13 steps)", grades: [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950] },
 ];

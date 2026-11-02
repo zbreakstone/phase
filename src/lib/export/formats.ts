@@ -94,7 +94,11 @@ interface Named {
 }
 
 function named(generated: GeneratedHue[]): Named[] {
-  const seen = new Map<string, number>();
+  // "white" and "black" are the shared neutrals, so a hue with either name gets a suffix instead of colliding.
+  const seen = new Map<string, number>([
+    ["white", 1],
+    ["black", 1],
+  ]);
   return generated.map((g) => {
     const base = slug(g.hue.name);
     const n = seen.get(base) ?? 0;
@@ -103,13 +107,22 @@ function named(generated: GeneratedHue[]): Named[] {
   });
 }
 
+/** A hue's own steps. White (0) and black (1000) bookend every hue identically, so they're exported once, not per hue. */
 function ramp(shades: Shade[]): Shade[] {
-  return shades;
+  return shades.filter((s) => !s.anchor);
 }
+
+const WHITE = "#ffffff";
+const BLACK = "#000000";
+
+/** The one white and one black shared by every hue, in the requested format. */
+const neutrals = (format: ColorFormat) => ({ white: formatColor(WHITE, format), black: formatColor(BLACK, format) });
 
 export function toCss(generated: GeneratedHue[], format: ColorFormat, prefix = "", gamut: Gamut = "srgb"): string {
   const p = prefix ? `${prefix}-` : "";
   const lines: string[] = [":root {"];
+  const nt = neutrals(format);
+  lines.push(`  --${p}white: ${nt.white};`, `  --${p}black: ${nt.black};`, "");
   named(generated).forEach((n, i) => {
     if (i > 0) lines.push("");
     for (const s of ramp(n.shades)) {
@@ -140,8 +153,16 @@ const sameColor = (a: RGB, b: RGB) => {
  * every screen can show. The `@media (color-gamut: p3)` block overrides only the colors that differ,
  * using the palette solved in P3. Both solves hit the same luminance targets, so contrast holds either way.
  */
-function dualBlocks(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, name: (slug: string, grade: number) => string) {
-  const base: string[] = [];
+function dualBlocks(
+  srgb: GeneratedHue[],
+  p3: GeneratedHue[],
+  format: ColorFormat,
+  name: (slug: string, grade: number) => string,
+  neutralName: (kind: "white" | "black") => string,
+) {
+  // White and black are identical in both gamuts, so they only appear in the base block.
+  const nt = neutrals(format);
+  const base: string[] = [`${neutralName("white")}: ${nt.white};`, `${neutralName("black")}: ${nt.black};`, ""];
   const wide: string[] = [];
   const a = named(srgb);
   const b = named(p3);
@@ -163,7 +184,7 @@ const indent = (lines: string[], pad: string) => lines.map((l) => (l ? pad + l :
 /** sRGB base plus a Display P3 override inside `@media (color-gamut: p3)`. */
 export function toCssDual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, prefix = ""): string {
   const p = prefix ? `${prefix}-` : "";
-  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--${p}${slug}-${grade}`);
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--${p}${slug}-${grade}`, (kind) => `--${p}${kind}`);
   const out = [":root {", ...indent(base, "  "), "}"];
   if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated color. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
   return out.join("\n");
@@ -171,7 +192,7 @@ export function toCssDual(srgb: GeneratedHue[], p3: GeneratedHue[], format: Colo
 
 /** Tailwind v4 theme in sRGB, with the P3 colors overriding the theme variables on wide-gamut screens. */
 export function toTailwindV4Dual(srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat): string {
-  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--color-${slug}-${grade}`);
+  const { base, wide } = dualBlocks(srgb, p3, format, (slug, grade) => `--color-${slug}-${grade}`, (kind) => `--color-${kind}`);
   const out = ['@import "tailwindcss";', "", "@theme {", ...indent(base, "  "), "}"];
   if (wide.length) out.push("", "/* Wider-gamut screens: same contrast, more saturated color. */", "@media (color-gamut: p3) {", "  :root {", ...indent(wide, "    "), "  }", "}");
   return out.join("\n");
@@ -183,7 +204,7 @@ export function toTailwindV4Dual(srgb: GeneratedHue[], p3: GeneratedHue[], forma
  * under `$extensions.phase`, for auditing a file or rebuilding it in Phase.
  */
 export function toTokensJson(state: PaletteState, generated: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
-  const color: Record<string, Record<string, unknown>> = {};
+  const color: Record<string, unknown> = neutralTokens(format);
   for (const n of named(generated)) {
     const group: Record<string, unknown> = {};
     for (const s of ramp(n.shades)) group[String(s.grade)] = tokenFor(s, format, state.gamut, includeMetadata);
@@ -212,7 +233,7 @@ export function toTokensJson(state: PaletteState, generated: GeneratedHue[], for
  * Tokens Studio) read the file unchanged; the Display P3 solve rides along in `$extensions.gamut["display-p3"]`.
  */
 export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: GeneratedHue[], format: ColorFormat, includeMetadata = false): string {
-  const color: Record<string, Record<string, unknown>> = {};
+  const color: Record<string, unknown> = neutralTokens(format);
   const a = named(srgb);
   const b = named(p3);
   const wideFormat = p3BlockFormat(format);
@@ -249,6 +270,11 @@ export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: 
   return JSON.stringify(doc, null, 2);
 }
 
+function neutralTokens(format: ColorFormat) {
+  const nt = neutrals(format);
+  return { white: { $type: "color", $value: nt.white }, black: { $type: "color", $value: nt.black } };
+}
+
 function tokenFor(shade: Shade, format: ColorFormat, gamut: Gamut, includeMetadata: boolean) {
   return {
     $type: "color",
@@ -266,6 +292,8 @@ export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat, gam
     "    extend: {",
     "      colors: {",
   ];
+  const nt = neutrals(format);
+  lines.push(`        white: ${JSON.stringify(nt.white)},`, `        black: ${JSON.stringify(nt.black)},`);
   for (const n of named(generated)) {
     lines.push(`        ${JSON.stringify(n.slug)}: {`);
     for (const s of ramp(n.shades)) {
@@ -278,7 +306,8 @@ export function toTailwindV3(generated: GeneratedHue[], format: ColorFormat, gam
 }
 
 export function toTailwindV4(generated: GeneratedHue[], format: ColorFormat, gamut: Gamut = "srgb"): string {
-  const lines = ["@import \"tailwindcss\";", "", "@theme {"];
+  const nt = neutrals(format);
+  const lines = ["@import \"tailwindcss\";", "", "@theme {", `  --color-white: ${nt.white};`, `  --color-black: ${nt.black};`, ""];
   named(generated).forEach((n, i) => {
     if (i > 0) lines.push("");
     for (const s of ramp(n.shades)) {
@@ -298,7 +327,15 @@ export const FIGMA_COLLECTION = "Phase palette";
  */
 function figmaColors(generated: GeneratedHue[], prefix: string) {
   const p = prefix ? `${prefix}-` : "";
-  const colors: Record<string, Record<string, unknown>> = {};
+  const colors: Record<string, unknown> = {};
+  for (const kind of ["white", "black"] as const) {
+    colors[kind] = {
+      $type: "color",
+      $value: kind === "white" ? WHITE : BLACK,
+      $scopes: ["ALL_FILLS", "STROKE_COLOR"],
+      $codeSyntax: { WEB: `var(--${p}${kind})` },
+    };
+  }
   for (const n of named(generated)) {
     const group: Record<string, unknown> = {};
     for (const s of ramp(n.shades)) {

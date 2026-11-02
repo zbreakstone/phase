@@ -1,17 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Braces, ChevronRight, FileCode2, Link2, Share2, Variable, Wind } from "lucide-react";
+import { Braces, ChevronRight, Link2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CssLogo, FigmaLogo, TailwindLogo } from "./brand-icons";
 
 export type ExportKind = "css" | "json" | "tailwind" | "figma";
 
 const EXPORTS: { kind: ExportKind; title: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { kind: "css", title: "CSS variables", description: "Custom properties in any color format", icon: FileCode2 },
+  { kind: "css", title: "CSS variables", description: "Custom properties in any color format", icon: CssLogo },
   { kind: "json", title: "JSON tokens", description: "Design tokens for token tools", icon: Braces },
-  { kind: "tailwind", title: "Tailwind", description: "A v4 @theme or a v3 config", icon: Wind },
-  { kind: "figma", title: "Figma variables", description: "Import in Figma's Variables panel", icon: Variable },
+  { kind: "tailwind", title: "Tailwind", description: "A v4 @theme or a v3 config", icon: TailwindLogo },
+  { kind: "figma", title: "Figma variables", description: "Import in Figma's Variables panel", icon: FigmaLogo },
 ];
 
 /**
@@ -59,7 +60,7 @@ export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolea
               className="flex w-full items-center gap-3 rounded-lg p-1.5 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <Icon className="size-4" />
+                <Icon className={kind === "json" ? "size-4" : "size-5 shrink-0"} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{title}</span>

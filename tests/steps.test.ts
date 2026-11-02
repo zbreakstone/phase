@@ -33,7 +33,7 @@ describe("midpointGrade", () => {
 describe("addStepBetween", () => {
   it("inserts the midpoint and keeps the steps in order", () => {
     const next = addStepBetween(defaultState(), 800, 900);
-    expect(next.scale.grades).toEqual([50, 100, 200, 300, 400, 500, 600, 700, 800, 850, 900]);
+    expect(next.scale.grades).toEqual([50, 100, 200, 300, 400, 500, 600, 700, 800, 850, 900, 950]);
   });
 
   it("can add a step between white and the lightest step", () => {

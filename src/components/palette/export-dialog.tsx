@@ -7,10 +7,10 @@ import { ExportPanel } from "./export-panel";
 import type { ExportKind } from "./share-menu";
 
 const COPY: Record<ExportKind, { title: string; description: string }> = {
-  css: { title: "Export CSS variables", description: "Custom properties for every step. Each hue includes white (0) and black (1000)." },
-  json: { title: "Export JSON tokens", description: "Design tokens you can import into a codebase or token tool. Each hue includes white (0) and black (1000)." },
-  tailwind: { title: "Export Tailwind theme", description: "A color theme for Tailwind. Each hue includes white (0) and black (1000)." },
-  figma: { title: "Export Figma variables", description: "A variables file for Figma. Each hue includes white (0) and black (1000)." },
+  css: { title: "Export CSS variables", description: "Custom properties for every step, plus one white and one black shared by every color." },
+  json: { title: "Export JSON tokens", description: "Design tokens you can import into a codebase or token tool, with a single white and black token." },
+  tailwind: { title: "Export Tailwind theme", description: "A color theme for Tailwind, with one white and one black shared by every color." },
+  figma: { title: "Export Figma variables", description: "A variables file for Figma, with a single white and black variable." },
 };
 
 /** Opens from the Share menu with the chosen format; closes by setting `kind` back to null. */
@@ -21,7 +21,7 @@ export function ExportDialog({ kind, onClose, state, generated }: { kind: Export
 
   return (
     <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{COPY[shown].title}</DialogTitle>
           <DialogDescription>{COPY[shown].description}</DialogDescription>
