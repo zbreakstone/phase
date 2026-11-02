@@ -14,7 +14,7 @@ export function Crumbs({ items }: { items: Crumb[] }) {
   const parent = [...items].reverse().find((c) => c.onClick);
   if (!current) return null;
   return (
-    <nav aria-label="Where you are" className="flex items-center gap-1 text-xs text-muted-foreground">
+    <nav aria-label="Where you are" className="flex items-center gap-1 text-sm text-muted-foreground">
       {parent ? (
         <button
           type="button"
