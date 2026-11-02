@@ -13,6 +13,7 @@ import { SliderField } from "./fields";
 import { PanelSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
+import { Hint } from "./hint";
 
 interface Props {
   generated: GeneratedHue;
@@ -112,15 +113,16 @@ export function HuePanel({
             onFocus={(e) => e.target.select()}
             className="h-9 text-base font-semibold md:text-base"
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Remove ${hue.name || "this color"}`}
-            title="Remove color"
-            onClick={onRemove}
-          >
-            <Trash2 />
-          </Button>
+          <Hint label="Remove color">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Remove ${hue.name || "this color"}`}
+              onClick={onRemove}
+            >
+              <Trash2 />
+            </Button>
+          </Hint>
         </div>
       </PanelSection>
 

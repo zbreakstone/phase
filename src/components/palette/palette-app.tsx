@@ -41,6 +41,7 @@ import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
+import { Hint } from "./hint";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -376,12 +377,16 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
           />
           <div className="flex items-center justify-end gap-2">
             <div className="flex items-center" role="group" aria-label="History">
-              <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (⌘Z)">
-                <Undo2 />
-              </Button>
-              <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (⇧⌘Z)">
-                <Redo2 />
-              </Button>
+              <Hint label="Undo (⌘Z)">
+                <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                  <Undo2 />
+                </Button>
+              </Hint>
+              <Hint label="Redo (⇧⌘Z)">
+                <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                  <Redo2 />
+                </Button>
+              </Hint>
             </div>
             <SavesDialog
               state={state}

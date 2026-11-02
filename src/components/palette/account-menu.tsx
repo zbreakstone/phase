@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Hint } from "./hint";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
   type Accent,
@@ -251,19 +252,20 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        aria-label="Account"
-        title={email}
-        style={{
-          backgroundColor: accent
-            ? accentColor(accent)
-            : colorFor(session.user.id),
-          color: accent ? accentOn(accent) : undefined,
-        }}
-        className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white shadow-(--shadow-default) transition-[color,box-shadow] outline-none hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {initial}
-      </PopoverTrigger>
+      <Hint label={email}>
+        <PopoverTrigger
+          aria-label="Account"
+          style={{
+            backgroundColor: accent
+              ? accentColor(accent)
+              : colorFor(session.user.id),
+            color: accent ? accentOn(accent) : undefined,
+          }}
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white shadow-(--shadow-default) transition-[color,box-shadow] outline-none hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {initial}
+        </PopoverTrigger>
+      </Hint>
       <PopoverContent align="end" className="w-72 gap-2 p-3">
         <p className="text-xs text-muted-foreground">Signed in as</p>
         <p className="truncate text-sm font-medium">{email}</p>
