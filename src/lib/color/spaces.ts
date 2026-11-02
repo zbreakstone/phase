@@ -71,7 +71,7 @@ export const SPACES: Record<SpaceId, SpaceDef> = {
     label: "OKLab",
     short: "OKLab",
     description:
-      "Same colour model as OKLCH, but the two ends of a scale are blended along a straight line on the a/b plane instead of around the hue wheel.",
+      "Same color model as OKLCH, but the two ends of a scale are blended along a straight line on the a/b plane instead of around the hue wheel.",
     interpolation: "rect",
     chroma: { max: 0.4, step: 0.005, decimals: 3, label: "Chroma (C)" },
     lightnessMax: 1,
@@ -95,7 +95,7 @@ export const SPACES: Record<SpaceId, SpaceDef> = {
     label: "CIELAB",
     short: "Lab",
     description:
-      "The space Stripe used for its accessible palette. Ends of the scale are blended on the a*/b* plane, so a big hue shift passes through less saturated colours.",
+      "The space Stripe used for its accessible palette. Ends of the scale are blended on the a*/b* plane, so a big hue shift passes through less saturated colors.",
     interpolation: "rect",
     chroma: { max: 150, step: 1, decimals: 0, label: "Chroma (C*)" },
     lightnessMax: 100,
@@ -107,7 +107,7 @@ export const SPACES: Record<SpaceId, SpaceDef> = {
     label: "HSLuv",
     short: "HSLuv",
     description:
-      "A human-friendly CIELUV variant where saturation is a percentage of what is possible at each lightness, so colours never leave the sRGB gamut.",
+      "A human-friendly CIELUV variant where saturation is a percentage of what is possible at each lightness, so colors never leave the sRGB gamut.",
     interpolation: "polar",
     chroma: { max: 100, step: 1, decimals: 0, label: "Saturation (S)" },
     lightnessMax: 100,

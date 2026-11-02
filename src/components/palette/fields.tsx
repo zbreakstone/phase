@@ -45,7 +45,7 @@ interface SliderFieldProps {
   disabled?: boolean;
 }
 
-/** A labelled slider paired with a number input, with an optional gradient guide above the track. */
+/** A labeled slider paired with a number input, with an optional gradient guide above the track. */
 export function SliderField({
   id,
   label,

@@ -15,7 +15,7 @@ export function wcagContrast(hexA: string, hexB: string): number {
   return contrastFromLuminance(relativeLuminance(hexA), relativeLuminance(hexB));
 }
 
-/** Luminance a colour must have to hit `ratio` against `y` (lighter side). */
+/** Luminance a color must have to hit `ratio` against `y` (lighter side). */
 export function luminanceForRatio(y: number, ratio: number, lighter: boolean) {
   return lighter ? ratio * (y + 0.05) - 0.05 : (y + 0.05) / ratio - 0.05;
 }
@@ -50,7 +50,7 @@ export function apcaContrast(textHex: string, bgHex: string): number {
   return apcaFromY(apcaY(textHex), apcaY(bgHex));
 }
 
-/** APCA luminance of a linear-light colour. Keeps the real colour for P3 shades the hex would clip. */
+/** APCA luminance of a linear-light color. Keeps the real color for P3 shades the hex would clip. */
 function apcaYLinear([r, g, b]: RGB): number {
   const ch = (c: number) => {
     const e = linearToSrgb(c);

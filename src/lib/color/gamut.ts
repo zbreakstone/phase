@@ -1,6 +1,6 @@
 import { type RGB, linearToSrgb } from "./convert";
 
-/** The set of colours a palette is allowed to use. */
+/** The set of colors a palette is allowed to use. */
 export type Gamut = "srgb" | "p3";
 
 export const GAMUT_ORDER: Gamut[] = ["srgb", "p3"];
@@ -9,12 +9,12 @@ export const DEFAULT_GAMUT: Gamut = "srgb";
 export const GAMUTS: Record<Gamut, { label: string; description: string }> = {
   srgb: {
     label: "sRGB",
-    description: "The web standard. Every screen shows these colours, and hex works everywhere.",
+    description: "The web standard. Every screen shows these colors, and hex works everywhere.",
   },
   p3: {
     label: "Display P3",
     description:
-      "About 25% more colours, mostly more vivid reds, oranges and greens. Shown on modern phones, Macs and wide-gamut monitors; other screens fall back to the nearest sRGB colour. Hex and HSL can't hold these colours, so export as OKLCH or Display P3.",
+      "About 25% more colors, mostly more vivid reds, oranges and greens. Shown on modern phones, Macs and wide-gamut monitors; other screens fall back to the nearest sRGB color. Hex and HSL can't hold these colors, so export as OKLCH or Display P3.",
   },
 };
 
@@ -60,7 +60,7 @@ export function p3Css(rgb: RGB): string {
   return `color(display-p3 ${r} ${g} ${b})`;
 }
 
-/** The colour to paint or print for a shade: its P3 value in a P3 palette, its hex otherwise. */
+/** The color to paint or print for a shade: its P3 value in a P3 palette, its hex otherwise. */
 export function cssColor(hex: string, linear: RGB, gamut: Gamut): string {
   return gamut === "p3" ? p3Css(linear) : hex;
 }

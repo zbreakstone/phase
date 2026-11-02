@@ -67,7 +67,7 @@ describe("Envoy luminance ranges", () => {
       }
     }
   });
-  it("passes the default rules with the generated colours", () => {
+  it("passes the default rules with the generated colors", () => {
     const scale = defaultScale();
     expect(checkTargets(scale)).toEqual([]);
     const s = defaultState();
@@ -219,8 +219,8 @@ describe("the magic-number guarantee holds on real output", () => {
   });
 });
 
-describe("switching colour space", () => {
-  it("keeps the endpoint colours when converting", () => {
+describe("switching color space", () => {
+  it("keeps the endpoint colors when converting", () => {
     const scale = defaultScale();
     const hue = hueFromPreset(HUE_PRESETS.find((p) => p.key === "blue")!, "oklch", scale);
     const before = generateHue("oklch", scale, hue).shades;
@@ -268,7 +268,7 @@ describe("step names and anchors", () => {
       }
     }
   });
-  it("exports white and black inside every colour set", () => {
+  it("exports white and black inside every color set", () => {
     const state = defaultState();
     const gen = generatePalette(state.space, state.scale, state.hues);
     const css = toCss(gen, "hex");
@@ -301,7 +301,7 @@ describe("perceived lightness across hues", () => {
   });
 });
 
-describe("source colours", () => {
+describe("source colors", () => {
   const scale = defaultScale();
   it("lands on the nearest step by luminance and reports the adjustment", () => {
     const hue = hueFromSource("#3b82f6", "oklch");
@@ -342,7 +342,7 @@ describe("source colours", () => {
       expect(report.failures).toEqual([]);
     }
   });
-  it("pinning keeps the exact colour and the checker reports any deviation", () => {
+  it("pinning keeps the exact color and the checker reports any deviation", () => {
     const hue = hueFromSource("#facc15", "oklch");
     hue.source = { ...hue.source!, pinned: true, grade: 700 };
     const g = generateHue("oklch", scale, hue);
@@ -361,7 +361,7 @@ describe("source colours", () => {
     const landed = g.shades.find((s) => s.isSource)!;
     expect(Math.abs(((landed.hue - g.source!.original.h + 540) % 360) - 180)).toBeLessThan(0.01);
   });
-  it("survives a colour space switch with the same source hex", () => {
+  it("survives a color space switch with the same source hex", () => {
     const hue = hueFromSource("#3b82f6", "oklch");
     for (const to of SPACE_ORDER) {
       const converted = convertHue(hue, scale, "oklch", to);

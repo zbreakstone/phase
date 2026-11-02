@@ -1,35 +1,36 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Layers, Link2, Plus, Redo2, RotateCcw, SunMedium, Undo2 } from "lucide-react";
+import { Eye, Layers, Link2, Redo2, RotateCcw, SunMedium, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { parseHex } from "@/lib/color/convert";
 import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
-import { HUE_PRESETS, defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
+import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
-import type { HueConfig, PaletteState, ScaleConfig } from "@/lib/palette/types";
+import type { HueConfig, PaletteState, ScaleConfig, StepTweak } from "@/lib/palette/types";
 import { encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { useHistory } from "@/lib/palette/use-history";
+import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
+import { addStepBetween, midpointGrade, removeStep, renameStep } from "@/lib/palette/steps";
+import { setStepTweak } from "@/lib/palette/tweaks";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import { createShare, getShared } from "@/lib/cloud/palettes";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { HelpTip } from "./fields";
+import { AddColorEnd } from "./color-label";
 import { HuePanel } from "./hue-panel";
 import { PaletteGrid, displayShade, type Against, type Metric, type Overlay } from "./palette-grid";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
-import { ScaleDialog } from "./scale-dialog";
+import { ScalePanel } from "./scale-panel";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -57,11 +58,11 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const stateKey = React.useMemo(() => encodeState(state), [state]);
 
   React.useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     (async () => {
       try {
         const raw = window.localStorage.getItem(CURRENT_KEY);
-        if (raw && !cancelled) setCurrent(JSON.parse(raw) as CurrentPalette);
+        if (raw && !canceled) setCurrent(JSON.parse(raw) as CurrentPalette);
       } catch {
         // Unreadable pointer: treat the palette as unsaved.
       }
@@ -78,7 +79,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       }
       const shared = fromCode ? null : stateFromHash(window.location.hash);
       if (fromCode) {
-        if (!cancelled) {
+        if (!canceled) {
           loadState({ ...fromCode, gamut: fromCode.gamut ?? DEFAULT_GAMUT });
           // A shared snapshot isn't one of your saved palettes.
           setCurrent(null);
@@ -95,15 +96,15 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
         try {
           const saved = await storage.get(AUTOSAVE_ID);
           // Autosaves from before the gamut control have no gamut and were always sRGB.
-          if (saved && !cancelled) loadState({ ...saved.state, gamut: saved.state.gamut ?? DEFAULT_GAMUT });
+          if (saved && !canceled) loadState({ ...saved.state, gamut: saved.state.gamut ?? DEFAULT_GAMUT });
         } catch {
           // Storage can be unavailable (private mode); start from the default palette.
         }
       }
-      if (!cancelled) setReady(true);
+      if (!canceled) setReady(true);
     })();
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [storage, shareCode, loadState]);
 
@@ -139,7 +140,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       const isUndo = key === "z" && !e.shiftKey;
       const isRedo = (key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey && e.ctrlKey);
       if (!isUndo && !isRedo) return;
-      if (isTextEntry(e.target) || document.querySelector('[role="dialog"]')) return;
+      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"]')) return;
       e.preventDefault();
       if (isUndo) undo();
       else redo();
@@ -209,17 +210,19 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     return name;
   };
 
-  const addPreset = (preset: HuePreset) =>
+  const insertHue = (hues: HueConfig[], hue: HueConfig, index: number) => [...hues.slice(0, index), hue, ...hues.slice(index)];
+
+  const addPreset = (preset: HuePreset, index: number) =>
     setState((s) => {
       const hue = hueFromPreset(preset, s.space, s.scale, uniqueName(preset.name, s.hues));
-      return { ...s, hues: [...s.hues, hue], selectedHueId: hue.id };
+      return { ...s, hues: insertHue(s.hues, hue, index), selectedHueId: hue.id };
     });
 
-  const addFromHex = (hex: string) =>
+  const addFromHex = (hex: string, index: number) =>
     setState((s) => {
       const draft = hueFromSource(hex, s.space);
       const hue = { ...draft, name: uniqueName(draft.name, s.hues) };
-      return { ...s, hues: [...s.hues, hue], selectedHueId: hue.id };
+      return { ...s, hues: insertHue(s.hues, hue, index), selectedHueId: hue.id };
     });
 
   const remove = (id: string) =>
@@ -239,6 +242,40 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       hues.splice(toIndex, 0, moved);
       return { ...s, hues };
     });
+
+  const addStep = (lower: number, upper: number) => {
+    const added = midpointGrade(lower, upper);
+    setState((s) => addStepBetween(s, lower, upper));
+    // Land on the new step so it can be tuned straight away.
+    if (added !== null) setGrade(added);
+  };
+
+  const removeStepAt = (removed: number) => {
+    setState((s) => removeStep(s, removed));
+    setGrade((g) => (g === removed ? null : g));
+  };
+
+  const renameStepTo = (from: number, to: number) => {
+    setState((s) => renameStep(s, from, to));
+    setGrade((g) => (g === from ? to : g));
+  };
+
+  const stepLimit = state.scale.grades.length >= MAX_GRADES ? "max" : state.scale.grades.length <= MIN_GRADES ? "min" : null;
+  const stepActions = { stepLimit, grades: state.scale.grades, onAddStep: addStep, onRemoveStep: removeStepAt, onRenameStep: renameStepTo } as const;
+  const colorActions = {
+    onRename: (id: string, name: string) => updateHue(id, { name }),
+    onRemove: remove,
+    onAddPreset: addPreset,
+    onAddHex: addFromHex,
+  };
+
+  const tweakStep = (hueId: string, grade: number, patch: Partial<StepTweak>) =>
+    setState((s) => ({ ...s, hues: s.hues.map((h) => (h.id === hueId ? { ...h, ...setStepTweak(h, grade, patch) } : h)) }));
+  const resetTweaks = (hueId: string, grade?: number) =>
+    setState((s) => ({
+      ...s,
+      hues: s.hues.map((h) => (h.id !== hueId ? h : { ...h, ...(grade === undefined ? { stepTweaks: undefined } : setStepTweak(h, grade, { dh: 0, dc: 0 })) })),
+    }));
 
   const reset = () => {
     setState(defaultState());
@@ -264,7 +301,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
               value={state.space}
               onValueChange={(v) => setSpace(v as SpaceId)}
             >
-              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Colour space">
+              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Color space">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -283,7 +320,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
               value={state.gamut}
               onValueChange={(v) => setGamut(v as Gamut)}
             >
-              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Colour gamut">
+              <SelectTrigger size="sm" className="w-32 rounded-none" aria-label="Color gamut">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -297,7 +334,6 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             <HelpTip>{GAMUTS[state.gamut].description}</HelpTip>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <ScaleDialog scale={state.scale} onChange={setScale} />
             <SavesDialog
               state={state}
               stateKey={stateKey}
@@ -339,11 +375,12 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             </div>
           ) : (
             <>
-              <Toolbar overlay={overlay} onOverlay={setOverlay} onAddPreset={addPreset} onAddHex={addFromHex} />
+              <Toolbar overlay={overlay} onOverlay={setOverlay} />
               {generated.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 border border-dashed border-border p-12 text-center">
-                  <p className="font-medium">No colours yet</p>
-                  <p className="max-w-sm text-sm text-muted-foreground">Add a colour above. Type a hex or pick a preset and a full scale from white to black appears.</p>
+                  <p className="font-medium">No colors yet</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">Type a hex or pick a preset and a full scale from white to black appears.</p>
+                  <AddColorEnd index={0} actions={colorActions} label="Add your first color" variant="secondary" />
                 </div>
               ) : (
                 <>
@@ -359,6 +396,10 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                       setGrade(g);
                     }}
                     onReorder={reorder}
+                    steps={stepActions}
+                    colors={colorActions}
+                    onTweakStep={tweakStep}
+                    onResetTweaks={resetTweaks}
                   />
                   {(overlay.metric === "contrast" || overlay.metric === "apca") && overlay.against === "selected" && grade === null ? (
                     <p className="text-xs text-muted-foreground">Click a swatch to compare every other swatch against it.</p>
@@ -375,6 +416,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                   />
                 </>
               )}
+              <ScalePanel scale={state.scale} onChange={setScale} />
             </>
           )}
         </section>
@@ -390,11 +432,10 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
               selectedGrade={grade}
               onSelectGrade={setGrade}
               onChange={(patch) => updateHue(selected.hue.id, patch)}
-              onRemove={() => remove(selected.hue.id)}
               display={(shade) => displayShade(shade, overlay, state.gamut)}
             />
           ) : ready ? (
-            <p className="text-sm text-muted-foreground">Add a colour to edit its hue and chroma here.</p>
+            <p className="text-sm text-muted-foreground">Add a color to edit its hue and chroma here.</p>
           ) : null}
         </aside>
       </main>
@@ -405,13 +446,9 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
 function Toolbar({
   overlay,
   onOverlay,
-  onAddPreset,
-  onAddHex,
 }: {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
-  onAddPreset: (p: HuePreset) => void;
-  onAddHex: (hex: string) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -433,7 +470,7 @@ function Toolbar({
       </div>
       {overlay.metric === "contrast" || overlay.metric === "apca" ? (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{overlay.metric === "apca" ? "text colour" : "against"}</span>
+          <span className="text-xs text-muted-foreground">{overlay.metric === "apca" ? "text color" : "against"}</span>
           <ToggleGroup
             value={[overlay.against]}
             onValueChange={(v) => v[0] && onOverlay({ ...overlay, against: v[0] as Against })}
@@ -456,8 +493,8 @@ function Toolbar({
           className="rounded-none"
           pressed={overlay.grayscale}
           onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
-          aria-label="Show swatches as greys of equal luminance"
-          title="Show each swatch as the grey with the same luminance, so you can check that steps line up across hues"
+          aria-label="Show swatches as grays of equal luminance"
+          title="Show each swatch as the gray with the same luminance, so you can check that steps line up across hues"
         >
           <SunMedium />
           Luminance
@@ -467,7 +504,7 @@ function Toolbar({
           value={overlay.vision}
           onValueChange={(v) => v && onOverlay({ ...overlay, vision: v as VisionId, grayscale: false })}
         >
-          <SelectTrigger size="sm" className="w-40 rounded-none" aria-label="Simulate colour vision">
+          <SelectTrigger size="sm" className="w-40 rounded-none" aria-label="Simulate color vision">
             <Eye />
             <SelectValue />
           </SelectTrigger>
@@ -483,69 +520,6 @@ function Toolbar({
           </SelectContent>
         </Select>
       </div>
-      <div className="ml-auto">
-        <AddColour onAddPreset={onAddPreset} onAddHex={onAddHex} />
-      </div>
     </div>
   );
 }
-
-function AddColour({ onAddPreset, onAddHex }: { onAddPreset: (p: HuePreset) => void; onAddHex: (hex: string) => void }) {
-  const [open, setOpen] = React.useState(false);
-  const [text, setText] = React.useState("");
-  const parsed = parseHex(text);
-  const submit = () => {
-    if (!parsed) return;
-    onAddHex(parsed);
-    setText("");
-    setOpen(false);
-  };
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button variant="secondary" size="sm" className="rounded-none" />}>
-        <Plus />
-        Add colour
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 space-y-3 rounded-none">
-        <form
-          className="space-y-1.5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
-        >
-          <label htmlFor="add-hex" className="text-xs font-medium">
-            From a hex colour
-          </label>
-          <div className="flex gap-2">
-            <Input id="add-hex" placeholder="#3b82f6" value={text} onChange={(e) => setText(e.target.value)} aria-invalid={text && !parsed ? true : undefined} className="h-8 font-mono text-xs" />
-            <Button type="submit" size="sm" className="rounded-none" disabled={!parsed}>
-              Add
-            </Button>
-          </div>
-          {text && !parsed ? <p className="text-[11px] text-destructive">Use a hex colour such as #3b82f6.</p> : null}
-        </form>
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium">Or a preset</p>
-          <div className="grid grid-cols-3 gap-px bg-border">
-            {HUE_PRESETS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => {
-                  onAddPreset(p);
-                  setOpen(false);
-                }}
-                className="flex items-center gap-1.5 bg-popover p-1.5 text-left text-xs hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                <span className="size-3 shrink-0" style={{ backgroundColor: p.swatch }} />
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-

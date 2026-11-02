@@ -34,19 +34,19 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="base-colour" className="text-xs font-semibold tracking-wide uppercase">
-        Base colour
+      <Label htmlFor="base-color" className="text-xs font-semibold tracking-wide uppercase">
+        Base color
       </Label>
       <div className="flex items-center gap-2">
         <Input
           type="color"
-          aria-label="Pick a base colour"
+          aria-label="Pick a base color"
           value={hex || "#3b82f6"}
           onChange={(e) => apply(e.target.value)}
           className="h-8 w-10 shrink-0 cursor-pointer rounded-none p-0.5"
         />
         <Input
-          id="base-colour"
+          id="base-color"
           placeholder="Optional, e.g. #3b82f6"
           value={draft ?? hex}
           aria-invalid={invalid ? true : undefined}
@@ -59,12 +59,12 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
           className="h-8 font-mono text-xs"
         />
         {source ? (
-          <Button variant="ghost" size="icon-sm" aria-label="Remove base colour" onClick={() => onChange(null)}>
+          <Button variant="ghost" size="icon-sm" aria-label="Remove base color" onClick={() => onChange(null)}>
             <X />
           </Button>
         ) : null}
       </div>
-      {invalid ? <p className="text-[11px] text-destructive">Enter a hex colour such as #3b82f6.</p> : null}
+      {invalid ? <p className="text-[11px] text-destructive">Enter a hex color such as #3b82f6.</p> : null}
 
       {source && analysis ? (
         <>
@@ -83,14 +83,14 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
           </p>
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="pin" className="text-xs">
-              Keep my exact colour
+              Keep my exact color
             </Label>
             <Switch id="pin" checked={source.pinned} onCheckedChange={(v) => onChange({ ...source, pinned: v })} />
           </div>
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">
-          Enter a colour and the scale is built around it, snapped to the nearest step.
+          Enter a color and the scale is built around it, snapped to the nearest step.
         </p>
       )}
     </div>

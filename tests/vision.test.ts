@@ -4,7 +4,7 @@ import { VISIONS, luminanceGray, simulateVision } from "@/lib/color/vision";
 
 const Y = (hex: string) => luminanceOfLinear(hexToLinear(hex));
 
-describe("colour vision simulation", () => {
+describe("color vision simulation", () => {
   it("leaves typical vision untouched", () => {
     expect(simulateVision("#3b82f6", "normal")).toBe("#3b82f6");
   });
@@ -27,13 +27,13 @@ describe("colour vision simulation", () => {
       expect(dist(simulateVision(red, v), simulateVision(green, v))).toBeLessThan(normal * 0.5);
     }
   });
-  it("renders achromatopsia as a neutral grey of equal luminance", () => {
+  it("renders achromatopsia as a neutral gray of equal luminance", () => {
     const out = simulateVision("#3b82f6", "achromatopsia");
     expect(out.slice(1, 3)).toBe(out.slice(3, 5));
     expect(out.slice(3, 5)).toBe(out.slice(5, 7));
     expect(Y(out)).toBeCloseTo(Y("#3b82f6"), 2);
   });
-  it("greyscale view keeps luminance", () => {
+  it("grayscale view keeps luminance", () => {
     for (const hex of ["#d03a2f", "#4f8a2b", "#3b82f6", "#f5c518"]) {
       expect(Y(luminanceGray(hex))).toBeCloseTo(Y(hex), 2);
     }

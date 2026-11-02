@@ -84,8 +84,8 @@ export function withFixedHue(h: HueConfig): HueConfig {
 }
 
 /**
- * Re-expresses a hue's endpoints in another colour space so that the two
- * scales start from the same colours and only differ in how they travel between them.
+ * Re-expresses a hue's endpoints in another color space so that the two
+ * scales start from the same colors and only differ in how they travel between them.
  */
 export function convertHue(
   hue: HueConfig,

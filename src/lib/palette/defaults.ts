@@ -82,7 +82,7 @@ export function clampChroma(space: SpaceId, value: number): number {
   return Math.min(max, Math.max(0, value));
 }
 
-/** A new hue whose scale is built around a colour the user supplied. */
+/** A new hue whose scale is built around a color the user supplied. */
 export function hueFromSource(hex: string, space: SpaceId, name?: string, id = uid("hue")): HueConfig {
   const c = coordsOf(space, hex);
   const ok = coordsOf("oklch", hex);
