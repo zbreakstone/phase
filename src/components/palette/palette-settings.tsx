@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -108,7 +109,8 @@ export function PaletteSettings({
       if (next === "system") window.localStorage.removeItem(THEME_KEY);
       else window.localStorage.setItem(THEME_KEY, next);
     } catch {
-      // Private mode: the choice just won't survive a reload.
+      // Private mode: the choice applies now but won't survive a reload.
+      toast.message("Couldn't remember your theme choice for next time.", { id: "theme-save" });
     }
     applyTheme(next);
     window.dispatchEvent(new Event(THEME_EVENT));
