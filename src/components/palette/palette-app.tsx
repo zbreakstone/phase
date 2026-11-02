@@ -36,6 +36,7 @@ import { ViewToolbar } from "./view-toolbar";
 import { displayShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import { AccountMenu } from "./account-menu";
+import { useApplyAccent } from "@/lib/accent";
 import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
@@ -198,7 +199,9 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   React.useEffect(() => {
     if (!ready) return;
     const t = setTimeout(() => {
-      storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() => undefined);
+      storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() =>
+        toast.error("Couldn't autosave. Your latest changes may be lost if you close this tab.", { id: "autosave-failed" }),
+      );
       if (cloudEnabled()) {
         // Short links replace the long ones, so keep the address bar clean (this also leaves a /s/code page).
         if (window.location.hash || window.location.pathname !== "/") window.history.replaceState(null, "", "/");
@@ -245,6 +248,8 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   // A removed color can't stay open, so fall back to the level above.
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
   const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
+
+  useApplyAccent();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
     setFocus({ hueId, grade: null });

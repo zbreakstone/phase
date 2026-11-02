@@ -125,6 +125,22 @@
   --sidebar-ring: oklch(0.553 0.013 58.071);
 }
 
+/*
+ * A person's chosen theme color (--accent-h / --accent-c, set from the account menu) recolors primary actions
+ * and controls. Lightness is fixed per theme so the label always has contrast.
+ */
+html[data-accent] {
+  --primary: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --primary-foreground: var(--accent-on);
+  --ring: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+}
+
+html.dark[data-accent] {
+  --primary: oklch(0.78 var(--accent-c) var(--accent-h));
+  --primary-foreground: oklch(0.2 0.03 var(--accent-h));
+  --ring: oklch(0.7 var(--accent-c) var(--accent-h));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
