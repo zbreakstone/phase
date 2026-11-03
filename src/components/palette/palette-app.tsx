@@ -497,14 +497,20 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="flex items-center justify-end gap-2">
             <div className="flex items-center" role="group" aria-label="History">
               <Hint label="Undo" shortcut={["⌘", "Z"]}>
-                <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
-                  <Undo2 />
-                </Button>
+                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+                <span className="inline-flex">
+                  <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                    <Undo2 />
+                  </Button>
+                </span>
               </Hint>
               <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
-                <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
-                  <Redo2 />
-                </Button>
+                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+                <span className="inline-flex">
+                  <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                    <Redo2 />
+                  </Button>
+                </span>
               </Hint>
             </div>
             <SavesDialog
