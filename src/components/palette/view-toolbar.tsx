@@ -1,6 +1,7 @@
 "use client";
 
-import { Contrast, Eye, SunMedium, SwatchBook } from "lucide-react";
+import * as React from "react";
+import { Contrast, Eye, EyeOff, SwatchBook } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,6 +17,22 @@ import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 
+type Lens = "luminance" | Exclude<VisionId, "normal">;
+
+/** What the preview can show: equal-luminance grays first, then each color vision type. */
+const LENSES: { id: Lens; label: string; note?: string }[] = [
+  {
+    id: "luminance",
+    label: "Luminance",
+    note: "Each swatch as the gray with the same luminance, to check steps line up across hues",
+  },
+  ...VISIONS.filter((v) => v.id !== "normal").map((v) => ({
+    id: v.id as Lens,
+    label: v.label,
+    note: v.note,
+  })),
+];
+
 /** Quick ways to look at the square differently: as equal-luminance grays, or as someone with color blindness would. */
 export function ViewToolbar({
   overlay,
@@ -30,51 +47,52 @@ export function ViewToolbar({
   mode: SquareMode;
   onMode: (m: SquareMode) => void;
 }) {
+  // One switch turns the preview on and off; the dropdown picks the lens. The last lens is remembered while
+  // the switch is off.
+  const [last, setLast] = React.useState<Lens>("luminance");
+  const active = overlay.grayscale || overlay.vision !== "normal";
+  const lens: Lens = overlay.grayscale
+    ? "luminance"
+    : overlay.vision !== "normal"
+      ? overlay.vision
+      : last;
+  const apply = (next: Lens | null) =>
+    onOverlay({
+      ...overlay,
+      grayscale: next === "luminance",
+      vision: next && next !== "luminance" ? next : "normal",
+    });
+
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
       <div className="min-w-0">
         <Crumbs items={crumbs} />
       </div>
       <div className="flex items-center gap-2">
-        <Hint label="Show each swatch as the gray with the same luminance, so you can check that steps line up across hues">
-          <Toggle
-            variant="outline"
-            size="sm"
-            pressed={overlay.grayscale}
-            onPressedChange={(grayscale) => onOverlay({ ...overlay, grayscale })}
-            aria-label="Show swatches as grays of equal luminance"
-          >
-            <SunMedium />
-            Luminance
-          </Toggle>
-        </Hint>
         <Select
-          items={VISIONS.map((v) => ({
-            value: v.id,
-            label: v.id === "normal" ? "Vision" : v.label,
-          }))}
-          value={overlay.vision}
-          onValueChange={(v) =>
-            v &&
-            onOverlay({ ...overlay, vision: v as VisionId, grayscale: false })
-          }
+          items={LENSES.map((l) => ({ value: l.id, label: l.label }))}
+          value={lens}
+          onValueChange={(v) => {
+            if (!v) return;
+            setLast(v as Lens);
+            apply(v as Lens);
+          }}
         >
           <SelectTrigger
             size="sm"
             className="w-40"
-            aria-label="Simulate color vision"
+            aria-label="Lens for the preview"
           >
-            <Eye />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {VISIONS.map((v) => (
-              <SelectItem key={v.id} value={v.id}>
+            {LENSES.map((l) => (
+              <SelectItem key={l.id} value={l.id}>
                 <span className="flex flex-col">
-                  <span>{v.label}</span>
-                  {v.note ? (
+                  <span>{l.label}</span>
+                  {l.note ? (
                     <span className="text-[11px] text-muted-foreground">
-                      {v.note}
+                      {l.note}
                     </span>
                   ) : null}
                 </span>
@@ -82,6 +100,17 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
+        <Hint label="Toggle mode">
+          <Toggle
+            variant="outline"
+            size="sm"
+            pressed={active}
+            onPressedChange={(on) => apply(on ? lens : null)}
+            aria-label="Preview with a lens"
+          >
+            {active ? <Eye /> : <EyeOff />}
+          </Toggle>
+        </Hint>
       </div>
       <div className="flex justify-end">
         <ToggleGroup
