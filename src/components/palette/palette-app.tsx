@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,9 @@ import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
 import { addStepBetween, midpointGrade, removeStep, renameStep } from "@/lib/palette/steps";
 import { setStepTweak } from "@/lib/palette/tweaks";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
-import { createShare, getShared } from "@/lib/cloud/palettes";
+import { createShare, getShared, loadLatest } from "@/lib/cloud/palettes";
+import { useSession } from "@/lib/cloud/use-session";
+import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { AddColorEnd } from "./color-label";
@@ -59,10 +62,27 @@ const isTextEntry = (el: EventTarget | null) => {
   return false;
 };
 
-/** The header and the page body share this, so their edges always line up. */
-const PAGE_WIDTH = "mx-auto max-w-[88rem] px-4";
+/** Remembers something across reloads. Private mode can refuse, and that only costs the memory. */
+const remember = (write: () => void) => {
+  try {
+    write();
+  } catch {
+    // Not remembered; nothing else depends on it.
+  }
+};
 
-export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
+interface PaletteAppProps {
+  /** A short-link code to open as a read-only snapshot. */
+  shareCode?: string;
+  /** A saved palette to open at its latest version. */
+  paletteId?: string;
+  /** Start from the starter palette instead of the last autosave. */
+  fresh?: boolean;
+}
+
+export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}) {
+  const router = useRouter();
+  const { session } = useSession();
   const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
   /** Which color and step fill the square. Both null is the resting state showing every color. */
@@ -82,6 +102,37 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   React.useEffect(() => {
     let canceled = false;
     (async () => {
+      // A palette from the list, or a new one: neither starts from the last autosave.
+      if (paletteId || fresh) {
+        try {
+          if (paletteId) {
+            const cloud = getCloud();
+            if (!cloud) throw new Error("Saved palettes aren't turned on here.");
+            const loaded = await loadLatest(cloud, paletteId);
+            if (canceled) return;
+            loadState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
+            const pointer: CurrentPalette = { id: loaded.paletteId, name: loaded.paletteName, versionId: loaded.versionId, savedKey: encodeState(loaded.state) };
+            setCurrent(pointer);
+            setName(pointer.name);
+            remember(() => {
+              window.localStorage.setItem(CURRENT_KEY, JSON.stringify(pointer));
+              window.localStorage.setItem(NAME_KEY, pointer.name);
+            });
+          } else {
+            loadState(defaultState());
+            setCurrent(null);
+            setName("");
+            remember(() => {
+              window.localStorage.removeItem(CURRENT_KEY);
+              window.localStorage.removeItem(NAME_KEY);
+            });
+          }
+        } catch (e) {
+          if (!canceled) toast.error(e instanceof Error ? e.message : "Couldn't open that palette.", { id: "palette-open-failed" });
+        }
+        if (!canceled) setReady(true);
+        return;
+      }
       try {
         const raw = window.localStorage.getItem(CURRENT_KEY);
         const savedName = window.localStorage.getItem(NAME_KEY);
@@ -135,7 +186,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     return () => {
       canceled = true;
     };
-  }, [storage, shareCode, loadState]);
+  }, [storage, shareCode, paletteId, fresh, loadState]);
 
   const updateName = React.useCallback((next: string) => {
     setName(next);
@@ -149,6 +200,10 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const updateCurrent = React.useCallback((next: CurrentPalette | null) => {
     setCurrent(next);
     if (next) updateName(next.name);
+    // Keep the address in step with the palette being edited, without remounting the editor.
+    const { pathname } = window.location;
+    if (next && !pathname.startsWith("/s/") && pathname !== `/p/${next.id}`) window.history.replaceState(null, "", `/p/${next.id}`);
+    else if (!next && pathname.startsWith("/p/")) window.history.replaceState(null, "", "/");
     try {
       if (next) window.localStorage.setItem(CURRENT_KEY, JSON.stringify(next));
       else window.localStorage.removeItem(CURRENT_KEY);
@@ -207,8 +262,11 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
         toast.error("Couldn't autosave. Your latest changes may be lost if you close this tab.", { id: "autosave-failed" }),
       );
       if (cloudEnabled()) {
-        // Short links replace the long ones, so keep the address bar clean (this also leaves a /s/code page).
-        if (window.location.hash || window.location.pathname !== "/") window.history.replaceState(null, "", "/");
+        // Short links replace the long ones, so keep the address bar clean. This also leaves a /s/code page,
+        // but a saved palette keeps its own /p/id address.
+        const { hash, pathname } = window.location;
+        if (pathname.startsWith("/s/")) window.history.replaceState(null, "", "/");
+        else if (hash) window.history.replaceState(null, "", pathname);
         return;
       }
       const hash = hashForState(state);
@@ -350,6 +408,14 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
     toast.success("Back to the starter palette", { action: { label: "Undo", onClick: undo } });
   };
 
+  /** Back to every palette. Asks first when leaving would drop changes that were never saved. */
+  const toList = () => {
+    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== encodeState(defaultState());
+    if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
+    router.push("/");
+  };
+  const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
+
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
   const reference = focusShade ?? null;
   const level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -453,10 +519,10 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                       onMode={setMode}
                       crumbs={
                         focused && focusShade
-                          ? [{ label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
+                          ? [...listCrumb, { label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
                           : focused
-                            ? [{ label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed" }]
-                            : [{ label: "All colors" }]
+                            ? [...listCrumb, { label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed" }]
+                            : [...listCrumb, { label: "All colors" }]
                       }
                     />
                   </div>
