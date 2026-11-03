@@ -28,7 +28,7 @@ export function Crumbs({ items }: { items: Crumb[] }) {
           size="sm"
           onClick={parent.onClick}
           aria-label={`Back to ${parent.label}`}
-          className="min-w-0 bg-white pr-3 pl-1.5 text-sm shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30"
+          className="min-w-0 border-0 bg-white pr-3 pl-1.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30"
         >
           <ChevronLeft className="shrink-0" />
           <span className="truncate font-medium">{parent.label}</span>

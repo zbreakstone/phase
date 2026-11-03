@@ -111,7 +111,12 @@ export function HuePanel({
             placeholder="Unnamed"
             onChange={(e) => onChange({ name: e.target.value })}
             onFocus={(e) => e.target.select()}
-            className="h-9 text-base font-semibold md:text-base"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+            // Reads as a title until you hover or click into it, like the palette name in the header. The
+            // negative margin lines the text up with the section's content while the field keeps its padding.
+            className="-ml-2 h-9 bg-transparent text-base font-semibold shadow-none hover:bg-muted hover:shadow-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent dark:hover:bg-muted md:text-base"
           />
           <Hint label="Remove color">
             <Button
