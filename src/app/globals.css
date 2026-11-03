@@ -6,6 +6,7 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-sunken: var(--sunken);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -54,6 +55,7 @@
   --shadow-large: 0 0 0 0.5px #0000000f, 0 2px 3px -2px #0000000f, 0 3px 12px -4px #0000001a, 0 4px 16px -8px #0000000d;
   --shadow-extra-large: 0 0 0 0.5px #0000 inset, 0 0 0 0.5px #0000000f, 0 8px 40px 0 #0000000d, 0 12px 32px -16px #00000026;
   --background: oklch(0.985 0.001 106.423); /* stone 50 */
+  --sunken: oklch(0.97 0.001 106.424); /* stone 100: one layer below the page */
   --foreground: oklch(0.147 0.004 49.25);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.147 0.004 49.25);
@@ -93,6 +95,7 @@
   --shadow-large: 0 0 0 1px #ffffff2c, 0 2px 3px -2px #00000026, 0 3px 8px -2px #0006, 0 4px 12px -4px #00000080;
   --shadow-extra-large: 0 0 0 0.5px #ffffff12 inset, 0 0 0 0.5px #0000, 0 8px 40px 0 #0000000d, 0 12px 32px -16px #00000026;
   --background: oklch(0.147 0.004 49.25); /* stone 950 */
+  --sunken: oklch(0.108 0.003 49.25); /* one layer below the page; stone has no step darker than 950 */
   --foreground: oklch(0.985 0.001 106.423);
   --card: oklch(0.216 0.006 56.043);
   --card-foreground: oklch(0.985 0.001 106.423);

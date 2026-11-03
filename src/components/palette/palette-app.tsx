@@ -45,6 +45,7 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { cn } from "@/lib/utils";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -89,6 +90,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
   const [resetOpen, setResetOpen] = React.useState(false);
+  /** The version history takes over the sidebar, drawn into this element by the history menu. */
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
   const [grain, setGrain] = React.useState(true);
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
@@ -493,6 +497,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               </Hint>
             </div>
             <SavesDialog
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              slot={historySlot}
               state={state}
               name={name}
               stateKey={stateKey}
@@ -575,7 +582,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
+            <ScrollFade className={cn("rounded-3xl shadow-(--shadow-large) transition-colors lg:h-full", historyOpen ? "bg-sunken" : "bg-white dark:bg-black")} innerClassName="divide-y divide-border">
+              {historyOpen ? (
+                <div ref={setHistorySlot} />
+              ) : (
+                <>
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -610,6 +621,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 </>
               )}
               {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
+                </>
+              )}
             </ScrollFade>
           )}
         </aside>
