@@ -1,11 +1,11 @@
 "use client";
 
-import { rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
+import { flightKeyframes, rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { EllipsisVertical, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -202,7 +202,7 @@ export function PalettesHome() {
         </div>
       </header>
       <main className={`${PAGE_WIDTH} w-full flex-1 py-8`}>
-        <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="sticky top-0 z-10 -mt-8 mb-3 flex items-center justify-between gap-3 bg-background pt-8 pb-3">
           <h1 className="text-xl font-semibold">Palettes</h1>
           <Button render={<Link href="/p/new" />} nativeButton={false}>
             <Plus />
@@ -226,14 +226,6 @@ export function PalettesHome() {
               Start one and save it. It will show up here every time you sign
               in.
             </p>
-            <Button
-              render={<Link href="/p/new" />}
-              nativeButton={false}
-              variant="secondary"
-            >
-              <Plus />
-              New palette
-            </Button>
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -263,10 +255,7 @@ export function PalettesHome() {
                         el.style.position = "relative";
                         el.style.zIndex = "20";
                         el.animate(
-                          [
-                            { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
-                            { transformOrigin: "0 0", transform: "translate(0, 0) scale(1, 1)" },
-                          ],
+                          flightKeyframes(from, to, 24, 16),
                           { duration: 420, easing: "cubic-bezier(0.65, 0, 0.35, 1)" },
                         ).onfinish = () => {
                           el.style.position = "";
@@ -310,11 +299,11 @@ export function PalettesHome() {
                           variant="ghost"
                           size="icon"
                           aria-label={`Actions for ${p.name}`}
-                          className="absolute right-3 bottom-3 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
+                          className="absolute right-3 bottom-5 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
                         />
                       }
                     >
-                      <MoreHorizontal />
+                      <EllipsisVertical />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       {menuItems(p)}
