@@ -10,8 +10,16 @@ export interface PaletteSummary {
 
 export interface VersionSummary {
   id: string;
-  note: string | null;
+  /** Set on versions added on purpose. A version without a title is an autosave. */
+  title: string | null;
+  description: string | null;
   createdAt: number;
+}
+
+/** What names a version. Leave it out for an autosave. */
+export interface VersionDetails {
+  title: string;
+  description: string;
 }
 
 export interface LoadedVersion {
@@ -34,9 +42,9 @@ export async function listPalettes(db: SupabaseClient): Promise<PaletteSummary[]
 
 export async function listVersions(db: SupabaseClient, paletteId: string): Promise<VersionSummary[]> {
   const rows = check(
-    await db.from("palette_versions").select("id, note, created_at").eq("palette_id", paletteId).order("created_at", { ascending: false }).limit(100),
+    await db.from("palette_versions").select("id, title, note, created_at").eq("palette_id", paletteId).order("created_at", { ascending: false }).limit(200),
   );
-  return rows.map((r) => ({ id: r.id as string, note: (r.note as string | null) ?? null, createdAt: Date.parse(r.created_at as string) }));
+  return rows.map(toSummary);
 }
 
 async function toLoaded(
@@ -67,23 +75,33 @@ export async function loadVersion(db: SupabaseClient, versionId: string): Promis
   return toLoaded(row as never);
 }
 
-/** Saves a snapshot. History is append-only: nothing already saved is changed. */
-export async function saveVersion(db: SupabaseClient, paletteId: string, state: PaletteState, note: string): Promise<VersionSummary> {
+function toSummary(r: Record<string, unknown>): VersionSummary {
+  return {
+    id: r.id as string,
+    title: (r.title as string | null) ?? null,
+    description: (r.note as string | null) ?? null,
+    createdAt: Date.parse(r.created_at as string),
+  };
+}
+
+/** Saves a snapshot. History is append-only: nothing already saved is changed. With details it is a named version, without them an autosave. */
+export async function saveVersion(db: SupabaseClient, paletteId: string, state: PaletteState, details?: VersionDetails): Promise<VersionSummary> {
+  const title = details?.title.trim() || null;
   const row = check(
     await db
       .from("palette_versions")
-      .insert({ palette_id: paletteId, state, note: note.trim() || null })
-      .select("id, note, created_at")
+      .insert({ palette_id: paletteId, state, title, note: title ? details?.description.trim() || null : null })
+      .select("id, title, note, created_at")
       .single(),
   );
-  return { id: row.id as string, note: (row.note as string | null) ?? null, createdAt: Date.parse(row.created_at as string) };
+  return toSummary(row);
 }
 
-export async function createPalette(db: SupabaseClient, name: string, state: PaletteState, note: string): Promise<{ paletteId: string; version: VersionSummary }> {
+export async function createPalette(db: SupabaseClient, name: string, state: PaletteState, details?: VersionDetails): Promise<{ paletteId: string; version: VersionSummary }> {
   const palette = check(await db.from("palettes").insert({ name: name.trim() || "Untitled" }).select("id").single());
   const paletteId = palette.id as string;
   try {
-    return { paletteId, version: await saveVersion(db, paletteId, state, note) };
+    return { paletteId, version: await saveVersion(db, paletteId, state, details) };
   } catch (e) {
     await db.from("palettes").delete().eq("id", paletteId);
     throw e;
@@ -100,12 +118,14 @@ export async function deletePalette(db: SupabaseClient, paletteId: string): Prom
   if (error) throw new Error(error.message);
 }
 
-/** Fixes a version's note. The saved palette itself can't be changed, only its description. */
-export async function updateVersionNote(db: SupabaseClient, versionId: string, note: string): Promise<string | null> {
-  const next = note.trim() || null;
-  const { error } = await db.from("palette_versions").update({ note: next }).eq("id", versionId);
+/** Fixes a named version's title and description. The saved palette itself can't be changed. */
+export async function updateVersionDetails(db: SupabaseClient, versionId: string, details: VersionDetails): Promise<{ title: string; description: string | null }> {
+  const title = details.title.trim();
+  if (!title) throw new Error("A named version needs a title.");
+  const description = details.description.trim() || null;
+  const { error } = await db.from("palette_versions").update({ title, note: description }).eq("id", versionId);
   if (error) throw new Error(error.message);
-  return next;
+  return { title, description };
 }
 
 /** Creates (or reuses) a short, read-only link to a snapshot of the palette. Needs a signed-in user. */

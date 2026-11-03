@@ -277,8 +277,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   }, [state, ready, storage]);
 
   // Signed-in editing of a saved or new palette saves itself. A new palette is created soon after the
-  // first change (including a name); after that, a version is added once you pause. "Save new version"
-  // in the history menu is still for notes on the moments worth keeping.
+  // first change (including a name); after that, an unnamed version is added once you pause.
+  // Named versions, added from the history menu, mark the moments worth keeping.
   const cloudSaving = React.useRef(false);
   const autosaves = Boolean(session) && ready && !shareCode && Boolean(paletteId || fresh || current);
   React.useEffect(() => {
@@ -293,11 +293,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
         cloudSaving.current = true;
         try {
           if (!current) {
-            const { paletteId: id, version } = await createPalette(cloud, trimmed, state, "Autosave");
+            const { paletteId: id, version } = await createPalette(cloud, trimmed, state);
             updateCurrent({ id, name: trimmed || "Untitled", versionId: version.id, savedKey: stateKey });
           } else {
             if (trimmed && trimmed !== current.name) await renamePalette(cloud, current.id, trimmed);
-            const version = await saveVersion(cloud, current.id, state, "Autosave");
+            const version = await saveVersion(cloud, current.id, state);
             updateCurrent({ ...current, name: trimmed || current.name, versionId: version.id, savedKey: stateKey });
           }
         } catch (e) {
