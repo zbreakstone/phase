@@ -2,7 +2,7 @@
 
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
+import { Hint } from "./hint";
 
 export interface Crumb {
   label: string;
@@ -24,20 +24,23 @@ export function Crumbs({ items }: { items: Crumb[] }) {
       {parent ? (
         // A button that names where it goes, not where you are. Styled like the toolbar toggles (white fill,
         // small shadow) so it reads as clickable.
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={parent.onClick}
-          aria-label={`Back to ${parent.label}`}
-          aria-keyshortcuts="Escape"
-          className="min-w-0 border-0 bg-white pr-3 pl-1.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30"
+        <Hint
+          label={`Back to ${parent.label}`}
+          shortcut={["Esc"]}
+          side="bottom"
         >
-          <ChevronLeft className="shrink-0" />
-          <span className="truncate font-medium">{parent.label}</span>
-          <Kbd size="sm" fit aria-hidden className="ml-1">
-            Esc
-          </Kbd>
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={parent.onClick}
+            aria-label={`Back to ${parent.label}`}
+            aria-keyshortcuts="Escape"
+            className="min-w-0 border-0 bg-white pr-3 pl-1.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30"
+          >
+            <ChevronLeft className="shrink-0" />
+            <span className="truncate font-medium">{parent.label}</span>
+          </Button>
+        </Hint>
       ) : (
         <span
           aria-current="page"
