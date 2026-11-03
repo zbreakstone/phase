@@ -1,6 +1,6 @@
 "use client";
 
-import { flightKeyframes, forgetCardOrigin, hasArrival, peekCardOrigin } from "@/lib/palette/card-origin";
+import { flightKeyframes, forgetCardOrigin, peekCardOrigin } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
@@ -274,12 +274,11 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   };
   const [shown, setShown] = React.useState({ key, view });
   // Arriving from a palette card the whole square zooms out of the card (below); otherwise it just settles in.
-  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() || peekCardOrigin() || hasArrival() ? null : ARRIVE));
+  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() || peekCardOrigin() ? null : ARRIVE));
   React.useLayoutEffect(() => {
     const from = peekCardOrigin();
     const el = boxRef.current;
-    // A stand-in has already flown here from the card while the palette loaded; this square just takes its place.
-    if (!from || !el || prefersReducedMotion() || hasArrival()) return;
+    if (!from || !el || prefersReducedMotion()) return;
     const to = el.getBoundingClientRect();
     if (to.width === 0 || to.height === 0) return;
     el.style.zIndex = "20";

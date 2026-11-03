@@ -2,20 +2,12 @@
  * Where the palette card you just opened sat on screen, so the editor's square can zoom out of it.
  * It lives in module scope because the home page and the editor are separate routes of one client app.
  */
-let origin: { rect: DOMRect; at: number; picture: HTMLCanvasElement | null } | null = null;
+let origin: { rect: DOMRect; at: number } | null = null;
 
 const FRESH_MS = 6000;
 
-export function rememberCardOrigin(rect: DOMRect, source?: HTMLCanvasElement | null) {
-  // A copy of the card's picture, so it can keep zooming while the editor is still loading.
-  let picture: HTMLCanvasElement | null = null;
-  if (source && source.width > 0) {
-    picture = document.createElement("canvas");
-    picture.width = source.width;
-    picture.height = source.height;
-    picture.getContext("2d")?.drawImage(source, 0, 0);
-  }
-  origin = { rect, at: Date.now(), picture };
+export function rememberCardOrigin(rect: DOMRect) {
+  origin = { rect, at: Date.now() };
 }
 
 /** The remembered card, if it was clicked a moment ago. Doesn't clear it (effects run twice in development). */
@@ -68,58 +60,4 @@ export function flightKeyframes(from: DOMRect, to: DOMRect, radiusFrom: number, 
 /** Which palette was just left, if any (doesn't consume it). */
 export function peekLeavingId(): string | null {
   return leaving && Date.now() - leaving.at < FRESH_MS ? leaving.id : null;
-}
-
-/**
- * The zoom from card to editor starts the moment the editor's shell is on screen, not when the palette finishes loading:
- * a copy of the card's picture flies to where the square will be, and waits there until the real square is ready.
- */
-let arrival: { el: HTMLElement; done: Promise<void> } | null = null;
-
-export function hasArrival(): boolean {
-  return arrival !== null;
-}
-
-/** Fly the remembered card's picture to `target`'s rectangle. Returns false when there is nothing to fly. */
-export function startArrival(target: HTMLElement): boolean {
-  if (arrival) return true;
-  const picture = origin && Date.now() - origin.at < FRESH_MS ? origin.picture : null;
-  if (!origin || !picture) return false;
-  const from = origin.rect;
-  const to = target.getBoundingClientRect();
-  if (to.width === 0 || to.height === 0) return false;
-  const el = document.createElement("div");
-  el.setAttribute("aria-hidden", "true");
-  Object.assign(el.style, {
-    position: "fixed",
-    left: `${to.left}px`,
-    top: `${to.top}px`,
-    width: `${to.width}px`,
-    height: `${to.height}px`,
-    overflow: "hidden",
-    zIndex: "50",
-    pointerEvents: "none",
-    willChange: "transform",
-  });
-  picture.style.cssText = "display:block;width:100%;height:100%";
-  el.appendChild(picture);
-  document.body.appendChild(el);
-  const flight = el.animate(flightKeyframes(from, to, 16, 24), { duration: 420, easing: "cubic-bezier(0.65, 0, 0.35, 1)" });
-  arrival = { el, done: flight.finished.then(() => undefined, () => undefined) };
-  return true;
-}
-
-/** The real square is on screen: let the flight finish, then fade the stand-in away. */
-export function endArrival() {
-  const current = arrival;
-  if (!current) return;
-  void current.done.then(() => {
-    const fade = current.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: "ease-out", fill: "forwards" });
-    const remove = () => {
-      current.el.remove();
-      if (arrival === current) arrival = null;
-      forgetCardOrigin();
-    };
-    fade.finished.then(remove, remove);
-  });
 }

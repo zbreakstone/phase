@@ -1,6 +1,6 @@
 "use client";
 
-import { endArrival, peekCardOrigin, rememberLeavingSquare, startArrival } from "@/lib/palette/card-origin";
+import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -81,14 +81,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [ready, setReady] = React.useState(false);
   // Opened from a palette card: the square zooms out of the card once it loads, so don't show a skeleton in its place.
   const [fromCard] = React.useState(() => peekCardOrigin() !== null);
-  // The zoom starts as soon as the shell lays out (the invisible placeholder marks where the square will be)...
-  const startFlight = React.useCallback((el: HTMLDivElement | null) => {
-    if (el && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) startArrival(el);
-  }, []);
-  // ...and the stand-in is released once the real square has taken its place.
-  React.useEffect(() => {
-    if (ready) endArrival();
-  }, [ready]);
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
@@ -557,7 +549,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="my-auto space-y-6">
             {!ready ? (
               <div aria-busy="true" aria-label="Loading your palette" className="mr-auto">
-                <Skeleton ref={fromCard ? startFlight : undefined} className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard ? "invisible" : ""}`} />
+                <Skeleton className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard ? "invisible" : ""}`} />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">

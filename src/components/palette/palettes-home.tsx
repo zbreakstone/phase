@@ -259,7 +259,7 @@ export function PalettesHome() {
                     onClick={(e) => {
                       // The editor's square zooms out of this thumbnail.
                       const thumb = e.currentTarget.querySelector("[data-card-preview]");
-                      if (thumb) rememberCardOrigin(thumb.getBoundingClientRect(), thumb.querySelector("canvas"));
+                      if (thumb) rememberCardOrigin(thumb.getBoundingClientRect());
                     }}
                     className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
                   >
