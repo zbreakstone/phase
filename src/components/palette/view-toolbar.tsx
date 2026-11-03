@@ -120,7 +120,7 @@ export function ViewToolbar({
             <SelectTrigger
               size="sm"
               className="w-40"
-              aria-label="Lens for the preview"
+              aria-label="Preview mode"
             >
               <SelectValue />
             </SelectTrigger>
@@ -144,13 +144,13 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Hint label="Toggle display mode" shortcut={["/"]}>
+        <Hint label="Toggle preview mode" shortcut={["/"]}>
           <Toggle
             variant="outline"
             size="sm"
             pressed={active}
             onPressedChange={(on) => apply(on ? lens : null)}
-            aria-label="Preview with a lens"
+            aria-label="Toggle preview mode"
           >
             {active ? <Eye /> : <EyeOff />}
           </Toggle>
