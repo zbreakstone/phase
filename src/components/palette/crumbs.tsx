@@ -24,11 +24,7 @@ export function Crumbs({ items }: { items: Crumb[] }) {
       {parent ? (
         // A button that names where it goes, not where you are. Styled like the toolbar toggles (white fill,
         // small shadow) so it reads as clickable.
-        <Hint
-          label={`Back to ${parent.label}`}
-          shortcut={["Esc"]}
-          side="bottom"
-        >
+        <Hint label={`Back to ${parent.label}`} shortcut={["Esc"]}>
           <Button
             variant="ghost"
             size="sm"
