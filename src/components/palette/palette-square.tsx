@@ -1,5 +1,6 @@
 "use client";
 
+import { forgetCardOrigin, peekCardOrigin } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
@@ -272,7 +273,31 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     C: focused ? focused.shades.length : (generated[0]?.shades.length ?? 0),
   };
   const [shown, setShown] = React.useState({ key, view });
-  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() ? null : ARRIVE));
+  // Arriving from a palette card the whole square zooms out of the card (below); otherwise it just settles in.
+  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() || peekCardOrigin() ? null : ARRIVE));
+  React.useLayoutEffect(() => {
+    const from = peekCardOrigin();
+    const el = boxRef.current;
+    if (!from || !el || prefersReducedMotion()) return;
+    const to = el.getBoundingClientRect();
+    if (to.width === 0 || to.height === 0) return;
+    el.style.zIndex = "20";
+    const flight = el.animate(
+      [
+        { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
+        { transformOrigin: "0 0", transform: "translate(0, 0) scale(1, 1)" },
+      ],
+      { duration: 420, easing: EASE_IN_OUT },
+    );
+    flight.onfinish = () => {
+      el.style.zIndex = "";
+      forgetCardOrigin();
+    };
+    return () => {
+      flight.cancel();
+      el.style.zIndex = "";
+    };
+  }, []);
   const [exiting, setExiting] = React.useState<{ id: string; node: React.ReactNode; anim: LayerAnim }[]>([]);
   const lastContent = React.useRef<React.ReactNode>(content);
   React.useEffect(() => {

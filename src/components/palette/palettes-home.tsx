@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberCardOrigin } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -240,10 +241,16 @@ export function PalettesHome() {
                 >
                   <Link
                     href={`/p/${p.id}`}
+                    onClick={(e) => {
+                      // The editor's square zooms out of this thumbnail.
+                      const thumb = e.currentTarget.querySelector("[data-card-preview]");
+                      if (thumb) rememberCardOrigin(thumb.getBoundingClientRect());
+                    }}
                     className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
                   >
                     <div
                       aria-hidden
+                      data-card-preview
                       className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)"
                     >
                       {previews[p.id] ? (
