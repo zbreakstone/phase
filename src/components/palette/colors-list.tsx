@@ -42,6 +42,7 @@ export function ColorsList({
     <CollapsibleSection
       id="colors"
       title="Colors"
+      count={generated.length}
       className="pt-2"
       action={
         <AddColorPopover

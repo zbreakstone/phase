@@ -156,14 +156,8 @@ export function PaletteSettings({
 
       <CollapsibleSection
         id="rules"
-        title={
-          <>
-            Contrast rules{" "}
-            <span className="font-normal text-muted-foreground tabular-nums">
-              ({scale.rules.length})
-            </span>
-          </>
-        }
+        title="Contrast rules"
+        count={scale.rules.length}
         defaultOpen={false}
       >
         <RulesSettings scale={scale} onChange={onScale} />

@@ -12,7 +12,7 @@ import { StepMenu, type StepHeaderActions } from "./step-header";
 export function StepsEditor({ actions }: { actions: StepHeaderActions }) {
   const { grades } = actions;
   return (
-    <CollapsibleSection id="steps" title="Steps" className="space-y-2 pt-2">
+    <CollapsibleSection id="steps" title="Steps" count={grades.length} className="space-y-2 pt-2">
       <p className="text-[11px] text-muted-foreground">
         Shared by every color. The number is where a step sits between white and
         black.
