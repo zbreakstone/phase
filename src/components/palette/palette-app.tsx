@@ -247,8 +247,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
       up();
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    // Capture phase: an open tooltip (any focused toolbar button has one) stops Escape before it bubbles to the window.
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [up]);
 
   React.useEffect(() => {
@@ -457,8 +458,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       if (historyOpen) setHistoryOpen(false);
       else if (!focused) toList();
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   });
 
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
