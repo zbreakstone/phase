@@ -13,7 +13,7 @@ import { type SpaceId } from "@/lib/color/spaces";
 import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
 import type { HueConfig, PaletteState, ScaleConfig, StepTweak } from "@/lib/palette/types";
-import { encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
+import { contentKey, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { useHistory } from "@/lib/palette/use-history";
 import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
@@ -93,7 +93,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
   /** The palette's name, edited in the header. A saved palette is renamed on its next save. */
   const [name, setName] = React.useState("");
-  const stateKey = React.useMemo(() => encodeState(state), [state]);
+  const stateKey = React.useMemo(() => contentKey(state), [state]);
 
   React.useEffect(() => {
     let canceled = false;
@@ -107,7 +107,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             const loaded = await loadLatest(cloud, paletteId);
             if (canceled) return;
             loadState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
-            const pointer: CurrentPalette = { id: loaded.paletteId, name: loaded.paletteName, versionId: loaded.versionId, savedKey: encodeState(loaded.state) };
+            const pointer: CurrentPalette = { id: loaded.paletteId, name: loaded.paletteName, versionId: loaded.versionId, savedKey: contentKey(loaded.state) };
             setCurrent(pointer);
             setName(pointer.name);
             remember(() => {
@@ -270,7 +270,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   React.useEffect(() => {
     if (!autosaves) return;
     const trimmed = name.trim();
-    const dirty = current ? current.savedKey !== stateKey || trimmed !== current.name : stateKey !== encodeState(defaultState()) || trimmed !== "";
+    const dirty = current ? current.savedKey !== stateKey || trimmed !== current.name : stateKey !== contentKey(defaultState()) || trimmed !== "";
     if (!dirty) return;
     const t = setTimeout(
       async () => {
@@ -431,7 +431,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
   /** Back to every palette. Asks first when leaving would drop changes that were never saved. */
   const toList = () => {
-    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== encodeState(defaultState());
+    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
     if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
     router.push("/");
   };
