@@ -45,7 +45,6 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
-import { cn } from "@/lib/utils";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -582,7 +581,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className={cn("rounded-3xl shadow-(--shadow-large) transition-colors lg:h-full", historyOpen ? "bg-sunken" : "bg-white dark:bg-black")} innerClassName="divide-y divide-border">
+            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
               {historyOpen ? (
                 <div ref={setHistorySlot} />
               ) : (

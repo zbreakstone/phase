@@ -417,7 +417,7 @@ export function SavesDialog({
       ) : (
         <>
           <section className="space-y-3 px-5 py-4">
-            <div className="flex items-center gap-2 rounded-lg bg-card px-2.5 py-2 text-xs shadow-(--shadow-default)">
+            <div className="flex items-center gap-2 rounded-lg bg-muted px-2.5 py-2 text-xs">
               <span
                 aria-hidden
                 className={`size-1.5 shrink-0 rounded-full ${status?.color ?? "bg-muted-foreground/40"}`}
@@ -460,7 +460,7 @@ export function SavesDialog({
                 Nothing saved yet.
               </p>
             ) : (
-              <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-lg bg-card shadow-(--shadow-default)">
+              <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border">
                 {palettes.map((p) => (
                   <li
                     key={p.id}
@@ -599,7 +599,7 @@ function VersionList({
   return (
     <div className="space-y-2">
       {named.length > 0 ? (
-        <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg bg-card shadow-(--shadow-default)">
+        <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {named.map((v) => (
             <li key={v.id} className="px-2.5 py-2 text-xs">
               {editing?.id === v.id ? (
@@ -712,7 +712,7 @@ function VersionList({
             {autosaves.length === 1 ? "version" : "versions"}
           </button>
           {showAutosaves ? (
-            <ul className="max-h-40 divide-y divide-border overflow-y-auto rounded-lg bg-card shadow-(--shadow-default)">
+            <ul className="max-h-40 divide-y divide-border overflow-y-auto rounded-lg border border-border">
               {autosaves.map((v) => (
                 <li
                   key={v.id}
