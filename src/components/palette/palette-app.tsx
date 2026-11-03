@@ -487,6 +487,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
                   onResetAll={() => resetTweaks(focused.hue.id)}
                   onPrevious={goStep(-1)}
                   onNext={goStep(1)}
+                  stepActions={stepActions}
                 />
               ) : focused ? (
                 <HuePanel
