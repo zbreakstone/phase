@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { contrastFromLuminance } from "@/lib/color/contrast";
@@ -203,8 +204,12 @@ export function HuePanel({
         className="space-y-2"
       >
         <div className="flex items-center justify-between gap-2">
-          <h3 id="hue-steps" className="text-sm font-semibold">
+          <h3
+            id="hue-steps"
+            className="flex items-center gap-1.5 text-sm font-semibold"
+          >
             Steps
+            <Badge size="sm">{generated.shades.length}</Badge>
           </h3>
           {tuned > 0 ? (
             <Button
