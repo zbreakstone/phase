@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { KbdGroup } from "@/components/ui/kbd";
 import { Hint } from "./hint";
 import { AddVersionDialog } from "./add-version-dialog";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
@@ -368,7 +369,7 @@ export function SavesDialog({
         </h2>
         <div className="-mr-2 flex items-center">
           {signedIn ? (
-            <Hint label="Add to version history (⌘⌥S)">
+            <Hint label="Add to version history" shortcut={["⌘", "⌥", "S"]}>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -453,9 +454,7 @@ export function SavesDialog({
         <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
           <p className="text-xs text-muted-foreground">
             Press{" "}
-            <kbd className="rounded bg-muted px-1 py-0.5 font-sans font-medium text-foreground">
-              ⌘ + ⌥ + S
-            </kbd>{" "}
+            <KbdGroup keys={["⌘", "⌥", "S"]} className="align-middle" />{" "}
             to add to version history while editing.
           </p>
           {current ? (

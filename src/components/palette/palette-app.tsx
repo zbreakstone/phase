@@ -491,12 +491,12 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           />
           <div className="flex items-center justify-end gap-2">
             <div className="flex items-center" role="group" aria-label="History">
-              <Hint label="Undo (⌘Z)">
+              <Hint label="Undo" shortcut={["⌘", "Z"]}>
                 <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
                   <Undo2 />
                 </Button>
               </Hint>
-              <Hint label="Redo (⇧⌘Z)">
+              <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
                 <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
                   <Redo2 />
                 </Button>

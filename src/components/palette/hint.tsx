@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { KbdGroup } from "@/components/ui/kbd";
 import {
   Tooltip,
   TooltipContent,
@@ -13,10 +14,13 @@ import {
  */
 export function Hint({
   label,
+  shortcut,
   side,
   children,
 }: {
   label: React.ReactNode;
+  /** Keys to show next to the label, such as `["⌘", "Z"]`. */
+  shortcut?: string[];
   side?: "top" | "bottom" | "left" | "right";
   children: React.ReactElement;
 }) {
@@ -25,6 +29,7 @@ export function Hint({
       <TooltipTrigger render={children} />
       <TooltipContent side={side} className="max-w-64 text-balance">
         {label}
+        {shortcut ? <KbdGroup keys={shortcut} size="sm" inverted /> : null}
       </TooltipContent>
     </Tooltip>
   );

@@ -117,7 +117,7 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Hint label="Toggle display mode (/)">
+        <Hint label="Toggle display mode" shortcut={["/"]}>
           <Toggle
             variant="outline"
             size="sm"
@@ -138,12 +138,12 @@ export function ViewToolbar({
           spacing={0}
           aria-label="How the square is drawn"
         >
-          <Hint label="Smooth: colors melt into each other ([)">
+          <Hint label="Smooth: colors melt into each other" shortcut={["["]}>
             <ToggleGroupItem value="smooth" aria-label="Smooth">
               <Contrast />
             </ToggleGroupItem>
           </Hint>
-          <Hint label="Cells: every swatch stays crisp (])">
+          <Hint label="Cells: every swatch stays crisp" shortcut={["]"]}>
             <ToggleGroupItem value="cells" aria-label="Cells">
               <SwatchBook />
             </ToggleGroupItem>
