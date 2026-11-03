@@ -120,9 +120,9 @@ function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim 
     // The fixed point that makes cell `idx` of `n` fill the square when scaled by n (and a layer shrunk by 1/n line up with that cell).
     const origin = axis === "y" ? `50% ${at * 100}%` : `${at * 100}% 50%`;
     const duration = 320;
-    // Going in, the old picture stays opaque underneath (the new one, shrunk to the row, doesn't cover the square yet) and the new one fades in on top.
+    // Going in, the old picture zooms into the row underneath while the new one, already full size, fades in over it. (Growing the new one from the row left its hard edges visible against the old picture's soft blend between rows.)
     return deeper
-      ? { enter: { origin, from: scale(1 / k), to: REST, fade: "in", duration } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration } as LayerAnim }
+      ? { enter: { origin, from: REST, to: REST, fade: "in", duration } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration } as LayerAnim }
       : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
   };
   if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", pin(to.hueIdx, from.R), from.R, true);
