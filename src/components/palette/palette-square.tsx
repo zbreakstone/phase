@@ -96,8 +96,11 @@ interface LayerAnim {
   to: string;
   fade: "in" | "out" | "none";
   duration: number;
+  easing?: string;
 }
 
+// Zooming in covers a lot of ground (the picture scales up to 13x), so it eases in as well as out and takes longer, or it reads as a cut.
+const EASE_IN_OUT = "cubic-bezier(0.65, 0, 0.35, 1)";
 const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const REST = "scale(1, 1)";
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -122,7 +125,7 @@ function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim 
     const duration = 320;
     // Going in, the old picture zooms into the row underneath while the new one, already full size, fades in over it. (Growing the new one from the row left its hard edges visible against the old picture's soft blend between rows.)
     return deeper
-      ? { enter: { origin, from: REST, to: REST, fade: "in", duration } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration } as LayerAnim }
+      ? { enter: { origin, from: REST, to: REST, fade: "in", duration: 560, easing: EASE_IN_OUT } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration: 560, easing: EASE_IN_OUT } as LayerAnim }
       : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
   };
   if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", pin(to.hueIdx, from.R), from.R, true);
@@ -145,7 +148,7 @@ function Layer({ children, enter, exit, onExited }: { children: React.ReactNode;
         { transform: a.from, opacity: opacity[0] },
         { transform: a.to, opacity: opacity[1] },
       ],
-      { duration: a.duration, easing: EASE_OUT, fill: leaving ? "forwards" : "backwards" },
+      { duration: a.duration, easing: a.easing ?? EASE_OUT, fill: leaving ? "forwards" : "backwards" },
     );
   };
   React.useLayoutEffect(() => {
