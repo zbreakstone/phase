@@ -59,6 +59,9 @@ const isTextEntry = (el: EventTarget | null) => {
   return false;
 };
 
+/** The header and the page body share this, so their edges always line up. */
+const PAGE_WIDTH = "mx-auto max-w-[88rem] px-4";
+
 export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
@@ -360,7 +363,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border bg-white dark:bg-black">
-        <div className="mx-auto grid h-14 max-w-[88rem] grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3 px-4">
+        <div className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}>
           <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
           <input
             aria-label="Palette name"
@@ -410,13 +413,13 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
       </header>
 
       <main
-        className="mx-auto lg:[container-type:size] grid w-full max-w-[88rem] flex-1 gap-6 px-4 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1fr)_24rem] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0"
+        className={`${PAGE_WIDTH} lg:[container-type:size] grid w-full flex-1 gap-6 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[auto_minmax(24rem,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0`}
       >
         <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:-mx-10 lg:px-10 lg:py-6">
           <div className="my-auto space-y-6">
             {!ready ? (
-              <div aria-busy="true" aria-label="Loading your palette" className="mx-auto">
-                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-7rem)]" />
+              <div aria-busy="true" aria-label="Loading your palette" className="mr-auto">
+                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)]" />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
@@ -427,7 +430,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
             ) : (
               <>
                 {/* The square is 16px taller than the sidebar, and the toolbar hangs above it so it never moves the square off center. */}
-                <div className="relative mx-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-7rem)]">
+                <div className="relative mr-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-9rem)]">
                   <PaletteSquare
                     generated={generated}
                     focusHueId={focused?.hue.id ?? null}
@@ -469,7 +472,7 @@ export function PaletteApp({ shareCode }: { shareCode?: string } = {}) {
           </div>
         </section>
 
-        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-7rem)-1rem)] lg:pb-0">
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
             <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
               {focused && focusShade ? (

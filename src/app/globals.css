@@ -151,6 +151,12 @@ html.dark[data-accent] {
   html {
     @apply font-sans;
   }
+  /* Everything is sized in rem, so shrinking the root scales the whole UI. Laptop screens get 14px; big displays keep 16px. */
+  @media (min-width: 1024px) and (max-width: 1999px) {
+    html {
+      font-size: 14px;
+    }
+  }
   /* Tailwind v4 resets buttons to the default arrow. Anything clickable should say so. */
   button:not(:disabled),
   summary,
