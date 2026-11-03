@@ -18,3 +18,18 @@ export function peekCardOrigin(): DOMRect | null {
 export function forgetCardOrigin() {
   origin = null;
 }
+
+/** The reverse trip: the square you're leaving, so that palette's card on the home page can zoom out of it. */
+let leaving: { id: string; rect: DOMRect; at: number } | null = null;
+
+export function rememberLeavingSquare(id: string, rect: DOMRect) {
+  leaving = { id, rect, at: Date.now() };
+}
+
+/** Takes the square rect for this palette's card (once), if it was just left. */
+export function takeLeavingSquare(id: string): DOMRect | null {
+  if (!leaving || leaving.id !== id) return null;
+  const { rect, at } = leaving;
+  leaving = null;
+  return Date.now() - at < FRESH_MS ? rect : null;
+}

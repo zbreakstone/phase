@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -433,6 +434,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const toList = () => {
     const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
     if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
+    // The palette's card on the home page zooms out of the square we're leaving.
+    const square = document.querySelector("[data-palette-square]");
+    if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
     router.push("/");
   };
   const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];

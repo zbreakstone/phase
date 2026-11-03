@@ -328,6 +328,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     <div className="relative">
       <div
         ref={boxRef}
+        data-palette-square
         role="group"
         aria-label={level === "all" ? "Your palette" : level === "hue" ? `${focused?.hue.name} steps` : `${focused?.hue.name} ${focusShade?.grade}`}
         onPointerMove={(e) => {

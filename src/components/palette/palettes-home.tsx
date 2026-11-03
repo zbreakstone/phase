@@ -1,6 +1,6 @@
 "use client";
 
-import { rememberCardOrigin } from "@/lib/palette/card-origin";
+import { rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -254,6 +254,25 @@ export function PalettesHome() {
                     <div
                       aria-hidden
                       data-card-preview
+                      ref={(el) => {
+                        // Coming back from this palette: the thumbnail zooms down out of the square we just left.
+                        const from = el ? takeLeavingSquare(p.id) : null;
+                        if (!el || !from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                        const to = el.getBoundingClientRect();
+                        if (to.width === 0 || to.height === 0) return;
+                        el.style.position = "relative";
+                        el.style.zIndex = "20";
+                        el.animate(
+                          [
+                            { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
+                            { transformOrigin: "0 0", transform: "translate(0, 0) scale(1, 1)" },
+                          ],
+                          { duration: 420, easing: "cubic-bezier(0.65, 0, 0.35, 1)" },
+                        ).onfinish = () => {
+                          el.style.position = "";
+                          el.style.zIndex = "";
+                        };
+                      }}
                       onPointerMove={(e) => {
                         // Pan the zoomed gradient so the point under the pointer drifts toward the middle of the card.
                         const box = e.currentTarget.getBoundingClientRect();
