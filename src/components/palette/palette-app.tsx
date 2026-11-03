@@ -505,7 +505,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               current={current}
               hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
               onCurrent={updateCurrent}
-              onReset={() => setResetOpen(true)}
               onOpen={(loaded) => {
                 setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
                 setFocus({ hueId: null, grade: null });
@@ -581,9 +580,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
+            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
               {historyOpen ? (
-                <div ref={setHistorySlot} />
+                <div ref={setHistorySlot} className="h-full" />
               ) : (
                 <>
               {focused && focusShade ? (
