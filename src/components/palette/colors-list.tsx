@@ -3,7 +3,7 @@
 import * as React from "react";
 import { GripVertical, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { displayShade, middleShade, type Overlay } from "@/lib/palette/overlay";
+import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
 import type { Gamut } from "@/lib/color/gamut";
 import type { GeneratedHue } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
@@ -76,7 +76,7 @@ export function ColorsList({
         }}
       >
         {generated.map((g, i) => {
-          const mid = middleShade(g.shades);
+          const mid = representativeShade(g);
           return (
             <li
               key={g.hue.id}

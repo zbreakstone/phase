@@ -3,7 +3,7 @@ import type { RGB } from "@/lib/color/convert";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { luminanceGrayLinear, simulateVisionLinear, type VisionId } from "@/lib/color/vision";
 import { requiredRatio } from "./scale";
-import type { ContrastRule, Shade } from "./types";
+import type { ContrastRule, GeneratedHue, Shade } from "./types";
 
 export type Metric = "contrast" | "apca" | "luminance" | "off";
 export type Against = "white" | "black" | "selected";
@@ -65,6 +65,12 @@ export function swatchMeta(shade: Shade, overlay: Overlay, reference: Shade | nu
 }
 
 /** The shade a hue is best summed up by: the middle of its ramp, ignoring the white and black ends. */
+/** The shade that stands for a color in a list: the step its source color landed on (picked by hand or by nearest luminance), otherwise 500. */
+export function representativeShade(g: GeneratedHue): Shade {
+  const target = g.source ? g.source.grade : 500;
+  return g.shades.find((s) => s.grade === target) ?? g.shades.find((s) => s.grade === 500) ?? middleShade(g.shades);
+}
+
 export function middleShade(shades: Shade[]): Shade {
   const ramp = shades.filter((s) => !s.anchor);
   const list = ramp.length > 0 ? ramp : shades;
