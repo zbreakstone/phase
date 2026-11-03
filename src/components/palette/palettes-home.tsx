@@ -1,6 +1,7 @@
 "use client";
 
-import { flightKeyframes, rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
+import { cn } from "@/lib/utils";
+import { flightKeyframes, peekLeavingId, rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -51,10 +52,19 @@ interface Preview {
 // Hover zooms the thumbnail to 125%, which leaves 25% of its size to pan across.
 const HOVER_ZOOM_PAN = 25;
 
+// The last list we loaded, so coming back from a palette shows the cards at once (and refreshes behind them)
+// instead of flashing skeletons and then rearranging.
+let listCache: { palettes: PaletteSummary[]; previews: Record<string, Preview> } | null = null;
+
 export function PalettesHome() {
-  const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
+  const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(() => listCache?.palettes ?? null);
   /** Previews by palette id. A palette missing here is still loading, or its latest version couldn't be read. */
-  const [previews, setPreviews] = React.useState<Record<string, Preview>>({});
+  const [previews, setPreviews] = React.useState<Record<string, Preview>>(() => listCache?.previews ?? {});
+  // The palette we just came back from flies out of the editor's square; the other cards fade up around it.
+  const [flyingId] = React.useState(() => peekLeavingId());
+  React.useEffect(() => {
+    if (palettes) listCache = { palettes, previews };
+  }, [palettes, previews]);
 
   const router = useRouter();
   /** Bumped to load the list again after a duplicate, rename or delete. */
@@ -198,10 +208,10 @@ export function PalettesHome() {
             priority
             className="h-6 w-auto invert dark:invert-0"
           />
-          <h1 className="truncate px-2 text-center text-sm font-medium">
+          <h1 className="animate-in fade-in truncate px-2 text-center text-sm font-medium duration-300 motion-reduce:animate-none">
             Palettes
           </h1>
-          <div className="flex items-center justify-end gap-2">
+          <div className="animate-in fade-in flex items-center justify-end gap-2 duration-300 motion-reduce:animate-none">
             <Button render={<Link href="/p/new" />} nativeButton={false}>
               <Plus />
               New palette
@@ -231,10 +241,18 @@ export function PalettesHome() {
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {palettes.map((p) => (
+            {palettes.map((p, i) => (
               <ContextMenu key={p.id}>
                 <ContextMenuTrigger
-                  render={<li className="group/card relative" />}
+                  render={
+                    <li
+                      className={cn(
+                        "group/card relative",
+                        p.id !== flyingId && "animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none",
+                      )}
+                      style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}
+                    />
+                  }
                 >
                   <Link
                     href={`/p/${p.id}`}

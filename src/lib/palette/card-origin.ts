@@ -56,3 +56,8 @@ export function flightKeyframes(from: DOMRect, to: DOMRect, radiusFrom: number, 
   }
   return frames;
 }
+
+/** Which palette was just left, if any (doesn't consume it). */
+export function peekLeavingId(): string | null {
+  return leaving && Date.now() - leaving.at < FRESH_MS ? leaving.id : null;
+}
