@@ -242,17 +242,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const up = React.useCallback(() => setFocus((f) => (f.grade !== null ? { ...f, grade: null } : { hueId: null, grade: null })), []);
 
   React.useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
-      up();
-    };
-    // Capture phase: an open tooltip (any focused toolbar button has one) stops Escape before it bubbles to the window.
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [up]);
-
-  React.useEffect(() => {
     if (!ready) return;
     const t = setTimeout(() => {
       storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() =>
@@ -452,15 +441,17 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   // steps up instead (handled above), and an open version history closes first.
   const onEscape = React.useRef<(e: KeyboardEvent) => void>(() => {});
   onEscape.current = (e) => {
-    if (!session || e.key !== "Escape" || e.defaultPrevented) return;
+    if (e.key !== "Escape" || e.defaultPrevented) return;
     if (isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
     // Esc in a text field just leaves the field (so it never feels stuck); the next Esc navigates.
     if (isTextEntry(e.target)) {
       (e.target as HTMLElement).blur();
       return;
     }
+    // One step per press: close history, else go up a level inside a color or step, else leave for Palettes.
     if (historyOpen) setHistoryOpen(false);
-    else if (!focused) toList();
+    else if (focused) up();
+    else if (session) toList();
   };
   // Subscribed once, so this listener keeps its place at the front of the capture phase instead of being re-added behind others on every render.
   React.useEffect(() => {
