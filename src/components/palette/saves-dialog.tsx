@@ -3,11 +3,17 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Mail, Pencil, Plus, X } from "lucide-react";
+import { Check, Mail, MoreHorizontal, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Hint } from "./hint";
 import { AddVersionDialog } from "./add-version-dialog";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
@@ -378,21 +384,13 @@ export function SavesDialog({
         </section>
       ) : (
         <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
-          <div className="flex shrink-0 items-center gap-2 rounded-lg bg-muted px-2.5 py-2 text-xs">
-            <span
-              aria-hidden
-              className={`size-1.5 shrink-0 rounded-full ${status?.color ?? "bg-muted-foreground/40"}`}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">
-                {current ? name.trim() || current.name : "Not saved yet"}
-              </span>
-              <span className="text-muted-foreground">
-                {status?.label ??
-                  "Changes save themselves once you start editing."}
-              </span>
-            </span>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Press{" "}
+            <kbd className="rounded bg-muted px-1 py-0.5 font-sans font-medium text-foreground">
+              ⌘ + ⌥ + S
+            </kbd>{" "}
+            to add to version history while editing.
+          </p>
           {current ? (
             <VersionList
               versions={versions}
@@ -557,40 +555,42 @@ function VersionList({
                     {when(v.createdAt)}
                   </span>
                 </span>
-                {named ? (
-                  <Hint label="Edit title and description">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Edit ${v.title}`}
-                      disabled={busy}
-                      onClick={() =>
-                        onEditing({
-                          id: v.id,
-                          title: v.title ?? "",
-                          description: v.description ?? "",
-                        })
-                      }
-                      className="text-muted-foreground"
-                    >
-                      <Pencil />
-                    </Button>
-                  </Hint>
-                ) : null}
-                {isOpen ? (
-                  <span className="shrink-0 self-center px-2 text-[11px] text-muted-foreground">
-                    Open now
-                  </span>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => onOpen(v.id)}
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Actions for ${v.title ?? "autosave"}`}
+                        disabled={busy}
+                        className="text-muted-foreground"
+                      />
+                    }
                   >
-                    Open
-                  </Button>
-                )}
+                    <MoreHorizontal />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      disabled={isOpen}
+                      onClick={() => onOpen(v.id)}
+                    >
+                      Open this version
+                    </DropdownMenuItem>
+                    {named ? (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          onEditing({
+                            id: v.id,
+                            title: v.title ?? "",
+                            description: v.description ?? "",
+                          })
+                        }
+                      >
+                        Edit title and description
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </li>
