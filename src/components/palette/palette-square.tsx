@@ -107,6 +107,8 @@ const ARRIVE: LayerAnim = { origin: "50% 50%", from: "scale(0.97, 0.97)", to: RE
 const DISSOLVE: LayerAnim = { origin: "50% 50%", from: REST, to: REST, fade: "out", duration: 200 };
 const SETTLE: LayerAnim = { origin: "50% 50%", from: "scale(0.985, 0.985)", to: REST, fade: "none", duration: 200 };
 
+const pin = (idx: number, n: number) => (n > 1 ? idx / (n - 1) : 0.5);
+
 /**
  * How two levels connect. Going into a row (or a column of that row) the old picture scales up around it until
  * it fills the square while the new one grows to meet it; going back out is the reverse. Anything else (another
@@ -115,6 +117,7 @@ const SETTLE: LayerAnim = { origin: "50% 50%", from: "scale(0.985, 0.985)", to: 
 function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim } {
   const zoom = (axis: "x" | "y", at: number, k: number, deeper: boolean) => {
     const scale = (n: number) => (axis === "y" ? `scale(1, ${n})` : `scale(${n}, 1)`);
+    // The fixed point that makes cell `idx` of `n` fill the square when scaled by n (and a layer shrunk by 1/n line up with that cell).
     const origin = axis === "y" ? `50% ${at * 100}%` : `${at * 100}% 50%`;
     const duration = 320;
     // Going in, the old picture stays opaque underneath (the new one, shrunk to the row, doesn't cover the square yet) and the new one fades in on top.
@@ -122,10 +125,10 @@ function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim 
       ? { enter: { origin, from: scale(1 / k), to: REST, fade: "in", duration } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration } as LayerAnim }
       : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
   };
-  if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", (to.hueIdx + 0.5) / from.R, from.R, true);
-  if (from.level === "hue" && to.level === "all" && to.R > 0) return zoom("y", (from.hueIdx + 0.5) / to.R, to.R, false);
-  if (from.level === "hue" && to.level === "step" && from.hueIdx === to.hueIdx && from.C > 0) return zoom("x", (to.gradeIdx + 0.5) / from.C, from.C, true);
-  if (from.level === "step" && to.level === "hue" && from.hueIdx === to.hueIdx && to.C > 0) return zoom("x", (from.gradeIdx + 0.5) / to.C, to.C, false);
+  if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", pin(to.hueIdx, from.R), from.R, true);
+  if (from.level === "hue" && to.level === "all" && to.R > 0) return zoom("y", pin(from.hueIdx, to.R), to.R, false);
+  if (from.level === "hue" && to.level === "step" && from.hueIdx === to.hueIdx && from.C > 0) return zoom("x", pin(to.gradeIdx, from.C), from.C, true);
+  if (from.level === "step" && to.level === "hue" && from.hueIdx === to.hueIdx && to.C > 0) return zoom("x", pin(from.gradeIdx, to.C), to.C, false);
   return { enter: SETTLE, exit: DISSOLVE };
 }
 
