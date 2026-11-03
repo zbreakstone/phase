@@ -78,6 +78,95 @@ const KERNELS: Record<Blend, (x: number) => number> = {
   },
 };
 
+type Level = "all" | "hue" | "step";
+interface View {
+  level: Level;
+  hueIdx: number;
+  gradeIdx: number;
+  /** Rows when every color shows; 0 otherwise. */
+  R: number;
+  /** Columns: a color's steps. */
+  C: number;
+}
+
+/** A layer's motion: where it scales from, how far, and whether it fades. */
+interface LayerAnim {
+  origin: string;
+  from: string;
+  to: string;
+  fade: "in" | "out" | "none";
+  duration: number;
+}
+
+const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
+const REST = "scale(1, 1)";
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** The square arriving, for instance from the palettes page: settles from slightly small. */
+const ARRIVE: LayerAnim = { origin: "50% 50%", from: "scale(0.97, 0.97)", to: REST, fade: "in", duration: 320 };
+const DISSOLVE: LayerAnim = { origin: "50% 50%", from: REST, to: REST, fade: "out", duration: 200 };
+const SETTLE: LayerAnim = { origin: "50% 50%", from: "scale(0.985, 0.985)", to: REST, fade: "none", duration: 200 };
+
+/**
+ * How two levels connect. Going into a row (or a column of that row) the old picture scales up around it until
+ * it fills the square while the new one grows to meet it; going back out is the reverse. Anything else (another
+ * color at the same level, say) just dissolves.
+ */
+function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim } {
+  const zoom = (axis: "x" | "y", at: number, k: number, deeper: boolean) => {
+    const scale = (n: number) => (axis === "y" ? `scale(1, ${n})` : `scale(${n}, 1)`);
+    const origin = axis === "y" ? `50% ${at * 100}%` : `${at * 100}% 50%`;
+    const duration = 320;
+    // Going in, the old picture stays opaque underneath (the new one, shrunk to the row, doesn't cover the square yet) and the new one fades in on top.
+    return deeper
+      ? { enter: { origin, from: scale(1 / k), to: REST, fade: "in", duration } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration } as LayerAnim }
+      : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
+  };
+  if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", (to.hueIdx + 0.5) / from.R, from.R, true);
+  if (from.level === "hue" && to.level === "all" && to.R > 0) return zoom("y", (from.hueIdx + 0.5) / to.R, to.R, false);
+  if (from.level === "hue" && to.level === "step" && from.hueIdx === to.hueIdx && from.C > 0) return zoom("x", (to.gradeIdx + 0.5) / from.C, from.C, true);
+  if (from.level === "step" && to.level === "hue" && from.hueIdx === to.hueIdx && to.C > 0) return zoom("x", (from.gradeIdx + 0.5) / to.C, to.C, false);
+  return { enter: SETTLE, exit: DISSOLVE };
+}
+
+/** One full-size picture of the square. Plays `enter` when it mounts and `exit` when it is told to leave. */
+function Layer({ children, enter, exit, onExited }: { children: React.ReactNode; enter?: LayerAnim | null; exit?: LayerAnim; onExited?: () => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const play = (a: LayerAnim, leaving: boolean) => {
+    const el = ref.current;
+    if (!el) return null;
+    el.style.transformOrigin = a.origin;
+    const opacity = a.fade === "none" ? [1, 1] : a.fade === "in" ? [0, 1] : [1, 0];
+    return el.animate(
+      [
+        { transform: a.from, opacity: opacity[0] },
+        { transform: a.to, opacity: opacity[1] },
+      ],
+      { duration: a.duration, easing: EASE_OUT, fill: leaving ? "forwards" : "backwards" },
+    );
+  };
+  React.useLayoutEffect(() => {
+    if (enter) play(enter, false);
+    // Only on mount: the layer keeps its picture while the level it shows stays the same.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  React.useLayoutEffect(() => {
+    if (!exit) return;
+    const a = play(exit, true);
+    if (!a) {
+      onExited?.();
+      return;
+    }
+    a.finished.then(() => onExited?.()).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exit]);
+  return (
+    <div ref={ref} className={cn("absolute inset-0", exit && "pointer-events-none")}>
+      {children}
+    </div>
+  );
+}
+
 /** A small, non-interactive copy of the all-colors gradient, for thumbnails. Fills whatever box it's put in. */
 export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]; gamut: Gamut }) {
   const colors = React.useMemo(
@@ -96,7 +185,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
 export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
-  const level: "all" | "hue" | "step" = focused ? (focusShade ? "step" : "hue") : "all";
+  const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
 
   const rows: Row[] = React.useMemo(() => {
     if (focused && focusShade) return [{ g: focused, shades: [focusShade] }];
@@ -131,6 +220,79 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     return { shade, ...meta };
   };
 
+  const content = (
+    <>
+      {mode === "smooth" ? (
+        <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+      ) : (
+        <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+          {rows.map((row, r) =>
+            row.shades.map((shade, c) => {
+              const { label: text, status } = label(r, c);
+              const fg = readableOn(displayHex(shade, overlay));
+              return (
+                <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
+                  <span className={cn(level === "hue" && "mt-24", level === "step" && "text-3xl")}>
+                    {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
+                    {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
+                    {text}
+                  </span>
+                  {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
+                  {shade.isSource ? (
+                    <span className="pointer-events-none absolute top-1 right-1 opacity-80">
+                      {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
+                    </span>
+                  ) : null}
+                  {!shade.anchor && (tweakAt(row.g.hue, shade.grade).dh !== 0 || tweakAt(row.g.hue, shade.grade).dc !== 0) ? (
+                    <span aria-hidden title="Tuned" className="pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80" />
+                  ) : null}
+                </div>
+              );
+            }),
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  // Moving between levels zooms into (or back out of) the row or column you chose, so the square reads as one
+  // object you travel through. The layer you leave stays mounted while it animates away.
+  const key = `${level}-${focusHueId}-${focusGrade}`;
+  const view: View = {
+    level,
+    hueIdx: focused ? generated.indexOf(focused) : -1,
+    gradeIdx: focusShade && focused ? focused.shades.indexOf(focusShade) : -1,
+    R: level === "all" ? generated.length : 0,
+    C: focused ? focused.shades.length : (generated[0]?.shades.length ?? 0),
+  };
+  const [shown, setShown] = React.useState({ key, view });
+  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() ? null : ARRIVE));
+  const [exiting, setExiting] = React.useState<{ id: string; node: React.ReactNode; anim: LayerAnim }[]>([]);
+  const lastContent = React.useRef<React.ReactNode>(content);
+  React.useEffect(() => {
+    lastContent.current = content;
+  });
+  if (shown.key !== key) {
+    setShown({ key, view });
+    if (prefersReducedMotion()) {
+      setEnterAnim(null);
+    } else {
+      const motion = levelMotion(shown.view, view);
+      // The picture to animate away is the one last committed, which is exactly what the ref holds.
+      // eslint-disable-next-line react-hooks/refs
+      const departing = { id: shown.key, node: lastContent.current, anim: motion.exit };
+      setEnterAnim(motion.enter);
+      setExiting((list) => [...list.filter((l) => l.id !== departing.id), departing]);
+    }
+  }
+
+  const leaving = exiting.filter((ex) => ex.id !== key);
+  const renderLeaving = (ex: (typeof exiting)[number]) => (
+    <Layer key={ex.id} exit={ex.anim} onExited={() => setExiting((list) => list.filter((l) => l.id !== ex.id))}>
+      {ex.node}
+    </Layer>
+  );
+
   return (
     <div className="relative">
       <div
@@ -149,37 +311,13 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         }}
         className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-extra-large)", level !== "step" && "cursor-pointer")}
       >
-        <div key={`${level}-${focusHueId}-${focusGrade}`} className="absolute inset-0 animate-in overflow-hidden rounded-[inherit] duration-300 fade-in">
-          {mode === "smooth" ? (
-            <SmoothCanvas colors={colors} grain={grain} blend={blend} />
-          ) : (
-            <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
-              {rows.map((row, r) =>
-                row.shades.map((shade, c) => {
-                  const { label: text, status } = label(r, c);
-                  const fg = readableOn(displayHex(shade, overlay));
-                  return (
-                    <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
-                      <span className={cn(level === "hue" && "mt-24", level === "step" && "text-3xl")}>
-                        {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
-                        {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
-                        {text}
-                      </span>
-                      {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
-                      {shade.isSource ? (
-                        <span className="pointer-events-none absolute top-1 right-1 opacity-80">
-                          {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
-                        </span>
-                      ) : null}
-                      {!shade.anchor && (tweakAt(row.g.hue, shade.grade).dh !== 0 || tweakAt(row.g.hue, shade.grade).dc !== 0) ? (
-                        <span aria-hidden title="Tuned" className="pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80" />
-                      ) : null}
-                    </div>
-                  );
-                }),
-              )}
-            </div>
-          )}
+        <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+          {/* A picture that stays opaque while the new one fades in sits beneath it; one that fades out sits on top. */}
+          {leaving.filter((ex) => ex.anim.fade === "none").map(renderLeaving)}
+          <Layer key={key} enter={enterAnim}>
+            {content}
+          </Layer>
+          {leaving.filter((ex) => ex.anim.fade !== "none").map(renderLeaving)}
         </div>
 
         {/* The row or column under the pointer. */}
@@ -303,7 +441,8 @@ const hash = (x: number, y: number) => {
 function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][]; grain: boolean; blend: Blend; size?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
-  React.useEffect(() => {
+  // Before the first paint, so a layer that animates in is never empty.
+  React.useLayoutEffect(() => {
     const canvas = ref.current;
     const R = colors.length;
     const C = colors[0]?.length ?? 0;
@@ -353,6 +492,18 @@ function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][
     const xs = taps(size, C);
     const ys = taps(size, R);
 
+    // The blend is separable, so blend each swatch row across first (R rows) and then down (once per pixel),
+    // instead of all 16 swatches for every pixel. That keeps a level change from stalling its own animation.
+    const across = new Float32Array(R * size * 3);
+    for (let r = 0; r < R; r++) {
+      for (let x = 0; x < size; x++) {
+        for (let ch = 0; ch < 3; ch++) {
+          let line = 0;
+          for (let k = 0; k < 4; k++) line += src[(r * C + xs.idx[x * 4 + k]) * 4 + ch] * xs.w[x * 4 + k];
+          across[(r * size + x) * 3 + ch] = line;
+        }
+      }
+    }
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const i = (y * size + x) * 4;
@@ -361,12 +512,7 @@ function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][
         const noise = dither + (grain ? (hash(x + 31, y + 57) - 0.5) * GRAIN : 0);
         for (let ch = 0; ch < 3; ch++) {
           let sum = 0;
-          for (let j = 0; j < 4; j++) {
-            const row = ys.idx[y * 4 + j] * C;
-            let line = 0;
-            for (let k = 0; k < 4; k++) line += src[(row + xs.idx[x * 4 + k]) * 4 + ch] * xs.w[x * 4 + k];
-            sum += line * ys.w[y * 4 + j];
-          }
+          for (let j = 0; j < 4; j++) sum += across[(ys.idx[y * 4 + j] * size + x) * 3 + ch] * ys.w[y * 4 + j];
           out.data[i + ch] = sum + noise;
         }
         out.data[i + 3] = 255;
