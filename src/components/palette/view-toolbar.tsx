@@ -63,6 +63,26 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
+  // / turns the preview on and off, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "/" && e.key !== "[" && e.key !== "]") return;
+      const t = e.target;
+      if (
+        t instanceof HTMLElement &&
+        (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
+      )
+        return;
+      if (document.querySelector('[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]')) return;
+      e.preventDefault();
+      if (e.key === "/") apply(active ? null : lens);
+      else onMode(e.key === "[" ? "smooth" : "cells");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
       <div className="min-w-0">
@@ -101,7 +121,7 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Hint label="Toggle display mode">
+        <Hint label="Toggle display mode (/)">
           <Toggle
             variant="outline"
             size="sm"
@@ -122,12 +142,12 @@ export function ViewToolbar({
           spacing={0}
           aria-label="How the square is drawn"
         >
-          <Hint label="Smooth: colors melt into each other">
+          <Hint label="Smooth: colors melt into each other ([)">
             <ToggleGroupItem value="smooth" aria-label="Smooth">
               <Contrast />
             </ToggleGroupItem>
           </Hint>
-          <Hint label="Cells: every swatch stays crisp">
+          <Hint label="Cells: every swatch stays crisp (])">
             <ToggleGroupItem value="cells" aria-label="Cells">
               <SwatchBook />
             </ToggleGroupItem>
