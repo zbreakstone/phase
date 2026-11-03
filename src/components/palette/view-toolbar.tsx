@@ -51,6 +51,7 @@ export function ViewToolbar({
   // One switch turns the preview on and off; the dropdown picks the lens. The last lens is remembered while
   // the switch is off.
   const [last, setLast] = React.useState<Lens>("luminance");
+  const [lensOpen, setLensOpen] = React.useState(false);
   const active = overlay.grayscale || overlay.vision !== "normal";
   const lens: Lens = overlay.grayscale
     ? "luminance"
@@ -64,15 +65,34 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
-  // / turns the preview on and off, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  // / turns the preview on and off, M opens the lens menu, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key !== "/" && e.key !== "[" && e.key !== "]") return;
+      if (
+        e.defaultPrevented ||
+        e.isComposing ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.altKey
+      )
+        return;
+      if (
+        e.key !== "/" &&
+        e.key !== "[" &&
+        e.key !== "]" &&
+        e.key.toLowerCase() !== "m"
+      )
+        return;
       if (isTextEntry(e.target)) return;
-      if (isPopupOpen('[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (
+        isPopupOpen(
+          '[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]',
+        )
+      )
+        return;
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);
+      else if (e.key.toLowerCase() === "m") setLensOpen(true);
       else onMode(e.key === "[" ? "smooth" : "cells");
     };
     window.addEventListener("keydown", onKeyDown);
@@ -88,21 +108,28 @@ export function ViewToolbar({
         <Select
           items={LENSES.map((l) => ({ value: l.id, label: l.label }))}
           value={lens}
+          open={lensOpen}
+          onOpenChange={setLensOpen}
           onValueChange={(v) => {
             if (!v) return;
             setLast(v as Lens);
             apply(v as Lens);
           }}
         >
-          <SelectTrigger
-            size="sm"
-            className="w-40"
-            aria-label="Lens for the preview"
+          <Hint label="Preview mode" shortcut={["M"]}>
+            <SelectTrigger
+              size="sm"
+              className="w-40"
+              aria-label="Preview mode"
+            >
+              <SelectValue />
+            </SelectTrigger>
+          </Hint>
+          <SelectContent
+            alignItemWithTrigger={false}
+            align="start"
+            className="max-h-72 w-80"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false} align="start" className="max-h-72 w-80">
-
             {LENSES.map((l) => (
               <SelectItem key={l.id} value={l.id}>
                 <span className="flex flex-col">
@@ -117,13 +144,13 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Hint label="Toggle display mode" shortcut={["/"]}>
+        <Hint label="Toggle preview mode" shortcut={["/"]}>
           <Toggle
             variant="outline"
             size="sm"
             pressed={active}
             onPressedChange={(on) => apply(on ? lens : null)}
-            aria-label="Preview with a lens"
+            aria-label="Toggle preview mode"
           >
             {active ? <Eye /> : <EyeOff />}
           </Toggle>
