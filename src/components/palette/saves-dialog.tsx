@@ -22,6 +22,7 @@ import {
   type VersionDetails,
   type VersionSummary,
   createPalette,
+  createShare,
   listVersions,
   loadVersion,
   renamePalette,
@@ -274,6 +275,72 @@ export function SavesDialog({
     });
   };
 
+  /** Puts an older version back on top of the work in progress. Unsaved edits are kept as a version first. */
+  const restore = (v: VersionSummary) =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud || !current) return;
+      const loaded = await loadVersion(cloud, v.id);
+      if (dirty) await saveVersion(cloud, current.id, state);
+      const label = v.title ?? when(v.createdAt);
+      const restored = await saveVersion(cloud, current.id, loaded.state, {
+        title: `Restored ${label}`.slice(0, 80),
+        description: "",
+      });
+      onOpen({ ...loaded, versionId: restored.id });
+      onCurrent({
+        ...current,
+        versionId: restored.id,
+        savedKey: encodeState(loaded.state),
+      });
+      await refresh(current.id);
+      toast.success("Version restored");
+    });
+
+  /** Starts a new palette from a version, leaving the original alone. */
+  const duplicate = (v: VersionSummary) => {
+    if (!confirmReplace()) return;
+    void run(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const loaded = await loadVersion(cloud, v.id);
+      const copyName = `${loaded.paletteName} copy`.slice(0, 80);
+      const { paletteId, version } = await createPalette(
+        cloud,
+        copyName,
+        loaded.state,
+      );
+      onOpen({
+        ...loaded,
+        paletteId,
+        paletteName: copyName,
+        versionId: version.id,
+      });
+      onCurrent({
+        id: paletteId,
+        name: copyName,
+        versionId: version.id,
+        savedKey: encodeState(loaded.state),
+      });
+      await refresh(paletteId);
+      toast.success(`Created ${copyName}`);
+    });
+  };
+
+  const copyLink = (v: VersionSummary) =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const loaded = await loadVersion(cloud, v.id);
+      const url = `${window.location.origin}/s/${await createShare(cloud, loaded.state)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(`Link copied: ${url}`);
+      } catch {
+        toast.message(url);
+      }
+    });
+
   const status = failed
     ? { label: "The last save failed", color: "bg-red-500" }
     : dirty
@@ -400,6 +467,9 @@ export function SavesDialog({
               onSaveDetails={() => void saveDetails()}
               busy={busy}
               onOpen={(id) => open_(() => loadVersion(getCloud()!, id))}
+              onRestore={(v) => void restore(v)}
+              onDuplicate={duplicate}
+              onCopyLink={(v) => void copyLink(v)}
             />
           ) : (
             <p className="text-[11px] text-muted-foreground">
@@ -455,6 +525,9 @@ function VersionList({
   onSaveDetails,
   busy,
   onOpen,
+  onRestore,
+  onDuplicate,
+  onCopyLink,
 }: {
   versions: VersionSummary[];
   currentId: string;
@@ -463,6 +536,9 @@ function VersionList({
   onSaveDetails: () => void;
   busy: boolean;
   onOpen: (versionId: string) => void;
+  onRestore: (version: VersionSummary) => void;
+  onDuplicate: (version: VersionSummary) => void;
+  onCopyLink: (version: VersionSummary) => void;
 }) {
   return (
     <ol className="relative space-y-1 before:absolute before:top-3 before:bottom-3 before:left-[0.4375rem] before:w-px before:bg-border">
@@ -535,9 +611,15 @@ function VersionList({
               </form>
             ) : (
               <div
-                className={`flex items-start gap-1 rounded-lg px-2 py-2 ${isOpen ? "bg-muted" : ""}`}
+                className={`flex items-start gap-1 rounded-lg px-2 py-2 ${isOpen ? "bg-muted" : "hover:bg-muted/50"}`}
               >
-                <span className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  aria-current={isOpen ? "true" : undefined}
+                  disabled={busy || isOpen}
+                  onClick={() => onOpen(v.id)}
+                  className="min-w-0 flex-1 cursor-pointer rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                >
                   <span
                     className={`block truncate ${named || latest ? "font-medium" : "text-muted-foreground"}`}
                   >
@@ -554,7 +636,7 @@ function VersionList({
                   <span className="text-muted-foreground">
                     {when(v.createdAt)}
                   </span>
-                </span>
+                </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     render={
@@ -571,24 +653,28 @@ function VersionList({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuItem
-                      disabled={isOpen}
-                      onClick={() => onOpen(v.id)}
+                      onClick={() =>
+                        onEditing({
+                          id: v.id,
+                          title: v.title ?? "",
+                          description: v.description ?? "",
+                        })
+                      }
                     >
-                      Open this version
+                      Edit info
                     </DropdownMenuItem>
-                    {named ? (
-                      <DropdownMenuItem
-                        onClick={() =>
-                          onEditing({
-                            id: v.id,
-                            title: v.title ?? "",
-                            description: v.description ?? "",
-                          })
-                        }
-                      >
-                        Edit title and description
-                      </DropdownMenuItem>
-                    ) : null}
+                    <DropdownMenuItem
+                      disabled={latest}
+                      onClick={() => onRestore(v)}
+                    >
+                      Restore this version
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onDuplicate(v)}>
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onCopyLink(v)}>
+                      Copy link
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
