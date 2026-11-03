@@ -48,6 +48,9 @@ interface Preview {
 }
 
 /** What a signed-in user sees first: every palette they've saved, newest first. */
+// Hover zooms the thumbnail to 125%, which leaves 25% of its size to pan across.
+const HOVER_ZOOM_PAN = 25;
+
 export function PalettesHome() {
   const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
   /** Previews by palette id. A palette missing here is still loading, or its latest version couldn't be read. */
@@ -251,10 +254,20 @@ export function PalettesHome() {
                     <div
                       aria-hidden
                       data-card-preview
+                      onPointerMove={(e) => {
+                        // Pan the zoomed gradient so the point under the pointer drifts toward the middle of the card.
+                        const box = e.currentTarget.getBoundingClientRect();
+                        const inner = e.currentTarget.firstElementChild as HTMLElement | null;
+                        if (!inner || box.width === 0) return;
+                        const x = (e.clientX - box.left) / box.width;
+                        const y = (e.clientY - box.top) / box.height;
+                        inner.style.setProperty("--tx", `${(0.5 - x) * HOVER_ZOOM_PAN}%`);
+                        inner.style.setProperty("--ty", `${(0.5 - y) * HOVER_ZOOM_PAN}%`);
+                      }}
                       className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)"
                     >
                       {previews[p.id] ? (
-                        <div className="size-full origin-center transition-transform duration-300 ease-out group-hover/card:scale-125 motion-reduce:transition-none motion-reduce:group-hover/card:scale-100">
+                        <div className="size-full origin-center transition-transform duration-200 ease-out group-hover/card:[transform:translate(var(--tx,0%),var(--ty,0%))_scale(1.25)] motion-reduce:transition-none motion-reduce:group-hover/card:transform-none">
                           <PalettePreview
                             generated={previews[p.id].generated}
                             gamut={previews[p.id].gamut}
