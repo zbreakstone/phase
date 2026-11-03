@@ -3,20 +3,42 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCloud } from "@/lib/cloud/client";
-import { type PaletteSummary, listPalettes, loadLatest } from "@/lib/cloud/palettes";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  type PaletteSummary,
+  createPalette,
+  createShare,
+  deletePalette,
+  listPalettes,
+  loadLatest,
+  renamePalette,
+} from "@/lib/cloud/palettes";
 import type { Gamut } from "@/lib/color/gamut";
 import { generatePalette } from "@/lib/palette/generate";
 import type { GeneratedHue } from "@/lib/palette/types";
 import { AccountMenu } from "./account-menu";
 import { PAGE_WIDTH } from "./page-width";
 import { PalettePreview } from "./palette-square";
+import { RenamePaletteDialog } from "./rename-palette-dialog";
 
-const when = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(ms);
+const when = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(ms);
 
 /** What a card draws: the palette's generated colors and the gamut to show them in. */
 interface Preview {
@@ -29,6 +51,89 @@ export function PalettesHome() {
   const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
   /** Previews by palette id. A palette missing here is still loading, or its latest version couldn't be read. */
   const [previews, setPreviews] = React.useState<Record<string, Preview>>({});
+
+  const router = useRouter();
+  /** Bumped to load the list again after a duplicate, rename or delete. */
+  const [reload, setReload] = React.useState(0);
+  const [renaming, setRenaming] = React.useState<PaletteSummary | null>(null);
+
+  const act = async (task: () => Promise<void>) => {
+    try {
+      await task();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  };
+
+  const copyLink = (p: PaletteSummary) =>
+    act(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const { state } = await loadLatest(cloud, p.id);
+      const url = `${window.location.origin}/s/${await createShare(cloud, state)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(`Link copied: ${url}`);
+      } catch {
+        toast.message(url);
+      }
+    });
+
+  const duplicate = (p: PaletteSummary) =>
+    act(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const { state } = await loadLatest(cloud, p.id);
+      const name = `${p.name} copy`.slice(0, 80);
+      await createPalette(cloud, name, state);
+      setReload((n) => n + 1);
+      toast.success(`Created ${name}`);
+    });
+
+  const remove = (p: PaletteSummary) => {
+    if (
+      !window.confirm(
+        `Delete "${p.name}" and all of its versions? This can't be undone.`,
+      )
+    )
+      return;
+    void act(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      await deletePalette(cloud, p.id);
+      setReload((n) => n + 1);
+      toast.success(`Deleted ${p.name}`);
+    });
+  };
+
+  const rename = (p: PaletteSummary, name: string) =>
+    act(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      await renamePalette(cloud, p.id, name);
+      setRenaming(null);
+      setReload((n) => n + 1);
+    });
+
+  const menuItems = (p: PaletteSummary) => (
+    <>
+      <DropdownMenuItem onClick={() => router.push(`/p/${p.id}`)}>
+        Open
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setRenaming(p)}>
+        Edit info
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void copyLink(p)}>
+        Copy link
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void duplicate(p)}>
+        Duplicate
+      </DropdownMenuItem>
+      <DropdownMenuItem variant="destructive" onClick={() => remove(p)}>
+        Delete
+      </DropdownMenuItem>
+    </>
+  );
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -44,8 +149,17 @@ export function PalettesHome() {
             try {
               const loaded = await loadLatest(cloud, p.id);
               const { state } = loaded;
-              const generated = generatePalette(state.space, state.scale, state.hues, state.gamut);
-              if (!canceled) setPreviews((prev) => ({ ...prev, [p.id]: { generated, gamut: state.gamut } }));
+              const generated = generatePalette(
+                state.space,
+                state.scale,
+                state.hues,
+                state.gamut,
+              );
+              if (!canceled)
+                setPreviews((prev) => ({
+                  ...prev,
+                  [p.id]: { generated, gamut: state.gamut },
+                }));
             } catch {
               // A palette without a readable version just shows an empty preview.
             }
@@ -54,20 +168,32 @@ export function PalettesHome() {
       } catch (e) {
         if (!canceled) {
           setPalettes([]);
-          toast.error(e instanceof Error ? e.message : "Couldn't load your palettes.", { id: "palettes-load-failed" });
+          toast.error(
+            e instanceof Error ? e.message : "Couldn't load your palettes.",
+            { id: "palettes-load-failed" },
+          );
         }
       }
     })();
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [reload]);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-border bg-white dark:bg-black">
-        <div className={`${PAGE_WIDTH} flex h-14 items-center justify-between gap-3`}>
-          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
+        <div
+          className={`${PAGE_WIDTH} flex h-14 items-center justify-between gap-3`}
+        >
+          <Image
+            src="/phase-lockup-white.png"
+            alt="Phase"
+            width={276}
+            height={90}
+            priority
+            className="h-6 w-auto invert dark:invert-0"
+          />
           <AccountMenu onSignedOut={() => undefined} />
         </div>
       </header>
@@ -80,7 +206,11 @@ export function PalettesHome() {
           </Button>
         </div>
         {palettes === null ? (
-          <div aria-busy="true" aria-label="Loading your palettes" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div
+            aria-busy="true"
+            aria-label="Loading your palettes"
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="aspect-[4/3] rounded-3xl" />
             ))}
@@ -88,8 +218,15 @@ export function PalettesHome() {
         ) : palettes.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-border p-12 text-center">
             <p className="font-medium">No palettes yet</p>
-            <p className="max-w-sm text-sm text-muted-foreground">Start one and save it. It will show up here every time you sign in.</p>
-            <Button render={<Link href="/p/new" />} nativeButton={false} variant="secondary">
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Start one and save it. It will show up here every time you sign
+              in.
+            </p>
+            <Button
+              render={<Link href="/p/new" />}
+              nativeButton={false}
+              variant="secondary"
+            >
               <Plus />
               New palette
             </Button>
@@ -97,24 +234,63 @@ export function PalettesHome() {
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {palettes.map((p) => (
-              <li key={p.id}>
-                <Link
-                  href={`/p/${p.id}`}
-                  className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
+              <ContextMenu key={p.id}>
+                <ContextMenuTrigger
+                  render={<li className="group/card relative" />}
                 >
-                  <div aria-hidden className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)">
-                    {previews[p.id] ? <PalettePreview generated={previews[p.id].generated} gamut={previews[p.id].gamut} /> : <Skeleton className="size-full rounded-none" />}
-                  </div>
-                  <div className="min-w-0 px-2 pt-3 pb-2">
-                    <p className="truncate font-medium">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">Edited {when(p.updatedAt)}</p>
-                  </div>
-                </Link>
-              </li>
+                  <Link
+                    href={`/p/${p.id}`}
+                    className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
+                  >
+                    <div
+                      aria-hidden
+                      className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)"
+                    >
+                      {previews[p.id] ? (
+                        <PalettePreview
+                          generated={previews[p.id].generated}
+                          gamut={previews[p.id].gamut}
+                        />
+                      ) : (
+                        <Skeleton className="size-full rounded-none" />
+                      )}
+                    </div>
+                    <div className="min-w-0 pr-10 pl-2 pt-3 pb-2">
+                      <p className="truncate font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Edited {when(p.updatedAt)}
+                      </p>
+                    </div>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Actions for ${p.name}`}
+                          className="absolute right-3 bottom-3 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
+                        />
+                      }
+                    >
+                      <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {menuItems(p)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </ContextMenuTrigger>
+                <ContextMenuContent>{menuItems(p)}</ContextMenuContent>
+              </ContextMenu>
             ))}
           </ul>
         )}
       </main>
+      <RenamePaletteDialog
+        name={renaming?.name ?? null}
+        onClose={() => setRenaming(null)}
+        onSubmit={(name) => renaming && void rename(renaming, name)}
+      />
     </div>
   );
 }
