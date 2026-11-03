@@ -16,6 +16,7 @@ import type { Overlay } from "@/lib/palette/overlay";
 import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
+import { isTextEntry } from "./text-entry";
 
 type Lens = "luminance" | Exclude<VisionId, "normal">;
 
@@ -68,12 +69,7 @@ export function ViewToolbar({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key !== "/" && e.key !== "[" && e.key !== "]") return;
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
-      )
-        return;
+      if (isTextEntry(e.target)) return;
       if (document.querySelector('[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]')) return;
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);

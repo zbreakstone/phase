@@ -45,6 +45,7 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -53,14 +54,6 @@ const NAME_KEY = "phase:name:v1";
 /** Undo and redo restore the palette but leave your current swatch selected, as long as it still exists. */
 const keepSelection = (restored: PaletteState, current: PaletteState): PaletteState =>
   restored.hues.some((h) => h.id === current.selectedHueId) ? { ...restored, selectedHueId: current.selectedHueId } : restored;
-
-/** Text fields keep the browser's own undo; everything else (sliders, buttons, the page) undoes the palette. */
-const isTextEntry = (el: EventTarget | null) => {
-  if (!(el instanceof HTMLElement)) return false;
-  if (el.isContentEditable || el instanceof HTMLTextAreaElement) return true;
-  if (el instanceof HTMLInputElement) return !["range", "checkbox", "radio", "button", "submit", "reset", "file", "color"].includes(el.type);
-  return false;
-};
 
 /** Remembers something across reloads. Private mode can refuse, and that only costs the memory. */
 const remember = (write: () => void) => {
