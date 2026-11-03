@@ -94,7 +94,7 @@ export function StepPanel({
             style={{ backgroundColor: css }}
           />
           <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold">
+            <h2 className="truncate text-sm font-semibold">
               {name} {shade.grade}
             </h2>
             <p className="text-[11px] text-muted-foreground">
