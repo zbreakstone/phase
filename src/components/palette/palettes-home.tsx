@@ -188,7 +188,7 @@ export function PalettesHome() {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-border bg-white dark:bg-black">
         <div
-          className={`${PAGE_WIDTH} flex h-14 items-center justify-between gap-3`}
+          className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}
         >
           <Image
             src="/phase-lockup-white.png"
@@ -198,17 +198,19 @@ export function PalettesHome() {
             priority
             className="h-6 w-auto invert dark:invert-0"
           />
-          <AccountMenu onSignedOut={() => undefined} />
+          <h1 className="truncate px-2 text-center text-sm font-medium">
+            Palettes
+          </h1>
+          <div className="flex items-center justify-end gap-2">
+            <Button render={<Link href="/p/new" />} nativeButton={false}>
+              <Plus />
+              New palette
+            </Button>
+            <AccountMenu onSignedOut={() => undefined} />
+          </div>
         </div>
       </header>
       <main className={`${PAGE_WIDTH} w-full flex-1 py-8`}>
-        <div className="sticky top-0 z-10 -mt-8 mb-3 flex items-center justify-between gap-3 bg-background pt-8 pb-3">
-          <h1 className="text-xl font-semibold">Palettes</h1>
-          <Button render={<Link href="/p/new" />} nativeButton={false}>
-            <Plus />
-            New palette
-          </Button>
-        </div>
         {palettes === null ? (
           <div
             aria-busy="true"
