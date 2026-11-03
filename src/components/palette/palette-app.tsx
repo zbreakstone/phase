@@ -454,7 +454,12 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     if (!session) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      // Esc in a text field just leaves the field (so it never feels stuck); the next Esc navigates.
+      if (isTextEntry(e.target)) {
+        (e.target as HTMLElement).blur();
+        return;
+      }
       if (historyOpen) setHistoryOpen(false);
       else if (!focused) toList();
     };
