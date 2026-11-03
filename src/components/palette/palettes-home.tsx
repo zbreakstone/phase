@@ -254,7 +254,7 @@ export function PalettesHome() {
                       className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)"
                     >
                       {previews[p.id] ? (
-                        <div className="size-full origin-center transition-transform duration-300 ease-out group-hover/card:scale-110 motion-reduce:transition-none motion-reduce:group-hover/card:scale-100">
+                        <div className="size-full origin-center transition-transform duration-300 ease-out group-hover/card:scale-125 motion-reduce:transition-none motion-reduce:group-hover/card:scale-100">
                           <PalettePreview
                             generated={previews[p.id].generated}
                             gamut={previews[p.id].gamut}
