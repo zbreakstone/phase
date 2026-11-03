@@ -20,7 +20,7 @@ import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
 import { addStepBetween, midpointGrade, removeStep, renameStep } from "@/lib/palette/steps";
 import { setStepTweak } from "@/lib/palette/tweaks";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
-import { createShare, getShared, loadLatest } from "@/lib/cloud/palettes";
+import { createPalette, createShare, getShared, loadLatest, renamePalette, saveVersion } from "@/lib/cloud/palettes";
 import { useSession } from "@/lib/cloud/use-session";
 import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
@@ -275,6 +275,41 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     }, 400);
     return () => clearTimeout(t);
   }, [state, ready, storage]);
+
+  // Signed-in editing of a saved or new palette saves itself. A new palette is created soon after the
+  // first change (including a name); after that, a version is added once you pause. "Save new version"
+  // in the history menu is still for notes on the moments worth keeping.
+  const cloudSaving = React.useRef(false);
+  const autosaves = Boolean(session) && ready && !shareCode && Boolean(paletteId || fresh || current);
+  React.useEffect(() => {
+    if (!autosaves) return;
+    const trimmed = name.trim();
+    const dirty = current ? current.savedKey !== stateKey || trimmed !== current.name : stateKey !== encodeState(defaultState()) || trimmed !== "";
+    if (!dirty) return;
+    const t = setTimeout(
+      async () => {
+        const cloud = getCloud();
+        if (!cloud || cloudSaving.current) return;
+        cloudSaving.current = true;
+        try {
+          if (!current) {
+            const { paletteId: id, version } = await createPalette(cloud, trimmed, state, "Autosave");
+            updateCurrent({ id, name: trimmed || "Untitled", versionId: version.id, savedKey: stateKey });
+          } else {
+            if (trimmed && trimmed !== current.name) await renamePalette(cloud, current.id, trimmed);
+            const version = await saveVersion(cloud, current.id, state, "Autosave");
+            updateCurrent({ ...current, name: trimmed || current.name, versionId: version.id, savedKey: stateKey });
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? `Couldn't save your palette. ${e.message}` : "Couldn't save your palette.", { id: "cloud-autosave-failed" });
+        } finally {
+          cloudSaving.current = false;
+        }
+      },
+      current ? 10_000 : 1_500,
+    );
+    return () => clearTimeout(t);
+  }, [autosaves, current, name, state, stateKey, updateCurrent]);
 
   const [exportKind, setExportKind] = React.useState<ExportKind | null>(null);
 
