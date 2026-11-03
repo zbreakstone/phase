@@ -45,7 +45,7 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
-import { isTextEntry } from "./text-entry";
+import { isPopupOpen, isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -230,7 +230,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       const isUndo = key === "z" && !e.shiftKey;
       const isRedo = (key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey && e.ctrlKey);
       if (!isUndo && !isRedo) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"]')) return;
       e.preventDefault();
       if (isUndo) undo();
       else redo();
@@ -244,7 +244,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
       up();
     };
     window.addEventListener("keydown", onKeyDown);
@@ -453,7 +453,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     if (!session) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
       if (historyOpen) setHistoryOpen(false);
       else if (!focused) toList();
     };
