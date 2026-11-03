@@ -255,7 +255,7 @@ export function PalettesHome() {
                         <Skeleton className="size-full rounded-none" />
                       )}
                     </div>
-                    <div className="min-w-0 px-2 pt-3 pb-2">
+                    <div className="min-w-0 pr-10 pl-2 pt-3 pb-2">
                       <p className="truncate font-medium">{p.name}</p>
                       <p className="text-xs text-muted-foreground">
                         Edited {when(p.updatedAt)}
@@ -266,10 +266,10 @@ export function PalettesHome() {
                     <DropdownMenuTrigger
                       render={
                         <Button
-                          variant="secondary"
+                          variant="ghost"
                           size="icon"
                           aria-label={`Actions for ${p.name}`}
-                          className="absolute top-4 right-4 bg-white/90 opacity-0 shadow-(--shadow-default) group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100 dark:bg-black/80"
+                          className="absolute right-3 bottom-3 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
                         />
                       }
                     >
