@@ -1,5 +1,5 @@
-import { PaletteApp } from "@/components/palette/palette-app";
+import { Home } from "@/components/palette/home";
 
-export default function Home() {
-  return <PaletteApp />;
+export default function HomePage() {
+  return <Home />;
 }

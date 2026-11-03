@@ -78,6 +78,15 @@ const KERNELS: Record<Blend, (x: number) => number> = {
   },
 };
 
+/** A small, non-interactive copy of the all-colors gradient, for thumbnails. Fills whatever box it's put in. */
+export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]; gamut: Gamut }) {
+  const colors = React.useMemo(
+    () => generated.map((g) => g.shades.map((s) => displayShade(s, { metric: "contrast", against: "white", grayscale: false, vision: "normal" }, gamut))),
+    [generated, gamut],
+  );
+  return <SmoothCanvas colors={colors} grain={false} blend="mitchell" size={160} />;
+}
+
 /**
  * One rounded square that stands in for the whole palette. With every color it is rows of hues; with
  * one color it is that color's steps side by side; with one step it is that single color. In
@@ -291,7 +300,7 @@ const hash = (x: number, y: number) => {
  * Paints the colors as a soft gradient. Each swatch becomes one pixel of a tiny canvas (so the browser
  * parses any CSS color, including Display P3), then the pixels are blended smoothly into a larger one.
  */
-function SmoothCanvas({ colors, grain, blend }: { colors: string[][]; grain: boolean; blend: Blend }) {
+function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][]; grain: boolean; blend: Blend; size?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
   React.useEffect(() => {
@@ -314,11 +323,11 @@ function SmoothCanvas({ colors, grain, blend }: { colors: string[][]; grain: boo
     );
     const src = tctx.getImageData(0, 0, C, R, { colorSpace: space }).data;
 
-    canvas.width = SIZE;
-    canvas.height = SIZE;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext("2d", { colorSpace: space });
     if (!ctx) return;
-    const out = ctx.createImageData(SIZE, SIZE, { colorSpace: space });
+    const out = ctx.createImageData(size, size, { colorSpace: space });
 
     // For each output column / row: the four neighbouring swatch indices and their cubic weights.
     const kernel = KERNELS[blend];
@@ -341,12 +350,12 @@ function SmoothCanvas({ colors, grain, blend }: { colors: string[][]; grain: boo
       }
       return { idx, w };
     };
-    const xs = taps(SIZE, C);
-    const ys = taps(SIZE, R);
+    const xs = taps(size, C);
+    const ys = taps(size, R);
 
-    for (let y = 0; y < SIZE; y++) {
-      for (let x = 0; x < SIZE; x++) {
-        const i = (y * SIZE + x) * 4;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
         // Dithering by up to one level hides the 8-bit steps that show as bands in slow, dark gradients.
         const dither = hash(x, y) + hash(x + 7919, y + 104729) - 1;
         const noise = dither + (grain ? (hash(x + 31, y + 57) - 0.5) * GRAIN : 0);
@@ -364,7 +373,7 @@ function SmoothCanvas({ colors, grain, blend }: { colors: string[][]; grain: boo
       }
     }
     ctx.putImageData(out, 0, 0);
-  }, [colors, grain, blend]);
+  }, [colors, grain, blend, size]);
 
   return <canvas ref={ref} aria-hidden className="size-full" />;
 }
