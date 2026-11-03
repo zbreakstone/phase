@@ -16,6 +16,7 @@ import type { Overlay } from "@/lib/palette/overlay";
 import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
+import { isPopupOpen, isTextEntry } from "./text-entry";
 
 type Lens = "luminance" | Exclude<VisionId, "normal">;
 
@@ -66,15 +67,10 @@ export function ViewToolbar({
   // / turns the preview on and off, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key !== "/" && e.key !== "[" && e.key !== "]") return;
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
-      )
-        return;
-      if (document.querySelector('[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (isTextEntry(e.target)) return;
+      if (isPopupOpen('[data-slot="dialog-content"], [data-slot="select-content"], [role="menu"]')) return;
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);
       else onMode(e.key === "[" ? "smooth" : "cells");

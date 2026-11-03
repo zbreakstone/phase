@@ -45,6 +45,7 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ScalePanel } from "./scale-panel";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { isPopupOpen, isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
 const CURRENT_KEY = "phase:current:v1";
@@ -53,14 +54,6 @@ const NAME_KEY = "phase:name:v1";
 /** Undo and redo restore the palette but leave your current swatch selected, as long as it still exists. */
 const keepSelection = (restored: PaletteState, current: PaletteState): PaletteState =>
   restored.hues.some((h) => h.id === current.selectedHueId) ? { ...restored, selectedHueId: current.selectedHueId } : restored;
-
-/** Text fields keep the browser's own undo; everything else (sliders, buttons, the page) undoes the palette. */
-const isTextEntry = (el: EventTarget | null) => {
-  if (!(el instanceof HTMLElement)) return false;
-  if (el.isContentEditable || el instanceof HTMLTextAreaElement) return true;
-  if (el instanceof HTMLInputElement) return !["range", "checkbox", "radio", "button", "submit", "reset", "file", "color"].includes(el.type);
-  return false;
-};
 
 /** Remembers something across reloads. Private mode can refuse, and that only costs the memory. */
 const remember = (write: () => void) => {
@@ -237,7 +230,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       const isUndo = key === "z" && !e.shiftKey;
       const isRedo = (key === "z" && e.shiftKey) || (key === "y" && !e.shiftKey && e.ctrlKey);
       if (!isUndo && !isRedo) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"]')) return;
       e.preventDefault();
       if (isUndo) undo();
       else redo();
@@ -251,7 +244,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
       up();
     };
     window.addEventListener("keydown", onKeyDown);
@@ -460,7 +453,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     if (!session) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
       if (historyOpen) setHistoryOpen(false);
       else if (!focused) toList();
     };
