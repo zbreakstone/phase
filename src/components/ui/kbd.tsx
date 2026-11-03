@@ -3,13 +3,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 
 const kbdVariants = cva(
-  "inline-flex shrink-0 items-center justify-center rounded-md font-sans leading-none font-medium whitespace-nowrap tabular-nums select-none",
+  "inline-flex shrink-0 items-center justify-center font-sans leading-none font-medium whitespace-nowrap tabular-nums select-none",
   {
     variants: {
       size: {
-        sm: "h-4 text-[10px]",
-        md: "h-5 text-[11px]",
-        lg: "h-6 text-xs",
+        sm: "h-4 rounded-[3px] text-[10px]",
+        md: "h-5 rounded-[4px] text-[11px]",
+        lg: "h-6 rounded-[5px] text-xs",
       },
       /** Square keys by default; `fit` lets a key like Esc or Enter be as wide as its label. */
       fit: {
