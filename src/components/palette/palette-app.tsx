@@ -475,7 +475,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border bg-white dark:bg-black">
         <div className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}>
-          <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
+          {session ? (
+            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="w-fit justify-self-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
+            </button>
+          ) : (
+            <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
+          )}
           <input
             aria-label="Palette name"
             value={name}
