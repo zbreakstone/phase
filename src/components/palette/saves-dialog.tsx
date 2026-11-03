@@ -1,33 +1,33 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Mail, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Mail, MoreHorizontal, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Hint } from "./hint";
+import { AddVersionDialog } from "./add-version-dialog";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
   type LoadedVersion,
-  type PaletteSummary,
+  type VersionDetails,
   type VersionSummary,
   createPalette,
-  deletePalette,
-  listPalettes,
+  createShare,
   listVersions,
-  loadLatest,
   loadVersion,
   renamePalette,
   saveVersion,
-  updateVersionNote,
+  updateVersionDetails,
 } from "@/lib/cloud/palettes";
 import { encodeState } from "@/lib/palette/serialize";
 import type { PaletteState } from "@/lib/palette/types";
@@ -52,8 +52,10 @@ interface Props {
   hasUnsaved: boolean;
   onCurrent: (current: CurrentPalette | null) => void;
   onOpen: (loaded: LoadedVersion) => void;
-  /** Asks to throw the palette away for the starter one. The caller confirms. */
-  onReset: () => void;
+  /** Whether the version history sidebar is showing, and the element it is drawn into. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  slot: HTMLElement | null;
 }
 
 const when = (ms: number) =>
@@ -70,24 +72,26 @@ export function SavesDialog({
   hasUnsaved,
   onCurrent,
   onOpen,
-  onReset,
+  open,
+  onOpenChange,
+  slot,
 }: Props) {
   const enabled = cloudEnabled();
   const [session, setSession] = React.useState<Session | null>(null);
   const [authReady, setAuthReady] = React.useState(false);
-  const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   /** The last save, open or load failed. Cleared by the next one that works. */
   const [failed, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
-  const [note, setNote] = React.useState("");
-  const [palettes, setPalettes] = React.useState<PaletteSummary[]>([]);
+  /** The "Add to version history" dialog. */
+  const [adding, setAdding] = React.useState(false);
   const [versions, setVersions] = React.useState<VersionSummary[]>([]);
   const [editing, setEditing] = React.useState<{
     id: string;
-    text: string;
+    title: string;
+    description: string;
   } | null>(null);
 
   React.useEffect(() => {
@@ -103,16 +107,29 @@ export function SavesDialog({
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // ⌘⌥S adds to the version history, as in Figma. The physical key is used because Option changes what S types.
+  React.useEffect(() => {
+    if (!session) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        e.code !== "KeyS" ||
+        !e.altKey ||
+        !(e.metaKey || e.ctrlKey)
+      )
+        return;
+      e.preventDefault();
+      setAdding(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [session]);
+
   const refresh = React.useCallback(async (paletteId: string | null) => {
     const cloud = getCloud();
     if (!cloud) return;
     try {
-      const [p, v] = await Promise.all([
-        listPalettes(cloud),
-        paletteId ? listVersions(cloud, paletteId) : Promise.resolve([]),
-      ]);
-      setPalettes(p);
-      setVersions(v);
+      setVersions(paletteId ? await listVersions(cloud, paletteId) : []);
       setFailed(false);
     } catch (e) {
       setFailed(true);
@@ -142,13 +159,13 @@ export function SavesDialog({
     }
   };
 
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
+  const toggle = () => {
+    const next = !open;
+    onOpenChange(next);
     setEditing(null);
     if (next) {
       setSent(false);
       setCode("");
-      setNote("");
       if (session) void refresh(current?.id ?? null);
     }
   };
@@ -182,55 +199,59 @@ export function SavesDialog({
       await refresh(current?.id ?? null);
     });
 
-  const saveNew = () =>
+  /** Adds a named version. A palette that was never saved is created along with it. */
+  const addVersion = (details: VersionDetails) =>
     run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
-      const { paletteId, version } = await createPalette(
-        cloud,
-        name,
-        state,
-        note,
-      );
-      onCurrent({
-        id: paletteId,
-        name: name.trim() || "Untitled",
-        versionId: version.id,
-        savedKey: stateKey,
-      });
-      setNote("");
-      await refresh(paletteId);
-      toast.success("Saved as a new palette");
+      const trimmed = name.trim();
+      if (!current) {
+        const { paletteId, version } = await createPalette(
+          cloud,
+          trimmed,
+          state,
+          details,
+        );
+        onCurrent({
+          id: paletteId,
+          name: trimmed || "Untitled",
+          versionId: version.id,
+          savedKey: stateKey,
+        });
+        await refresh(paletteId);
+      } else {
+        if (trimmed && trimmed !== current.name)
+          await renamePalette(cloud, current.id, trimmed);
+        const version = await saveVersion(cloud, current.id, state, details);
+        onCurrent({
+          ...current,
+          name: trimmed || current.name,
+          versionId: version.id,
+          savedKey: stateKey,
+        });
+        await refresh(current.id);
+      }
+      setAdding(false);
+      toast.success("Added to version history");
     });
 
-  const saveAgain = () =>
-    run(async () => {
-      const cloud = getCloud();
-      if (!cloud || !current) return;
-      if (name.trim() && name.trim() !== current.name)
-        await renamePalette(cloud, current.id, name);
-      const version = await saveVersion(cloud, current.id, state, note);
-      onCurrent({
-        ...current,
-        name: name.trim() || current.name,
-        versionId: version.id,
-        savedKey: stateKey,
-      });
-      setNote("");
-      await refresh(current.id);
-      toast.success("Saved a new version");
-    });
-
-  const saveNote = () =>
+  const saveDetails = () =>
     run(async () => {
       const cloud = getCloud();
       if (!cloud || !editing) return;
-      const next = await updateVersionNote(cloud, editing.id, editing.text);
+      const next = await updateVersionDetails(cloud, editing.id, {
+        title: editing.title,
+        description: editing.description,
+      });
       setVersions((list) =>
-        list.map((v) => (v.id === editing.id ? { ...v, note: next } : v)),
+        list.map((v) =>
+          v.id === editing.id
+            ? { ...v, title: next.title, description: next.description }
+            : v,
+        ),
       );
       setEditing(null);
-      toast.success("Note updated");
+      toast.success("Version updated");
     });
 
   const confirmReplace = () =>
@@ -250,26 +271,75 @@ export function SavesDialog({
         versionId: loaded.versionId,
         savedKey: encodeState(loaded.state),
       });
-      setOpen(false);
       toast.success(`Opened ${loaded.paletteName}`);
     });
   };
 
-  const remove = (p: PaletteSummary) => {
-    if (
-      !window.confirm(
-        `Delete "${p.name}" and all of its versions? This can't be undone.`,
-      )
-    )
-      return;
+  /** Puts an older version back on top of the work in progress. Unsaved edits are kept as a version first. */
+  const restore = (v: VersionSummary) =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud || !current) return;
+      const loaded = await loadVersion(cloud, v.id);
+      if (dirty) await saveVersion(cloud, current.id, state);
+      const label = v.title ?? when(v.createdAt);
+      const restored = await saveVersion(cloud, current.id, loaded.state, {
+        title: `Restored ${label}`.slice(0, 80),
+        description: "",
+      });
+      onOpen({ ...loaded, versionId: restored.id });
+      onCurrent({
+        ...current,
+        versionId: restored.id,
+        savedKey: encodeState(loaded.state),
+      });
+      await refresh(current.id);
+      toast.success("Version restored");
+    });
+
+  /** Starts a new palette from a version, leaving the original alone. */
+  const duplicate = (v: VersionSummary) => {
+    if (!confirmReplace()) return;
     void run(async () => {
       const cloud = getCloud();
       if (!cloud) return;
-      await deletePalette(cloud, p.id);
-      if (current?.id === p.id) onCurrent(null);
-      await refresh(current?.id === p.id ? null : (current?.id ?? null));
+      const loaded = await loadVersion(cloud, v.id);
+      const copyName = `${loaded.paletteName} copy`.slice(0, 80);
+      const { paletteId, version } = await createPalette(
+        cloud,
+        copyName,
+        loaded.state,
+      );
+      onOpen({
+        ...loaded,
+        paletteId,
+        paletteName: copyName,
+        versionId: version.id,
+      });
+      onCurrent({
+        id: paletteId,
+        name: copyName,
+        versionId: version.id,
+        savedKey: encodeState(loaded.state),
+      });
+      await refresh(paletteId);
+      toast.success(`Created ${copyName}`);
     });
   };
+
+  const copyLink = (v: VersionSummary) =>
+    run(async () => {
+      const cloud = getCloud();
+      if (!cloud) return;
+      const loaded = await loadVersion(cloud, v.id);
+      const url = `${window.location.origin}/s/${await createShare(cloud, loaded.state)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success(`Link copied: ${url}`);
+      } catch {
+        toast.message(url);
+      }
+    });
 
   const status = failed
     ? { label: "The last save failed", color: "bg-red-500" }
@@ -290,37 +360,45 @@ export function SavesDialog({
             ? "Saved"
             : "Not saved";
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger
-        render={
-          <Button variant="ghost" size="sm" aria-label="Version history" />
-        }
-      >
-        {status ? (
-          <span
-            aria-hidden
-            className={`size-1.5 shrink-0 rounded-full ${status.color}`}
-          />
-        ) : null}
-        <span className="hidden sm:inline">{label}</span>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="max-h-[calc(100dvh-5rem)] w-[26rem] gap-4 overflow-y-auto p-4"
-      >
-        <PopoverHeader>
-          <PopoverTitle>
-            {signedIn ? "Versions" : "Sign in to save"}
-          </PopoverTitle>
-          <PopoverDescription>
-            {signedIn
-              ? "Every save adds a version you can come back to. Sign in on another browser to pick up where you left off."
-              : "Saved palettes follow you across browsers. We email you a sign-in code, so there's no password."}
-          </PopoverDescription>
-        </PopoverHeader>
+  const panel = (
+    <div className="flex h-full min-h-0 flex-col divide-y divide-border">
+      <section className="flex items-center justify-between gap-2 px-5 py-4">
+        <h2 className="text-sm font-semibold">
+          {signedIn ? "Version history" : "Sign in to save"}
+        </h2>
+        <div className="-mr-2 flex items-center">
+          {signedIn ? (
+            <Hint label="Add to version history (⌘⌥S)">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Add to version history"
+                disabled={busy}
+                onClick={() => setAdding(true)}
+              >
+                <Plus />
+              </Button>
+            </Hint>
+          ) : null}
+          <Hint label="Close version history">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close version history"
+              onClick={() => onOpenChange(false)}
+            >
+              <X />
+            </Button>
+          </Hint>
+        </div>
+      </section>
 
-        {!signedIn ? (
+      {!signedIn ? (
+        <section className="space-y-3 px-5 py-4">
+          <p className="text-xs text-muted-foreground">
+            Saved palettes follow you across browsers. We email you a sign-in
+            code, so there&apos;s no password.
+          </p>
           <form
             className="space-y-3"
             onSubmit={(e) => {
@@ -348,232 +426,262 @@ export function SavesDialog({
               </p>
             ) : null}
           </form>
-        ) : (
-          <div className="space-y-5">
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide uppercase">
-                {current ? name.trim() || current.name : "Save this palette"}
-              </h3>
+          {sent ? (
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (code.length >= 6) void verifyCode();
+              }}
+            >
               <Input
-                aria-label="Version note"
-                placeholder="Note for this version (optional)"
-                maxLength={200}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="Code from the email"
+                aria-label="Sign-in code"
+                maxLength={10}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               />
-              <div className="flex flex-wrap gap-2">
-                {current ? (
-                  <Button onClick={saveAgain} disabled={busy}>
-                    Save new version
-                  </Button>
-                ) : null}
-                <Button
-                  variant={current ? "outline" : "default"}
-                  onClick={saveNew}
-                  disabled={busy || !name.trim()}
-                  title={
-                    name.trim()
-                      ? undefined
-                      : "Name the palette in the header first"
+              <Button type="submit" disabled={busy || code.length < 6}>
+                Sign in
+              </Button>
+            </form>
+          ) : null}
+        </section>
+      ) : (
+        <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+          <p className="text-xs text-muted-foreground">
+            Press{" "}
+            <kbd className="rounded bg-muted px-1 py-0.5 font-sans font-medium text-foreground">
+              ⌘ + ⌥ + S
+            </kbd>{" "}
+            to add to version history while editing.
+          </p>
+          {current ? (
+            <VersionList
+              versions={versions}
+              currentId={current.versionId}
+              editing={editing}
+              onEditing={setEditing}
+              onSaveDetails={() => void saveDetails()}
+              busy={busy}
+              onOpen={(id) => open_(() => loadVersion(getCloud()!, id))}
+              onRestore={(v) => void restore(v)}
+              onDuplicate={duplicate}
+              onCopyLink={(v) => void copyLink(v)}
+            />
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Press + or ⌘⌥S to name a version once the palette is saved.
+            </p>
+          )}
+        </section>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label="Version history"
+        aria-expanded={open}
+        onClick={toggle}
+        className={open ? "bg-muted" : undefined}
+      >
+        {status ? (
+          <span
+            aria-hidden
+            className={`size-1.5 shrink-0 rounded-full ${status.color}`}
+          />
+        ) : null}
+        <span className="hidden sm:inline">{label}</span>
+      </Button>
+      {open && slot ? createPortal(panel, slot) : null}
+      <AddVersionDialog
+        open={adding}
+        onOpenChange={setAdding}
+        busy={busy}
+        onSubmit={(details) => void addVersion(details)}
+      />
+    </>
+  );
+}
+
+interface EditingVersion {
+  id: string;
+  title: string;
+  description: string;
+}
+
+/** Every version on one timeline, newest first. Named versions stand out; autosaves are quieter dots. */
+function VersionList({
+  versions,
+  currentId,
+  editing,
+  onEditing,
+  onSaveDetails,
+  busy,
+  onOpen,
+  onRestore,
+  onDuplicate,
+  onCopyLink,
+}: {
+  versions: VersionSummary[];
+  currentId: string;
+  editing: EditingVersion | null;
+  onEditing: (next: EditingVersion | null) => void;
+  onSaveDetails: () => void;
+  busy: boolean;
+  onOpen: (versionId: string) => void;
+  onRestore: (version: VersionSummary) => void;
+  onDuplicate: (version: VersionSummary) => void;
+  onCopyLink: (version: VersionSummary) => void;
+}) {
+  return (
+    <ol className="relative space-y-1 before:absolute before:top-3 before:bottom-3 before:left-[0.4375rem] before:w-px before:bg-border">
+      {versions.map((v, i) => {
+        const named = v.title !== null;
+        const latest = i === 0;
+        const isOpen = v.id === currentId;
+        return (
+          <li key={v.id} className="relative pl-6 text-xs">
+            <span
+              aria-hidden
+              className={
+                named
+                  ? "absolute top-4 left-0 size-3.5 rounded-full border-2 border-white bg-foreground dark:border-black"
+                  : "absolute top-[1.1875rem] left-[0.1875rem] size-2 rounded-full border-2 border-white bg-muted-foreground/60 dark:border-black"
+              }
+            />
+            {editing?.id === v.id ? (
+              <form
+                className="space-y-1.5 py-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  onSaveDetails();
+                }}
+              >
+                <Input
+                  autoFocus
+                  aria-label="Version title"
+                  maxLength={80}
+                  value={editing.title}
+                  onChange={(e) =>
+                    onEditing({ ...editing, title: e.target.value })
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      onEditing(null);
+                    }
+                  }}
+                  className="h-7 text-xs"
+                />
+                <Textarea
+                  aria-label="Version description"
+                  maxLength={200}
+                  value={editing.description}
+                  onChange={(e) =>
+                    onEditing({ ...editing, description: e.target.value })
+                  }
+                  className="min-h-12 text-xs md:text-xs"
+                />
+                <div className="flex justify-end gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEditing(null)}
+                  >
+                    <X />
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={busy || !editing.title.trim()}
+                  >
+                    <Check />
+                    Save
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div
+                className={`flex items-start gap-1 rounded-lg px-2 py-2 ${isOpen ? "bg-muted" : "hover:bg-muted/50"}`}
+              >
+                <button
+                  type="button"
+                  aria-current={isOpen ? "true" : undefined}
+                  disabled={busy || isOpen}
+                  onClick={() => onOpen(v.id)}
+                  className="min-w-0 flex-1 cursor-pointer rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
                 >
-                  {current ? "Save as new palette" : "Save palette"}
-                </Button>
-              </div>
-              {current && !dirty ? (
-                <p className="text-[11px] text-muted-foreground">
-                  No changes since the last save.
-                </p>
-              ) : null}
-            </section>
-
-            {current && versions.length > 0 ? (
-              <section className="space-y-2">
-                <h3 className="text-xs font-semibold tracking-wide uppercase">
-                  Versions
-                </h3>
-                <ul className="max-h-48 divide-y divide-border overflow-y-auto border border-border">
-                  {versions.map((v, i) => (
-                    <li
-                      key={v.id}
-                      className="flex items-center gap-2 px-2 py-1.5 text-xs"
-                    >
-                      {editing?.id === v.id ? (
-                        <form
-                          className="flex min-w-0 flex-1 items-center gap-1"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            void saveNote();
-                          }}
-                        >
-                          <Input
-                            autoFocus
-                            aria-label="Version note"
-                            maxLength={200}
-                            value={editing.text}
-                            onChange={(e) =>
-                              setEditing({ id: v.id, text: e.target.value })
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape") {
-                                e.stopPropagation();
-                                setEditing(null);
-                              }
-                            }}
-                            className="h-7 text-xs"
-                          />
-                          <Button
-                            type="submit"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Save note"
-                            disabled={busy}
-                          >
-                            <Check />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Cancel"
-                            onClick={() => setEditing(null)}
-                          >
-                            <X />
-                          </Button>
-                        </form>
-                      ) : (
-                        <>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate">
-                              {v.note ?? "No note"}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {when(v.createdAt)}
-                              {i === 0 ? " · latest" : ""}
-                              {v.id === current.versionId ? " · open" : ""}
-                            </span>
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Edit note"
-                            disabled={busy}
-                            onClick={() =>
-                              setEditing({ id: v.id, text: v.note ?? "" })
-                            }
-                            className="text-muted-foreground"
-                          >
-                            <Pencil />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={busy || v.id === current.versionId}
-                            onClick={() =>
-                              open_(() => loadVersion(getCloud()!, v.id))
-                            }
-                          >
-                            Open
-                          </Button>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-wide uppercase">
-                Your palettes
-              </h3>
-              {palettes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Nothing saved yet.
-                </p>
-              ) : (
-                <ul className="max-h-48 divide-y divide-border overflow-y-auto border border-border">
-                  {palettes.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center gap-2 px-2 py-1.5 text-xs"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">
-                          {p.name}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {when(p.updatedAt)}
-                        </span>
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          open_(() => loadLatest(getCloud()!, p.id))
-                        }
-                      >
-                        Open latest
-                      </Button>
+                  <span
+                    className={`block truncate ${named || latest ? "font-medium" : "text-muted-foreground"}`}
+                  >
+                    {latest ? "Current version" : (v.title ?? "Autosave")}
+                  </span>
+                  {latest && named ? (
+                    <span className="block truncate">{v.title}</span>
+                  ) : null}
+                  {v.description ? (
+                    <span className="block text-muted-foreground">
+                      {v.description}
+                    </span>
+                  ) : null}
+                  <span className="text-muted-foreground">
+                    {when(v.createdAt)}
+                  </span>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={`Delete ${p.name}`}
+                        aria-label={`Actions for ${v.title ?? "autosave"}`}
                         disabled={busy}
-                        onClick={() => remove(p)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-        )}
-
-        {!signedIn && sent ? (
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (code.length >= 6) void verifyCode();
-            }}
-          >
-            <Input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              placeholder="Code from the email"
-              aria-label="Sign-in code"
-              maxLength={10}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            />
-            <Button type="submit" disabled={busy || code.length < 6}>
-              Sign in
-            </Button>
-          </form>
-        ) : null}
-        <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">
-            Start over from the starter palette.
-          </p>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="shrink-0"
-            onClick={() => {
-              setOpen(false);
-              onReset();
-            }}
-          >
-            <RotateCcw />
-            Reset
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+                        className="text-muted-foreground"
+                      />
+                    }
+                  >
+                    <MoreHorizontal />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        onEditing({
+                          id: v.id,
+                          title: v.title ?? "",
+                          description: v.description ?? "",
+                        })
+                      }
+                    >
+                      Edit info
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={latest}
+                      onClick={() => onRestore(v)}
+                    >
+                      Restore this version
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onDuplicate(v)}>
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onCopyLink(v)}>
+                      Copy link
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

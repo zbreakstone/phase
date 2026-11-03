@@ -89,6 +89,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
   const [resetOpen, setResetOpen] = React.useState(false);
+  /** The version history takes over the sidebar, drawn into this element by the history menu. */
+  const [historyOpen, setHistoryOpen] = React.useState(false);
+  const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
   const [grain, setGrain] = React.useState(true);
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
@@ -277,8 +280,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   }, [state, ready, storage]);
 
   // Signed-in editing of a saved or new palette saves itself. A new palette is created soon after the
-  // first change (including a name); after that, a version is added once you pause. "Save new version"
-  // in the history menu is still for notes on the moments worth keeping.
+  // first change (including a name); after that, an unnamed version is added once you pause.
+  // Named versions, added from the history menu, mark the moments worth keeping.
   const cloudSaving = React.useRef(false);
   const autosaves = Boolean(session) && ready && !shareCode && Boolean(paletteId || fresh || current);
   React.useEffect(() => {
@@ -293,11 +296,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
         cloudSaving.current = true;
         try {
           if (!current) {
-            const { paletteId: id, version } = await createPalette(cloud, trimmed, state, "Autosave");
+            const { paletteId: id, version } = await createPalette(cloud, trimmed, state);
             updateCurrent({ id, name: trimmed || "Untitled", versionId: version.id, savedKey: stateKey });
           } else {
             if (trimmed && trimmed !== current.name) await renamePalette(cloud, current.id, trimmed);
-            const version = await saveVersion(cloud, current.id, state, "Autosave");
+            const version = await saveVersion(cloud, current.id, state);
             updateCurrent({ ...current, name: trimmed || current.name, versionId: version.id, savedKey: stateKey });
           }
         } catch (e) {
@@ -493,13 +496,15 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               </Hint>
             </div>
             <SavesDialog
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              slot={historySlot}
               state={state}
               name={name}
               stateKey={stateKey}
               current={current}
               hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
               onCurrent={updateCurrent}
-              onReset={() => setResetOpen(true)}
               onOpen={(loaded) => {
                 setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
                 setFocus({ hueId: null, grade: null });
@@ -575,7 +580,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName="divide-y divide-border">
+            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
+              {historyOpen ? (
+                <div ref={setHistorySlot} className="h-full" />
+              ) : (
+                <>
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -610,6 +619,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 </>
               )}
               {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
+                </>
+              )}
             </ScrollFade>
           )}
         </aside>
