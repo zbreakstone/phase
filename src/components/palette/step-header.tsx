@@ -56,7 +56,8 @@ export function StepHeader({
   );
 }
 
-export function StepMenu({ grade, actions }: { grade: number; actions: StepHeaderActions }) {
+/** The rename and delete popover for one step. By default the number is the trigger; pass `trigger` to use your own button. */
+export function StepMenu({ grade, actions, trigger }: { grade: number; actions: StepHeaderActions; trigger?: React.ReactElement }) {
   const [open, setOpen] = React.useState(false);
   const [text, setText] = React.useState(String(grade));
   const result = parseStepName(text, actions.grades, grade);
@@ -77,17 +78,21 @@ export function StepMenu({ grade, actions }: { grade: number; actions: StepHeade
         if (next) setText(String(grade));
       }}
     >
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            aria-label={`Step ${grade} options`}
-            className="-ml-1 rounded-sm px-1 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          />
-        }
-      >
-        {grade}
-      </PopoverTrigger>
+      {trigger ? (
+        <PopoverTrigger render={trigger} />
+      ) : (
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              aria-label={`Step ${grade} options`}
+              className="-ml-1 rounded-sm px-1 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            />
+          }
+        >
+          {grade}
+        </PopoverTrigger>
+      )}
       <PopoverContent align="center" className="w-60">
         <PopoverHeader>
           <PopoverTitle>Step {grade}</PopoverTitle>

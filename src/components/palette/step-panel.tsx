@@ -15,6 +15,7 @@ import { SliderField } from "./fields";
 import { PanelSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
+import { StepMenu, type StepHeaderActions } from "./step-header";
 
 interface Props {
   generated: GeneratedHue;
@@ -27,6 +28,8 @@ interface Props {
   /** Open the neighboring step, or null at either end. */
   onPrevious: (() => void) | null;
   onNext: (() => void) | null;
+  /** Rename and delete for this step, which changes it in every color. */
+  stepActions: StepHeaderActions;
 }
 
 const WHITE: RGB = [1, 1, 1];
@@ -43,6 +46,7 @@ export function StepPanel({
   onResetAll,
   onPrevious,
   onNext,
+  stepActions,
 }: Props) {
   const hue = generated.hue;
   const name = hue.name || "Unnamed";
@@ -211,6 +215,23 @@ export function StepPanel({
               ) : null}
             </div>
           ) : null}
+        </PanelSection>
+      ) : null}
+
+      {!shade.anchor ? (
+        <PanelSection className="flex items-center justify-between gap-3">
+          <p className="text-[11px] text-muted-foreground">
+            Step {shade.grade} is shared by every color.
+          </p>
+          <StepMenu
+            grade={shade.grade}
+            actions={stepActions}
+            trigger={
+              <Button variant="outline" size="sm">
+                Rename or delete
+              </Button>
+            }
+          />
         </PanelSection>
       ) : null}
 
