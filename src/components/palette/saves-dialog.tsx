@@ -454,7 +454,7 @@ export function SavesDialog({
         <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
           <p className="text-xs text-muted-foreground">
             Press{" "}
-            <KbdGroup keys={["⌘", "⌥", "S"]} className="align-middle" />{" "}
+            <KbdGroup keys={["⌘", "⌥", "S"]} size="sm" className="align-middle" />{" "}
             to add to version history while editing.
           </p>
           {current ? (
