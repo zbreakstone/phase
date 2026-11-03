@@ -4,7 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +14,12 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   type PaletteSummary,
   createPalette,
@@ -109,6 +114,26 @@ export function PalettesHome() {
       setRenaming(null);
       setReload((n) => n + 1);
     });
+
+  const menuItems = (p: PaletteSummary) => (
+    <>
+      <DropdownMenuItem onClick={() => router.push(`/p/${p.id}`)}>
+        Open
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setRenaming(p)}>
+        Edit info
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void copyLink(p)}>
+        Copy link
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => void duplicate(p)}>
+        Duplicate
+      </DropdownMenuItem>
+      <DropdownMenuItem variant="destructive" onClick={() => remove(p)}>
+        Delete
+      </DropdownMenuItem>
+    </>
+  );
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -210,7 +235,9 @@ export function PalettesHome() {
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {palettes.map((p) => (
               <ContextMenu key={p.id}>
-                <ContextMenuTrigger render={<li />}>
+                <ContextMenuTrigger
+                  render={<li className="group/card relative" />}
+                >
                   <Link
                     href={`/p/${p.id}`}
                     className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
@@ -235,27 +262,25 @@ export function PalettesHome() {
                       </p>
                     </div>
                   </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          aria-label={`Actions for ${p.name}`}
+                          className="absolute top-4 right-4 bg-white/90 opacity-0 shadow-(--shadow-default) group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100 dark:bg-black/80"
+                        />
+                      }
+                    >
+                      <MoreHorizontal />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      {menuItems(p)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <DropdownMenuItem onClick={() => router.push(`/p/${p.id}`)}>
-                    Open
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setRenaming(p)}>
-                    Edit info
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void copyLink(p)}>
-                    Copy link
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void duplicate(p)}>
-                    Duplicate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => remove(p)}
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </ContextMenuContent>
+                <ContextMenuContent>{menuItems(p)}</ContextMenuContent>
               </ContextMenu>
             ))}
           </ul>
