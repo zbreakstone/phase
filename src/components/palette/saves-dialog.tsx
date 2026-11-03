@@ -30,7 +30,7 @@ import {
   saveVersion,
   updateVersionDetails,
 } from "@/lib/cloud/palettes";
-import { encodeState } from "@/lib/palette/serialize";
+import { contentKey } from "@/lib/palette/serialize";
 import type { PaletteState } from "@/lib/palette/types";
 
 /** The saved palette the editor is working on, and what it looked like when last saved. */
@@ -270,7 +270,7 @@ export function SavesDialog({
         id: loaded.paletteId,
         name: loaded.paletteName,
         versionId: loaded.versionId,
-        savedKey: encodeState(loaded.state),
+        savedKey: contentKey(loaded.state),
       });
       toast.success(`Opened ${loaded.paletteName}`);
     });
@@ -292,7 +292,7 @@ export function SavesDialog({
       onCurrent({
         ...current,
         versionId: restored.id,
-        savedKey: encodeState(loaded.state),
+        savedKey: contentKey(loaded.state),
       });
       await refresh(current.id);
       toast.success("Version restored");
@@ -321,7 +321,7 @@ export function SavesDialog({
         id: paletteId,
         name: copyName,
         versionId: version.id,
-        savedKey: encodeState(loaded.state),
+        savedKey: contentKey(loaded.state),
       });
       await refresh(paletteId);
       toast.success(`Created ${copyName}`);

@@ -136,6 +136,14 @@ export function encodeState(state: PaletteState): string {
   return toBase64Url(JSON.stringify(state, roundForLink));
 }
 
+/**
+ * Identifies what a palette *is*, for telling whether it has changed since it was saved. Which color is selected
+ * is where you are looking, not part of the palette, so moving around must not count as an edit.
+ */
+export function contentKey(state: PaletteState): string {
+  return encodeState({ ...state, selectedHueId: null });
+}
+
 export const SHARE_PARAM = "p";
 
 /** Reads a palette from a location hash such as `#p=...`. Returns null when the hash has no palette. */
