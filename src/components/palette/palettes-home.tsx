@@ -1,10 +1,12 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import { flightKeyframes, peekLeavingId, rememberCardOrigin, takeLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { EllipsisVertical, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,10 +49,22 @@ interface Preview {
 }
 
 /** What a signed-in user sees first: every palette they've saved, newest first. */
+// Hover zooms the thumbnail to 125%, which leaves 25% of its size to pan across.
+const HOVER_ZOOM_PAN = 25;
+
+// The last list we loaded, so coming back from a palette shows the cards at once (and refreshes behind them)
+// instead of flashing skeletons and then rearranging.
+let listCache: { palettes: PaletteSummary[]; previews: Record<string, Preview> } | null = null;
+
 export function PalettesHome() {
-  const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
+  const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(() => listCache?.palettes ?? null);
   /** Previews by palette id. A palette missing here is still loading, or its latest version couldn't be read. */
-  const [previews, setPreviews] = React.useState<Record<string, Preview>>({});
+  const [previews, setPreviews] = React.useState<Record<string, Preview>>(() => listCache?.previews ?? {});
+  // The palette we just came back from flies out of the editor's square; the other cards fade up around it.
+  const [flyingId] = React.useState(() => peekLeavingId());
+  React.useEffect(() => {
+    if (palettes) listCache = { palettes, previews };
+  }, [palettes, previews]);
 
   const router = useRouter();
   /** Bumped to load the list again after a duplicate, rename or delete. */
@@ -184,7 +198,7 @@ export function PalettesHome() {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-border bg-white dark:bg-black">
         <div
-          className={`${PAGE_WIDTH} flex h-14 items-center justify-between gap-3`}
+          className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}
         >
           <Image
             src="/phase-lockup-white.png"
@@ -194,17 +208,19 @@ export function PalettesHome() {
             priority
             className="h-6 w-auto invert dark:invert-0"
           />
-          <AccountMenu onSignedOut={() => undefined} />
+          <h1 className="animate-in fade-in truncate px-2 text-center text-sm font-medium duration-300 motion-reduce:animate-none">
+            Palettes
+          </h1>
+          <div className="animate-in fade-in flex items-center justify-end gap-2 duration-300 motion-reduce:animate-none">
+            <Button render={<Link href="/p/new" />} nativeButton={false}>
+              <Plus />
+              New palette
+            </Button>
+            <AccountMenu onSignedOut={() => undefined} />
+          </div>
         </div>
       </header>
       <main className={`${PAGE_WIDTH} w-full flex-1 py-8`}>
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-xl font-semibold">Palettes</h1>
-          <Button render={<Link href="/p/new" />} nativeButton={false}>
-            <Plus />
-            New palette
-          </Button>
-        </div>
         {palettes === null ? (
           <div
             aria-busy="true"
@@ -222,35 +238,69 @@ export function PalettesHome() {
               Start one and save it. It will show up here every time you sign
               in.
             </p>
-            <Button
-              render={<Link href="/p/new" />}
-              nativeButton={false}
-              variant="secondary"
-            >
-              <Plus />
-              New palette
-            </Button>
           </div>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {palettes.map((p) => (
+            {palettes.map((p, i) => (
               <ContextMenu key={p.id}>
                 <ContextMenuTrigger
-                  render={<li className="group/card relative" />}
+                  render={
+                    <li
+                      className={cn(
+                        "group/card relative",
+                        p.id !== flyingId && "animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards motion-reduce:animate-none",
+                      )}
+                      style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}
+                    />
+                  }
                 >
                   <Link
                     href={`/p/${p.id}`}
+                    onClick={(e) => {
+                      // The editor's square zooms out of this thumbnail.
+                      const thumb = e.currentTarget.querySelector("[data-card-preview]");
+                      if (thumb) rememberCardOrigin(thumb.getBoundingClientRect());
+                    }}
                     className="block rounded-3xl bg-white p-2 shadow-(--shadow-default) transition-shadow hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-black"
                   >
                     <div
                       aria-hidden
+                      data-card-preview
+                      ref={(el) => {
+                        // Coming back from this palette: the thumbnail zooms down out of the square we just left.
+                        const from = el ? takeLeavingSquare(p.id) : null;
+                        if (!el || !from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+                        const to = el.getBoundingClientRect();
+                        if (to.width === 0 || to.height === 0) return;
+                        el.style.position = "relative";
+                        el.style.zIndex = "20";
+                        el.animate(
+                          flightKeyframes(from, to, 24, 16),
+                          { duration: 420, easing: "cubic-bezier(0.65, 0, 0.35, 1)" },
+                        ).onfinish = () => {
+                          el.style.position = "";
+                          el.style.zIndex = "";
+                        };
+                      }}
+                      onPointerMove={(e) => {
+                        // Pan the zoomed gradient so the point under the pointer drifts toward the middle of the card.
+                        const box = e.currentTarget.getBoundingClientRect();
+                        const inner = e.currentTarget.firstElementChild as HTMLElement | null;
+                        if (!inner || box.width === 0) return;
+                        const x = (e.clientX - box.left) / box.width;
+                        const y = (e.clientY - box.top) / box.height;
+                        inner.style.setProperty("--tx", `${(0.5 - x) * HOVER_ZOOM_PAN}%`);
+                        inner.style.setProperty("--ty", `${(0.5 - y) * HOVER_ZOOM_PAN}%`);
+                      }}
                       className="aspect-[16/10] overflow-hidden rounded-2xl bg-muted shadow-(--shadow-border)"
                     >
                       {previews[p.id] ? (
-                        <PalettePreview
-                          generated={previews[p.id].generated}
-                          gamut={previews[p.id].gamut}
-                        />
+                        <div className="size-full origin-center transition-transform duration-200 ease-out group-hover/card:[transform:translate(var(--tx,0%),var(--ty,0%))_scale(1.25)] motion-reduce:transition-none motion-reduce:group-hover/card:transform-none">
+                          <PalettePreview
+                            generated={previews[p.id].generated}
+                            gamut={previews[p.id].gamut}
+                          />
+                        </div>
                       ) : (
                         <Skeleton className="size-full rounded-none" />
                       )}
@@ -269,11 +319,11 @@ export function PalettesHome() {
                           variant="ghost"
                           size="icon"
                           aria-label={`Actions for ${p.name}`}
-                          className="absolute right-3 bottom-3 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
+                          className="absolute right-3 bottom-5 text-muted-foreground opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
                         />
                       }
                     >
-                      <MoreHorizontal />
+                      <EllipsisVertical />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       {menuItems(p)}

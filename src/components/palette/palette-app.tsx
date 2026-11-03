@@ -1,5 +1,6 @@
 "use client";
 
+import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -78,6 +79,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const { session } = useSession();
   const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
+  // Opened from a palette card: the square zooms out of the card once it loads, so don't show a skeleton in its place.
+  const [fromCard] = React.useState(() => peekCardOrigin() !== null);
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
@@ -433,6 +436,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const toList = () => {
     const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
     if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
+    // The palette's card on the home page zooms out of the square we're leaving.
+    const square = document.querySelector("[data-palette-square]");
+    if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
     router.push("/");
   };
   const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
@@ -492,9 +498,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             }}
             onFocus={(e) => e.currentTarget.select()}
             size={Math.max(12, name.length + 1)}
-            className="h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+            className="animate-in fade-in duration-300 motion-reduce:animate-none h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           />
-          <div className="flex items-center justify-end gap-2">
+          <div className="animate-in fade-in flex items-center justify-end gap-2 duration-300 motion-reduce:animate-none">
             <div className="flex items-center" role="group" aria-label="History">
               <Hint label="Undo" shortcut={["⌘", "Z"]}>
                 {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
@@ -543,7 +549,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="my-auto space-y-6">
             {!ready ? (
               <div aria-busy="true" aria-label="Loading your palette" className="mr-auto">
-                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)]" />
+                <Skeleton className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard ? "invisible" : ""}`} />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
@@ -569,7 +575,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
                   />
-                  <div className="absolute inset-x-0 bottom-full mb-4">
+                  <div className="animate-in fade-in absolute inset-x-0 bottom-full mb-4 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none">
                     <ViewToolbar
                       overlay={overlay}
                       onOverlay={setOverlay}
@@ -598,7 +604,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="rounded-3xl bg-white shadow-(--shadow-large) lg:h-full dark:bg-black" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
+            <ScrollFade className="animate-in fade-in slide-in-from-bottom-2 rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
               {historyOpen ? (
                 <div ref={setHistorySlot} className="h-full" />
               ) : (
