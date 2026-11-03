@@ -454,6 +454,20 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   };
   const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
 
+  // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
+  // steps up instead (handled above), and an open version history closes first.
+  React.useEffect(() => {
+    if (!session) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (isTextEntry(e.target) || document.querySelector('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (historyOpen) setHistoryOpen(false);
+      else if (!focused) toList();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
   const reference = focusShade ?? null;
   const level = focused ? (focusShade ? "step" : "hue") : "all";
