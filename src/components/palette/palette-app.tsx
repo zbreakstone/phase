@@ -242,16 +242,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const up = React.useCallback(() => setFocus((f) => (f.grade !== null ? { ...f, grade: null } : { hueId: null, grade: null })), []);
 
   React.useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"]')) return;
-      up();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [up]);
-
-  React.useEffect(() => {
     if (!ready) return;
     const t = setTimeout(() => {
       storage.save({ id: AUTOSAVE_ID, name: "Autosave", updatedAt: Date.now(), state }).catch(() =>
@@ -449,17 +439,26 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
   // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
   // steps up instead (handled above), and an open version history closes first.
+  const onEscape = React.useRef<(e: KeyboardEvent) => void>(() => {});
+  onEscape.current = (e) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+    // Esc in a text field just leaves the field (so it never feels stuck); the next Esc navigates.
+    if (isTextEntry(e.target)) {
+      (e.target as HTMLElement).blur();
+      return;
+    }
+    // One step per press: close history, else go up a level inside a color or step, else leave for Palettes.
+    if (historyOpen) setHistoryOpen(false);
+    else if (focused) up();
+    else if (session) toList();
+  };
+  // Subscribed once, so this listener keeps its place at the front of the capture phase instead of being re-added behind others on every render.
   React.useEffect(() => {
-    if (!session) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (isTextEntry(e.target) || isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
-      if (historyOpen) setHistoryOpen(false);
-      else if (!focused) toList();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
+    const onKeyDown = (e: KeyboardEvent) => onEscape.current(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
   const reference = focusShade ?? null;
