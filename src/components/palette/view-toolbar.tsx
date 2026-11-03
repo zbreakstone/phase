@@ -85,13 +85,14 @@ export function ViewToolbar({
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent alignItemWithTrigger={false} align="start" className="max-h-72 w-80">
+
             {LENSES.map((l) => (
               <SelectItem key={l.id} value={l.id}>
                 <span className="flex flex-col">
                   <span>{l.label}</span>
                   {l.note ? (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-[11px] whitespace-normal text-muted-foreground">
                       {l.note}
                     </span>
                   ) : null}
@@ -100,7 +101,7 @@ export function ViewToolbar({
             ))}
           </SelectContent>
         </Select>
-        <Hint label="Toggle mode">
+        <Hint label="Toggle display mode">
           <Toggle
             variant="outline"
             size="sm"
