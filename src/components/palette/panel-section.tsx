@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function SettingRow({
 export function CollapsibleSection({
   id,
   title,
+  count,
   action,
   defaultOpen = true,
   className,
@@ -47,6 +49,8 @@ export function CollapsibleSection({
 }: {
   id: string;
   title: React.ReactNode;
+  /** How many things the section holds, shown as a badge next to the title. */
+  count?: number;
   action?: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
@@ -65,6 +69,11 @@ export function CollapsibleSection({
             className="-mx-1 flex items-center gap-1 rounded-md px-1 py-0.5 outline-none hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             {title}
+            {count !== undefined ? (
+              <Badge size="sm">
+                {count}
+              </Badge>
+            ) : null}
             <ChevronDown
               className={cn(
                 "size-4 text-muted-foreground transition-transform",
