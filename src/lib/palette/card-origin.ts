@@ -33,3 +33,26 @@ export function takeLeavingSquare(id: string): DOMRect | null {
   leaving = null;
   return Date.now() - at < FRESH_MS ? rect : null;
 }
+
+/**
+ * Keyframes that carry an element from where `from` sat to where `to` sits. Scaling would squash its
+ * rounded corners, so the border radius is animated too, keeping the corners the same size on screen
+ * while they grow from `radiusFrom` to `radiusTo` pixels. (Use with an easing on the animation itself, not per keyframe.)
+ */
+export function flightKeyframes(from: DOMRect, to: DOMRect, radiusFrom: number, radiusTo: number, steps = 12): Keyframe[] {
+  const frames: Keyframe[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const p = i / steps;
+    const lerp = (a: number, b: number) => a + (b - a) * p;
+    const sx = lerp(from.width / to.width, 1);
+    const sy = lerp(from.height / to.height, 1);
+    const r = lerp(radiusFrom, radiusTo);
+    frames.push({
+      offset: p,
+      transformOrigin: "0 0",
+      transform: `translate(${lerp(from.left - to.left, 0)}px, ${lerp(from.top - to.top, 0)}px) scale(${sx}, ${sy})`,
+      borderRadius: `${r / sx}px / ${r / sy}px`,
+    });
+  }
+  return frames;
+}

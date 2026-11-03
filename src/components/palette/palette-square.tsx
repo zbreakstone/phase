@@ -1,6 +1,6 @@
 "use client";
 
-import { forgetCardOrigin, peekCardOrigin } from "@/lib/palette/card-origin";
+import { flightKeyframes, forgetCardOrigin, peekCardOrigin } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
@@ -283,10 +283,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     if (to.width === 0 || to.height === 0) return;
     el.style.zIndex = "20";
     const flight = el.animate(
-      [
-        { transformOrigin: "0 0", transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width}, ${from.height / to.height})` },
-        { transformOrigin: "0 0", transform: "translate(0, 0) scale(1, 1)" },
-      ],
+      flightKeyframes(from, to, 16, 24),
       { duration: 420, easing: EASE_IN_OUT },
     );
     flight.onfinish = () => {
