@@ -16,7 +16,7 @@ import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { CollapsibleSection, PanelSection, SettingRow } from "./panel-section";
+import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
@@ -128,8 +128,8 @@ export function StepPanel({
 
   return (
     <>
-      <div>
-        <PanelSection className="space-y-4 pb-0">
+      <CollapsibleSection id="details" title="Details">
+        <div className="space-y-4">
           <div className="flex items-center gap-3">
             <span
               aria-hidden
@@ -173,9 +173,6 @@ export function StepPanel({
               </Hint>
             </div>
           </div>
-        </PanelSection>
-
-        <CollapsibleSection id="details" title="Details">
           <div className="space-y-3">
             {!shade.anchor ? (
               <SettingRow id="step-name" label="Step name">
@@ -223,8 +220,8 @@ export function StepPanel({
               </SettingRow>
             ))}
           </div>
-        </CollapsibleSection>
-      </div>
+        </div>
+      </CollapsibleSection>
 
       {!shade.anchor ? (
         <CollapsibleSection
