@@ -66,6 +66,7 @@ export function ViewToolbar({
   // the switch is off.
   const [last, setLast] = React.useState<Lens>("luminance");
   const [lensOpen, setLensOpen] = React.useState(false);
+  const [themeOpen, setThemeOpen] = React.useState(false);
   const active = overlay.grayscale || overlay.vision !== "normal";
   const lens: Lens = overlay.grayscale
     ? "luminance"
@@ -79,7 +80,7 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
-  // / turns the preview on and off, M opens the lens menu, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  // / turns the preview on and off, M opens the lens menu, T the theme menu, G toggles grain, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -94,7 +95,9 @@ export function ViewToolbar({
         e.key !== "/" &&
         e.key !== "[" &&
         e.key !== "]" &&
-        e.key.toLowerCase() !== "m"
+        e.key.toLowerCase() !== "m" &&
+        e.key.toLowerCase() !== "t" &&
+        e.key.toLowerCase() !== "g"
       )
         return;
       if (isTextEntry(e.target)) return;
@@ -107,7 +110,10 @@ export function ViewToolbar({
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);
       else if (e.key.toLowerCase() === "m") setLensOpen(true);
-      else onMode(e.key === "[" ? "smooth" : "cells");
+      else if (e.key.toLowerCase() === "t") setThemeOpen(true);
+      else if (e.key.toLowerCase() === "g") {
+        if (mode === "smooth") onGrain(!grain);
+      } else onMode(e.key === "[" ? "smooth" : "cells");
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -171,8 +177,8 @@ export function ViewToolbar({
         </Hint>
       </div>
       <div className="flex items-center justify-end gap-2">
-        <DropdownMenu>
-          <Hint label="Theme">
+        <DropdownMenu open={themeOpen} onOpenChange={setThemeOpen}>
+          <Hint label="Theme" shortcut={["T"]}>
             <DropdownMenuTrigger aria-label="Theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
               {theme === "light" ? <Sun /> : theme === "dark" ? <Moon /> : <SunMoon />}
             </DropdownMenuTrigger>
@@ -187,7 +193,7 @@ export function ViewToolbar({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Hint label={mode === "smooth" ? "Grain" : "Grain only applies to the smooth view"}>
+        <Hint label={mode === "smooth" ? "Grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
           <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Grain">
             <Wheat />
           </Toggle>
