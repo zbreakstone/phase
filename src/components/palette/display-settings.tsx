@@ -7,19 +7,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
-import type { SquareMode } from "./palette-square";
 
 export type Panel = "curves" | "report";
 
 interface Props {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
-  mode: SquareMode;
-  grain: boolean;
-  onGrain: (on: boolean) => void;
   /** The one panel open under the square, if any. */
   panel: Panel | null;
   onPanel: (p: Panel | null) => void;
@@ -51,9 +46,6 @@ const PANELS: { id: Panel | "none"; label: string }[] = [
 export function DisplaySettings({
   overlay,
   onOverlay,
-  mode,
-  grain,
-  onGrain,
   panel,
   onPanel,
   curvesDisabled,
@@ -63,17 +55,6 @@ export function DisplaySettings({
     overlay.metric === "contrast" || overlay.metric === "apca";
   const rows = (
     <>
-      {mode === "smooth" ? (
-        <>
-          <SettingRow id="display-grain" label="Grain">
-            <Switch
-              id="display-grain"
-              checked={grain}
-              onCheckedChange={onGrain}
-            />
-          </SettingRow>
-        </>
-      ) : null}
       <SettingRow id="display-metric" label="Show">
         <Select
           items={METRICS.map((m) => ({ value: m.id, label: m.label }))}

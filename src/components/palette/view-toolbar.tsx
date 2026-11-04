@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Contrast, Eye, EyeOff, SwatchBook } from "lucide-react";
+import { Contrast, Eye, EyeOff, SunMoon, SwatchBook, Wheat } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
+import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import type { Overlay } from "@/lib/palette/overlay";
@@ -17,6 +18,14 @@ import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 import { isPopupOpen, isTextEntry } from "./text-entry";
+import { useTheme } from "./use-theme";
+import type { Theme } from "@/lib/theme";
+
+const THEMES: { id: Theme; label: string }[] = [
+  { id: "system", label: "System" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
 
 type Lens = "luminance" | Exclude<VisionId, "normal">;
 
@@ -41,13 +50,18 @@ export function ViewToolbar({
   crumbs,
   mode,
   onMode,
+  grain,
+  onGrain,
 }: {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
   crumbs: Crumb[];
   mode: SquareMode;
   onMode: (m: SquareMode) => void;
+  grain: boolean;
+  onGrain: (on: boolean) => void;
 }) {
+  const [theme, pickTheme] = useTheme();
   // One switch turns the preview on and off; the dropdown picks the lens. The last lens is remembered while
   // the switch is off.
   const [last, setLast] = React.useState<Lens>("luminance");
@@ -156,7 +170,28 @@ export function ViewToolbar({
           </Toggle>
         </Hint>
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <Hint label="Theme">
+            <DropdownMenuTrigger aria-label="Theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
+              <SunMoon />
+            </DropdownMenuTrigger>
+          </Hint>
+          <DropdownMenuContent align="end" className="min-w-36">
+            <DropdownMenuRadioGroup value={theme} onValueChange={(v) => pickTheme(v as Theme)}>
+              {THEMES.map((t) => (
+                <DropdownMenuRadioItem key={t.id} value={t.id}>
+                  {t.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Hint label={mode === "smooth" ? "Grain" : "Grain only applies to the smooth view"}>
+          <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Grain">
+            <Wheat />
+          </Toggle>
+        </Hint>
         <ToggleGroup
           value={[mode]}
           onValueChange={(v) => v[0] && onMode(v[0] as SquareMode)}
