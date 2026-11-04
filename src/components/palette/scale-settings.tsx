@@ -144,9 +144,12 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
                   </Button>
                 </div>
                 ) : (
-                  <p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
-                    <span className="font-mono text-foreground">{rule.minDiff}</span> apart reach <span className="font-mono text-foreground">{rule.ratio}</span>:1
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex h-8 w-20 items-center rounded-lg bg-muted/50 px-2.5 font-mono text-xs">{rule.minDiff}</span>
+                    <span className="text-xs text-muted-foreground">apart reach</span>
+                    <span className="flex h-8 w-16 items-center rounded-lg bg-muted/50 px-2.5 font-mono text-xs">{rule.ratio}</span>
+                    <span className="text-xs text-muted-foreground">:1</span>
+                  </div>
                 )}
                 {editable && maxed ? (
                   <p className="text-[11px] text-muted-foreground">{uniformRatio.toFixed(2)}:1 is the most steps {rule.minDiff} apart can reach, so this is as high as it goes.</p>
