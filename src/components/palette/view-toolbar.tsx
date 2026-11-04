@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Contrast, Eye, EyeOff, SunMoon, SwatchBook, Wheat } from "lucide-react";
+import { Contrast, Eye, EyeOff, Moon, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -174,7 +174,7 @@ export function ViewToolbar({
         <DropdownMenu>
           <Hint label="Theme">
             <DropdownMenuTrigger aria-label="Theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
-              <SunMoon />
+              {theme === "light" ? <Sun /> : theme === "dark" ? <Moon /> : <SunMoon />}
             </DropdownMenuTrigger>
           </Hint>
           <DropdownMenuContent align="end" className="min-w-36">
