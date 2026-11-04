@@ -29,7 +29,7 @@ import { ExportDialog } from "./export-dialog";
 import { AddColorEnd } from "./color-label";
 import { SectionGroup } from "./panel-section";
 import { ColorsList } from "./colors-list";
-import { CurvesPanel } from "./curves-panel";
+import { PaletteChart } from "./palette-chart";
 import { HuePanel } from "./hue-panel";
 import { ContrastRulesSection, PaletteSettings } from "./palette-settings";
 import { PaletteSquare, type SquareMode } from "./palette-square";
@@ -474,7 +474,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     const next = focused?.shades[stepIndex + offset];
     return next && focused ? () => openStep(focused.hue.id, next.grade) : null;
   };
-  const openPanel: Panel | null = panel === "curves" && !focused ? null : panel;
+  const openPanel: Panel | null = panel === "report" ? panel : null;
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
@@ -594,7 +594,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   </div>
                 </div>
                 {openPanel ? <div className="mt-16 space-y-6" /> : null}
-                {openPanel === "curves" && focused ? <CurvesPanel generated={focused} scale={state.scale} space={state.space} gamut={state.gamut} /> : null}
                 {openPanel === "report" ? (
                   <ContrastReport report={report} rules={rules} gamut={state.gamut} showApcaNote={overlay.metric === "apca"} onSelect={openStep} />
                 ) : null}
@@ -605,12 +604,18 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
           {!ready ? null : (
-            <ScrollFade className="animate-in fade-in slide-in-from-bottom-2 rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
+            <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
+            {historyOpen || generated.length === 0 ? null : (
+              <div className="shrink-0 border-b border-border">
+                <PaletteChart generated={generated} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
+              </div>
+            )}
+            <ScrollFade className="min-h-0 flex-1" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
               {historyOpen ? (
                 <div ref={setHistorySlot} className="h-full" />
               ) : (
                 <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "display"}>
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null}
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -639,7 +644,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
@@ -648,6 +653,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 </SectionGroup>
               )}
             </ScrollFade>
+            </div>
           )}
         </aside>
       </main>
