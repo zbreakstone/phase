@@ -4,6 +4,17 @@ import * as React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  ColorPicker,
+  ColorPickerArea,
+  ColorPickerAreaThumb,
+  ColorPickerContent,
+  ColorPickerControl,
+  ColorPickerInput,
+  ColorPickerSlider,
+  ColorPickerTrigger,
+  ColorPickerView,
+} from "@/components/ui/color-picker";
 import { SettingRow } from "./panel-section";
 import { Switch } from "@/components/ui/switch";
 import { parseHex } from "@/lib/color/convert";
@@ -18,61 +29,62 @@ interface Props {
 }
 
 export function SourceEditor({ source, analysis, onChange }: Props) {
-  const [draft, setDraft] = React.useState<string | null>(null);
   const hex = source?.hex ?? "";
-  const invalid = draft !== null && draft.trim() !== "" && !parseHex(draft);
 
   const apply = (text: string) => {
     const parsed = parseHex(text);
     if (parsed) {
       onChange({ grade: source?.grade ?? null, pinned: source?.pinned ?? false, hex: parsed });
-      setDraft(null);
-    } else if (!text.trim()) {
-      setDraft(null);
     }
   };
 
   return (
     <div className="space-y-3">
-      <SettingRow id="base-color" label="Base color">
-        <div
-          className={cn(
-            "flex h-8 w-full items-center gap-2 rounded-lg bg-white pr-1 pl-1.5 shadow-(--shadow-default) hover:shadow-(--shadow-large) dark:bg-input/30 focus-within:ring-2 focus-within:ring-ring",
-            invalid && "ring-1 ring-destructive",
-          )}
-        >
-          <span className="relative size-5 shrink-0 overflow-hidden rounded-md ring-1 ring-foreground/15" style={{ backgroundColor: hex || undefined }}>
-            <input
-              type="color"
-              aria-label="Pick a base color"
-              value={hex || "#3b82f6"}
-              onChange={(e) => apply(e.target.value)}
-              className="absolute inset-0 size-full cursor-pointer opacity-0"
-            />
-          </span>
-          <input
-            id="base-color"
-            placeholder="Add color"
-            spellCheck={false}
-            value={(draft ?? hex).replace(/^#/, "").toUpperCase()}
-            aria-invalid={invalid ? true : undefined}
-            onChange={(e) => {
-              const text = e.target.value.replace(/^#/, "");
-              setDraft(text);
-              const parsed = parseHex(text);
-              if (parsed) apply(parsed);
+      <SettingRow label="Base color">
+        <div className="flex h-8 w-full items-center rounded-lg bg-white shadow-(--shadow-default) hover:shadow-(--shadow-large) dark:bg-input/30 focus-within:ring-2 focus-within:ring-ring">
+          <ColorPicker
+            value={hex || "#3b82f6"}
+            format="hsba"
+            onValueChange={(d) => {
+              const next = d.value.toString("hex").toLowerCase();
+              if (next !== hex.toLowerCase()) apply(next);
             }}
-            onBlur={(e) => apply(e.target.value)}
-            className="min-w-0 flex-1 bg-transparent font-mono text-xs uppercase outline-none placeholder:text-muted-foreground placeholder:normal-case"
-          />
+            className="min-w-0 flex-1"
+          >
+            <ColorPickerControl className="h-full">
+              <ColorPickerTrigger
+                aria-label="Pick a base color"
+                className="flex h-full min-w-0 flex-1 items-center gap-2 rounded-lg pr-1 pl-1.5 text-left outline-none"
+              >
+                <span className="size-5 shrink-0 rounded-md ring-1 ring-foreground/15" style={{ backgroundColor: hex || undefined }} />
+                <span className={cn("min-w-0 flex-1 truncate font-mono text-xs uppercase", !hex && "text-muted-foreground normal-case")}>
+                  {hex ? hex.replace(/^#/, "") : "Add color"}
+                </span>
+              </ColorPickerTrigger>
+            </ColorPickerControl>
+            <ColorPickerContent>
+              <ColorPickerArea>
+                <ColorPickerAreaThumb />
+              </ColorPickerArea>
+              <ColorPickerView format="hsba">
+                <ColorPickerSlider channel="hue" />
+              </ColorPickerView>
+              <label className="flex h-8 items-center gap-2 rounded-lg bg-white pl-2.5 shadow-(--shadow-default) focus-within:ring-2 focus-within:ring-ring dark:bg-input/30">
+                <span className="text-xs text-muted-foreground">Hex</span>
+                <ColorPickerInput
+                  aria-label="Hex"
+                  className="min-w-0 flex-1 bg-transparent pr-2.5 font-mono text-xs uppercase outline-none"
+                />
+              </label>
+            </ColorPickerContent>
+          </ColorPicker>
           {source ? (
-            <Button variant="ghost" size="icon-sm" className="size-6" aria-label="Remove base color" onClick={() => onChange(null)}>
+            <Button variant="ghost" size="icon-sm" className="mr-1 size-6" aria-label="Remove base color" onClick={() => onChange(null)}>
               <X />
             </Button>
           ) : null}
         </div>
       </SettingRow>
-      {invalid ? <p className="text-[11px] text-destructive">Enter a hex color such as #3b82f6.</p> : null}
 
       {source && analysis ? (
         <>
