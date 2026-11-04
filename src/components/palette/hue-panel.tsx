@@ -26,6 +26,8 @@ interface Props {
   onOpenStep: (grade: number) => void;
   /** How swatches are painted under the current view (vision simulation, grayscale). */
   display: (shade: Shade) => string;
+  /** Renders the Settings section, with the delete button passed in to sit at its end. */
+  settings: (danger: React.ReactNode) => React.ReactNode;
 }
 
 function hueGuide(
@@ -52,6 +54,7 @@ export function HuePanel({
   onResetTweaks,
   onOpenStep,
   display,
+  settings,
 }: Props) {
   const hue = generated.hue;
   const def = SPACES[space];
@@ -247,12 +250,12 @@ export function HuePanel({
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection id="danger" title="Danger zone">
-        <Button variant="destructive" className="w-full" onClick={() => setDeleting(true)}>
+      {settings(
+        <Button variant="destructive" className="mt-3 w-full" onClick={() => setDeleting(true)}>
           <Trash2 />
           Delete {hue.name || "this color"}
-        </Button>
-      </CollapsibleSection>
+        </Button>,
+      )}
 
       <ConfirmDeleteDialog
         open={deleting}

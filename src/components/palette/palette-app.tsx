@@ -21,7 +21,7 @@ import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
 import { addStepBetween, midpointGrade, removeStep, renameStep } from "@/lib/palette/steps";
 import { setStepTweak } from "@/lib/palette/tweaks";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
-import { createPalette, createShare, getShared, loadLatest, renamePalette, saveVersion } from "@/lib/cloud/palettes";
+import { createPalette, createShare, deletePalette, getShared, loadLatest, renamePalette, saveVersion } from "@/lib/cloud/palettes";
 import { useSession } from "@/lib/cloud/use-session";
 import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
@@ -103,6 +103,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     (async () => {
       // A palette from the list, or a new one: neither starts from the last autosave.
       if (paletteId || fresh) {
+        // Coming back to a palette starts from its latest version with the history closed, not wherever it was left.
+        setHistoryOpen(false);
         try {
           if (paletteId) {
             const cloud = getCloud();
@@ -334,6 +336,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   // A removed color can't stay open, so fall back to the level above.
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
   const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
+  const renderSettings = (danger: React.ReactNode) => (
+    <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} extra={danger} />
+  );
 
   useApplyAccent();
   const openHue = (hueId: string) => {
@@ -439,6 +444,19 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     // The palette's card on the home page zooms out of the square we're leaving.
     const square = document.querySelector("[data-palette-square]");
     if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
+    router.push("/");
+  };
+  /** Deletes the saved palette and returns to the list, skipping the unsaved-changes prompt. */
+  const deleteCurrent = async () => {
+    const cloud = getCloud();
+    if (!cloud || !current) return;
+    try {
+      await deletePalette(cloud, current.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete that palette.");
+      return;
+    }
+    toast.success(`Deleted ${current.name}`);
     router.push("/");
   };
   const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
@@ -614,8 +632,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               {historyOpen ? (
                 <div ref={setHistorySlot} className="h-full" />
               ) : (
-                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "display"}>
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null}
+                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -629,6 +646,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onPrevious={goStep(-1)}
                   onNext={goStep(1)}
                   stepActions={stepActions}
+                  settings={renderSettings}
                 />
               ) : focused ? (
                 <HuePanel
@@ -641,13 +659,14 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onResetTweaks={() => resetTweaks(focused.hue.id)}
                   onOpenStep={(g) => openStep(focused.hue.id, g)}
                   display={(shade) => displayShade(shade, overlay, state.gamut)}
+                  settings={renderSettings}
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
                 </SectionGroup>
