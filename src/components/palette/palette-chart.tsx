@@ -254,8 +254,16 @@ export function PaletteChart({
     setHover(points.reduce((best, p) => (Math.abs(xOf(p.t) - x) < Math.abs(xOf(best.t) - x) ? p : best), points[0]).key);
   };
 
+  // Thin the value row so labels never touch: every nth value, and none next to the one you're on.
+  const spacing = points.length > 1 ? (W - PAD_X * 2) / (points.length - 1) : W;
+  const minGap = 36;
+  const stride = Math.max(1, Math.ceil(minGap / spacing));
+  const activeIndex = active ? points.findIndex((p) => p.key === active.key) : -1;
+  const shown = points.map((_, i) => i === activeIndex || (i % stride === 0 && (activeIndex < 0 || Math.abs(i - activeIndex) * spacing >= minGap)));
+
   return (
     <div>
+      <div className="relative">
       <svg
         role="img"
         aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : `of every color at step ${level}`}`}
@@ -283,20 +291,33 @@ export function PaletteChart({
           </>
         ) : null}
         {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/15" strokeWidth={1} /> : null}
-        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
+        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H} className="stroke-foreground/25" strokeWidth={1} /> : null}
         <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => {
-          const on = active?.key === p.key;
-          return <circle key={p.key} cx={xy[i].x} cy={xy[i].y} r={on ? 4.5 : 3} fill={p.hex} stroke="white" strokeWidth={on ? 2 : 1.5} />;
-        })}
       </svg>
+      {points.map((p, i) => (
+        <span
+          key={p.key}
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
+            active?.key === p.key ? "size-3" : "size-2",
+          )}
+          style={{ left: `${(xy[i].x / W) * 100}%`, top: `${(xy[i].y / H) * 100}%`, backgroundColor: p.hex }}
+        />
+      ))}
+      {!focused && active ? (
+        <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
+          {active.label}
+        </p>
+      ) : null}
+      </div>
       <div
         aria-hidden
         className="h-0.5"
         style={{ background: `linear-gradient(to right, ${points.map((p) => `${p.hex} ${((xOf(p.t) / W) * 100).toFixed(1)}%`).join(", ")})` }}
       />
-      <div className="relative h-7 bg-muted/30" aria-hidden>
-        {points.map((p) => (
+      <div className="relative h-7" aria-hidden>
+        {points.map((p, i) => shown[i] && (
           <span
             key={p.key}
             className={cn(
@@ -348,9 +369,6 @@ export function PaletteChart({
             </Select>
           )}
         </div>
-        {!focused ? (
-          <p className="mt-1 h-4 truncate font-mono text-[11px] text-muted-foreground tabular-nums">{active ? `${active.label} · ${format(metric, active.value)}` : ""}</p>
-        ) : null}
       </div>
     </div>
   );
