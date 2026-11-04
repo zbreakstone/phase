@@ -10,7 +10,7 @@ import {
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 
-export type Panel = "curves" | "report";
+export type Panel = "report";
 
 interface Props {
   overlay: Overlay;
@@ -18,7 +18,6 @@ interface Props {
   /** The one panel open under the square, if any. */
   panel: Panel | null;
   onPanel: (p: Panel | null) => void;
-  curvesDisabled: boolean;
   /** Render just the rows, to sit inside another section. */
   bare?: boolean;
 }
@@ -38,7 +37,6 @@ const AGAINST: { id: Against; label: string }[] = [
 
 const PANELS: { id: Panel | "none"; label: string }[] = [
   { id: "none", label: "None" },
-  { id: "curves", label: "Curves" },
   { id: "report", label: "Contrast report" },
 ];
 
@@ -48,7 +46,6 @@ export function DisplaySettings({
   onOverlay,
   panel,
   onPanel,
-  curvesDisabled,
   bare,
 }: Props) {
   const printsContrast =
@@ -116,14 +113,8 @@ export function DisplaySettings({
               <SelectItem
                 key={m.id}
                 value={m.id}
-                disabled={m.id === "curves" && curvesDisabled}
               >
                 {m.label}
-                {m.id === "curves" && curvesDisabled ? (
-                  <span className="ml-1 text-[11px] text-muted-foreground">
-                    open a color first
-                  </span>
-                ) : null}
               </SelectItem>
             ))}
           </SelectContent>
