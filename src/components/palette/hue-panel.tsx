@@ -132,12 +132,62 @@ export function HuePanel({
         </div>
       </PanelSection>
 
-      <PanelSection>
+      <PanelSection className="space-y-6">
         <SourceEditor
           source={hue.source}
           analysis={generated.source}
           onChange={(source) => onChange({ source })}
         />
+        <div role="region" aria-labelledby="hue-steps" className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3
+              id="hue-steps"
+              className="flex items-center gap-1.5 text-sm font-semibold"
+            >
+              Steps
+              <Badge size="sm">{generated.shades.length}</Badge>
+            </h3>
+            {tuned > 0 ? (
+              <Button
+                variant="destructive"
+                size="xs"
+                onClick={() => setConfirming(true)}
+              >
+                Reset {tuned} tuned
+              </Button>
+            ) : null}
+          </div>
+          <ul>
+            {generated.shades.map((s) => (
+              <li key={s.grade}>
+                <button
+                  type="button"
+                  onClick={() => onOpenStep(s.grade)}
+                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <span
+                    aria-hidden
+                    className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15"
+                    style={{ backgroundColor: display(s) }}
+                  >
+                    {s.tweaked ? (
+                      <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-white mix-blend-difference" />
+                    ) : null}
+                  </span>
+                  <span className="w-9 font-mono text-xs tabular-nums">
+                    {s.grade}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                    {s.hex}
+                  </span>
+                  <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
+                    {contrastFromLuminance(1, s.luminance).toFixed(2)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </PanelSection>
 
       <PanelSection className="space-y-3">
@@ -196,61 +246,6 @@ export function HuePanel({
           decimals={def.chroma.decimals}
           onChange={setChroma}
         />
-      </PanelSection>
-
-      <PanelSection
-        role="region"
-        aria-labelledby="hue-steps"
-        className="space-y-2"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h3
-            id="hue-steps"
-            className="flex items-center gap-1.5 text-sm font-semibold"
-          >
-            Steps
-            <Badge size="sm">{generated.shades.length}</Badge>
-          </h3>
-          {tuned > 0 ? (
-            <Button
-              variant="destructive"
-              size="xs"
-              onClick={() => setConfirming(true)}
-            >
-              Reset {tuned} tuned
-            </Button>
-          ) : null}
-        </div>
-        <ul>
-          {generated.shades.map((s) => (
-            <li key={s.grade}>
-              <button
-                type="button"
-                onClick={() => onOpenStep(s.grade)}
-                className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-              >
-                <span
-                  aria-hidden
-                  className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15"
-                  style={{ backgroundColor: display(s) }}
-                >
-                  {s.tweaked ? (
-                    <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-white mix-blend-difference" />
-                  ) : null}
-                </span>
-                <span className="w-9 font-mono text-xs tabular-nums">
-                  {s.grade}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
-                  {s.hex}
-                </span>
-                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                  {contrastFromLuminance(1, s.luminance).toFixed(2)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
       </PanelSection>
 
       <ResetTweaksDialog
