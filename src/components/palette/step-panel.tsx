@@ -30,6 +30,8 @@ interface Props {
   onTweak: (patch: Partial<StepTweak>) => void;
   onResetStep: () => void;
   onResetAll: () => void;
+  /** Renders the Settings section, with the delete button passed in to sit at its end. */
+  settings: (danger: React.ReactNode) => React.ReactNode;
   /** Open the neighboring step, or null at either end. */
   onPrevious: (() => void) | null;
   onNext: (() => void) | null;
@@ -64,6 +66,7 @@ export function StepPanel({
   onTweak,
   onResetStep,
   onResetAll,
+  settings,
   onPrevious,
   onNext,
   stepActions,
@@ -285,28 +288,26 @@ export function StepPanel({
         </CollapsibleSection>
       ) : null}
 
-      {!shade.anchor ? (
-        <CollapsibleSection
-          id="danger"
-          title="Danger zone"
-          className="space-y-2"
-        >
-          <Button
-            variant="destructive"
-            className="w-full"
-            disabled={stepActions.stepLimit === "min"}
-            onClick={() => setDeleting(true)}
-          >
-            <Trash2 />
-            Delete step {shade.grade}
-          </Button>
-          {stepActions.stepLimit === "min" ? (
-            <p className="text-[11px] text-muted-foreground">
-              A scale needs at least 3 steps.
-            </p>
-          ) : null}
-        </CollapsibleSection>
-      ) : null}
+      {settings(
+        !shade.anchor ? (
+          <div className="mt-3 space-y-2">
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={stepActions.stepLimit === "min"}
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 />
+              Delete step {shade.grade}
+            </Button>
+            {stepActions.stepLimit === "min" ? (
+              <p className="text-[11px] text-muted-foreground">
+                A scale needs at least 3 steps.
+              </p>
+            ) : null}
+          </div>
+        ) : null,
+      )}
 
       <ConfirmDeleteDialog
         open={deleting}

@@ -1,5 +1,7 @@
 "use client";
 
+import type * as React from "react";
+
 import {
   Select,
   SelectContent,
@@ -20,6 +22,8 @@ interface Props {
   onPanel: (p: Panel | null) => void;
   /** Render just the rows, to sit inside another section. */
   bare?: boolean;
+  /** Extra content at the end of the section, such as a delete button. */
+  extra?: React.ReactNode;
 }
 
 const METRICS: { id: Metric; label: string }[] = [
@@ -47,6 +51,7 @@ export function DisplaySettings({
   panel,
   onPanel,
   bare,
+  extra,
 }: Props) {
   const printsContrast =
     overlay.metric === "contrast" || overlay.metric === "apca";
@@ -126,6 +131,7 @@ export function DisplaySettings({
   return (
     <CollapsibleSection id="display" title="Settings" className="space-y-3">
       {rows}
+      {extra}
     </CollapsibleSection>
   );
 }

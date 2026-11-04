@@ -336,6 +336,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   // A removed color can't stay open, so fall back to the level above.
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
   const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
+  const renderSettings = (danger: React.ReactNode) => (
+    <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} extra={danger} />
+  );
 
   useApplyAccent();
   const openHue = (hueId: string) => {
@@ -630,6 +633,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onPrevious={goStep(-1)}
                   onNext={goStep(1)}
                   stepActions={stepActions}
+                  settings={renderSettings}
                 />
               ) : focused ? (
                 <HuePanel
@@ -642,6 +646,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onResetTweaks={() => resetTweaks(focused.hue.id)}
                   onOpenStep={(g) => openStep(focused.hue.id, g)}
                   display={(shade) => displayShade(shade, overlay, state.gamut)}
+                  settings={renderSettings}
                 />
               ) : (
                 <>
@@ -651,7 +656,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null}
                 </SectionGroup>
               )}
             </ScrollFade>
