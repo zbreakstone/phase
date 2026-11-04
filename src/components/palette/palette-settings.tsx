@@ -26,10 +26,8 @@ import { RulesSettings } from "./scale-settings";
 interface Props {
   space: SpaceId;
   gamut: Gamut;
-  scale: ScaleConfig;
   onSpace: (space: SpaceId) => void;
   onGamut: (gamut: Gamut) => void;
-  onScale: (scale: ScaleConfig) => void;
   /** Replaces everything with the starter palette. Recorded in the undo history. */
   /** More display rows, shown in the same group as color space / gamut / theme. */
   display?: React.ReactNode;
@@ -80,14 +78,12 @@ function DescribedSelect<T extends string>({
   );
 }
 
-/** The settings you pick once per project: how colors are computed, which screens they target, and the contrast rules. */
+/** The settings you pick once per project: how colors are computed and which screens they target. */
 export function PaletteSettings({
   space,
   gamut,
-  scale,
   onSpace,
   onGamut,
-  onScale,
   display,
 }: Props) {
   const theme = React.useSyncExternalStore(
@@ -153,15 +149,15 @@ export function PaletteSettings({
         </SettingRow>
         {display}
       </CollapsibleSection>
-
-      <CollapsibleSection
-        id="rules"
-        title="Contrast rules"
-        count={scale.rules.length}
-        defaultOpen={false}
-      >
-        <RulesSettings scale={scale} onChange={onScale} />
-      </CollapsibleSection>
     </>
+  );
+}
+
+/** The contrast rules, which live at the bottom of the palette sidebar. */
+export function ContrastRulesSection({ scale, onScale }: { scale: ScaleConfig; onScale: (scale: ScaleConfig) => void }) {
+  return (
+    <CollapsibleSection id="rules" title="Contrast rules" count={scale.rules.length} defaultOpen={false}>
+      <RulesSettings scale={scale} onChange={onScale} />
+    </CollapsibleSection>
   );
 }

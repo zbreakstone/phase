@@ -30,7 +30,7 @@ import { AddColorEnd } from "./color-label";
 import { ColorsList } from "./colors-list";
 import { CurvesPanel } from "./curves-panel";
 import { HuePanel } from "./hue-panel";
-import { PaletteSettings } from "./palette-settings";
+import { ContrastRulesSection, PaletteSettings } from "./palette-settings";
 import { PaletteSquare, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
@@ -637,9 +637,10 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} scale={state.scale} onSpace={setSpace} onGamut={setGamut} onScale={setScale} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} />
+                  <ContrastRulesSection scale={state.scale} onScale={setScale} />
                 </>
               )}
               {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
