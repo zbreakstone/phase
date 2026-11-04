@@ -103,6 +103,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     (async () => {
       // A palette from the list, or a new one: neither starts from the last autosave.
       if (paletteId || fresh) {
+        // Coming back to a palette starts from its latest version with the history closed, not wherever it was left.
+        setHistoryOpen(false);
         try {
           if (paletteId) {
             const cloud = getCloud();
