@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -12,14 +11,6 @@ import {
 import { GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import type { ScaleConfig } from "@/lib/palette/types";
-import {
-  applyTheme,
-  readTheme,
-  subscribeTheme,
-  THEME_EVENT,
-  THEME_KEY,
-  type Theme,
-} from "@/lib/theme";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 import { RulesSettings } from "./scale-settings";
 
@@ -32,12 +23,6 @@ interface Props {
   /** More display rows, shown in the same group as color space / gamut / theme. */
   display?: React.ReactNode;
 }
-
-const THEMES: { id: Theme; label: string }[] = [
-  { id: "system", label: "System" },
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-];
 
 /** A select whose options each explain themselves, so the sidebar doesn't need paragraphs under it. */
 function DescribedSelect<T extends string>({
@@ -86,32 +71,6 @@ export function PaletteSettings({
   onGamut,
   display,
 }: Props) {
-  const theme = React.useSyncExternalStore(
-    subscribeTheme,
-    readTheme,
-    () => "system" as Theme,
-  );
-
-  React.useEffect(() => {
-    if (theme !== "system") return;
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const sync = () => applyTheme("system");
-    query.addEventListener("change", sync);
-    return () => query.removeEventListener("change", sync);
-  }, [theme]);
-
-  const pickTheme = (next: Theme) => {
-    try {
-      if (next === "system") window.localStorage.removeItem(THEME_KEY);
-      else window.localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // Private mode: the choice applies now but won't survive a reload.
-      toast.message("Couldn't remember your theme choice for next time.", { id: "theme-save" });
-    }
-    applyTheme(next);
-    window.dispatchEvent(new Event(THEME_EVENT));
-  };
-
   return (
     <>
       <CollapsibleSection id="display" title="Display" className="space-y-3">
@@ -137,14 +96,6 @@ export function PaletteSettings({
               label: GAMUTS[id].label,
               description: GAMUTS[id].description,
             }))}
-          />
-        </SettingRow>
-        <SettingRow id="settings-theme" label="Theme">
-          <DescribedSelect
-            id="settings-theme"
-            value={theme}
-            onChange={pickTheme}
-            options={THEMES}
           />
         </SettingRow>
         {display}

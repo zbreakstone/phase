@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Contrast, Eye, EyeOff, SwatchBook } from "lucide-react";
+import { Contrast, Eye, EyeOff, Moon, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
+import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import type { Overlay } from "@/lib/palette/overlay";
@@ -17,6 +18,14 @@ import { Crumbs, type Crumb } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 import { isPopupOpen, isTextEntry } from "./text-entry";
+import { useTheme } from "./use-theme";
+import type { Theme } from "@/lib/theme";
+
+const THEMES: { id: Theme; label: string }[] = [
+  { id: "system", label: "System" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
 
 type Lens = "luminance" | Exclude<VisionId, "normal">;
 
@@ -41,17 +50,23 @@ export function ViewToolbar({
   crumbs,
   mode,
   onMode,
+  grain,
+  onGrain,
 }: {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
   crumbs: Crumb[];
   mode: SquareMode;
   onMode: (m: SquareMode) => void;
+  grain: boolean;
+  onGrain: (on: boolean) => void;
 }) {
+  const [theme, pickTheme] = useTheme();
   // One switch turns the preview on and off; the dropdown picks the lens. The last lens is remembered while
   // the switch is off.
   const [last, setLast] = React.useState<Lens>("luminance");
   const [lensOpen, setLensOpen] = React.useState(false);
+  const [themeOpen, setThemeOpen] = React.useState(false);
   const active = overlay.grayscale || overlay.vision !== "normal";
   const lens: Lens = overlay.grayscale
     ? "luminance"
@@ -65,7 +80,7 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
-  // / turns the preview on and off, M opens the lens menu, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  // / turns the preview on and off, P opens the lens menu, T the theme menu, G toggles grain, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -80,7 +95,9 @@ export function ViewToolbar({
         e.key !== "/" &&
         e.key !== "[" &&
         e.key !== "]" &&
-        e.key.toLowerCase() !== "m"
+        e.key.toLowerCase() !== "p" &&
+        e.key.toLowerCase() !== "t" &&
+        e.key.toLowerCase() !== "g"
       )
         return;
       if (isTextEntry(e.target)) return;
@@ -92,8 +109,11 @@ export function ViewToolbar({
         return;
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);
-      else if (e.key.toLowerCase() === "m") setLensOpen(true);
-      else onMode(e.key === "[" ? "smooth" : "cells");
+      else if (e.key.toLowerCase() === "p") setLensOpen(true);
+      else if (e.key.toLowerCase() === "t") setThemeOpen(true);
+      else if (e.key.toLowerCase() === "g") {
+        if (mode === "smooth") onGrain(!grain);
+      } else onMode(e.key === "[" ? "smooth" : "cells");
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -116,11 +136,11 @@ export function ViewToolbar({
             apply(v as Lens);
           }}
         >
-          <Hint label="Preview mode" shortcut={["M"]}>
+          <Hint label="Change preview mode" shortcut={["P"]}>
             <SelectTrigger
               size="sm"
               className="w-40"
-              aria-label="Preview mode"
+              aria-label="Change preview mode"
             >
               <SelectValue />
             </SelectTrigger>
@@ -156,7 +176,28 @@ export function ViewToolbar({
           </Toggle>
         </Hint>
       </div>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <DropdownMenu open={themeOpen} onOpenChange={setThemeOpen}>
+          <Hint label="Change theme" shortcut={["T"]}>
+            <DropdownMenuTrigger aria-label="Change theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
+              {theme === "light" ? <Sun /> : theme === "dark" ? <Moon /> : <SunMoon />}
+            </DropdownMenuTrigger>
+          </Hint>
+          <DropdownMenuContent align="end" className="min-w-36">
+            <DropdownMenuRadioGroup value={theme} onValueChange={(v) => pickTheme(v as Theme)}>
+              {THEMES.map((t) => (
+                <DropdownMenuRadioItem key={t.id} value={t.id}>
+                  {t.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Hint label={mode === "smooth" ? "Toggle grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
+          <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Toggle grain">
+            <Wheat />
+          </Toggle>
+        </Hint>
         <ToggleGroup
           value={[mode]}
           onValueChange={(v) => v[0] && onMode(v[0] as SquareMode)}
@@ -165,13 +206,13 @@ export function ViewToolbar({
           spacing={0}
           aria-label="How the square is drawn"
         >
-          <Hint label="Smooth: colors melt into each other" shortcut={["["]}>
-            <ToggleGroupItem value="smooth" aria-label="Smooth">
+          <Hint label="Show gradient" shortcut={["["]}>
+            <ToggleGroupItem value="smooth" aria-label="Show gradient">
               <Contrast />
             </ToggleGroupItem>
           </Hint>
-          <Hint label="Cells: every swatch stays crisp" shortcut={["]"]}>
-            <ToggleGroupItem value="cells" aria-label="Cells">
+          <Hint label="Show swatches" shortcut={["]"]}>
+            <ToggleGroupItem value="cells" aria-label="Show swatches">
               <SwatchBook />
             </ToggleGroupItem>
           </Hint>
