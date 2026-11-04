@@ -5,14 +5,13 @@ import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { CollapsibleSection } from "./panel-section";
+import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
 
@@ -104,10 +103,7 @@ export function HuePanel({
   return (
     <>
       <CollapsibleSection id="details" title="Details" className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="color-name" className="text-xs font-semibold tracking-wide uppercase">
-            Name
-          </Label>
+        <SettingRow id="color-name" label="Name">
           <Input
             id="color-name"
             value={hue.name}
@@ -118,8 +114,9 @@ export function HuePanel({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
             }}
+            className="h-8 text-right text-xs"
           />
-        </div>
+        </SettingRow>
         <SourceEditor
           source={hue.source}
           analysis={generated.source}

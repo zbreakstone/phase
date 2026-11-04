@@ -3,8 +3,8 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { SettingRow } from "./panel-section";
 import { Switch } from "@/components/ui/switch";
 import { parseHex } from "@/lib/color/convert";
 import { readableOn } from "@/lib/color/contrast";
@@ -33,37 +33,45 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="base-color" className="text-xs font-semibold tracking-wide uppercase">
-        Base color
-      </Label>
-      <div className="flex items-center gap-2">
-        <Input
-          type="color"
-          aria-label="Pick a base color"
-          value={hex || "#3b82f6"}
-          onChange={(e) => apply(e.target.value)}
-          className="h-8 w-10 shrink-0 cursor-pointer rounded-lg p-0.5"
-        />
-        <Input
-          id="base-color"
-          placeholder="Optional, e.g. #3b82f6"
-          value={draft ?? hex}
-          aria-invalid={invalid ? true : undefined}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            const parsed = parseHex(e.target.value);
-            if (parsed) apply(parsed);
-          }}
-          onBlur={(e) => apply(e.target.value)}
-          className="h-8 font-mono text-xs"
-        />
-        {source ? (
-          <Button variant="ghost" size="icon-sm" aria-label="Remove base color" onClick={() => onChange(null)}>
-            <X />
-          </Button>
-        ) : null}
-      </div>
+    <div className="space-y-3">
+      <SettingRow id="base-color" label="Base color">
+        <div
+          className={cn(
+            "flex h-8 w-full items-center gap-2 rounded-lg bg-white pr-1 pl-1.5 shadow-(--shadow-default) hover:shadow-(--shadow-large) dark:bg-input/30 focus-within:ring-2 focus-within:ring-ring",
+            invalid && "ring-1 ring-destructive",
+          )}
+        >
+          <span className="relative size-5 shrink-0 overflow-hidden rounded-md ring-1 ring-foreground/15" style={{ backgroundColor: hex || undefined }}>
+            <input
+              type="color"
+              aria-label="Pick a base color"
+              value={hex || "#3b82f6"}
+              onChange={(e) => apply(e.target.value)}
+              className="absolute inset-0 size-full cursor-pointer opacity-0"
+            />
+          </span>
+          <input
+            id="base-color"
+            placeholder="Add color"
+            spellCheck={false}
+            value={(draft ?? hex).replace(/^#/, "").toUpperCase()}
+            aria-invalid={invalid ? true : undefined}
+            onChange={(e) => {
+              const text = e.target.value.replace(/^#/, "");
+              setDraft(text);
+              const parsed = parseHex(text);
+              if (parsed) apply(parsed);
+            }}
+            onBlur={(e) => apply(e.target.value)}
+            className="min-w-0 flex-1 bg-transparent font-mono text-xs uppercase outline-none placeholder:text-muted-foreground placeholder:normal-case"
+          />
+          {source ? (
+            <Button variant="ghost" size="icon-sm" className="size-6" aria-label="Remove base color" onClick={() => onChange(null)}>
+              <X />
+            </Button>
+          ) : null}
+        </div>
+      </SettingRow>
       {invalid ? <p className="text-[11px] text-destructive">Enter a hex color such as #3b82f6.</p> : null}
 
       {source && analysis ? (
@@ -81,12 +89,9 @@ export function SourceEditor({ source, analysis, onChange }: Props) {
                 ? `Already on step ${analysis.grade}.`
                 : `Moved to step ${analysis.grade} by changing lightness only. Hue and chroma are kept.`}
           </p>
-          <div className="flex items-center justify-between gap-3">
-            <Label htmlFor="pin" className="text-xs">
-              Keep my exact color
-            </Label>
+          <SettingRow id="pin" label="Keep exact color">
             <Switch id="pin" checked={source.pinned} onCheckedChange={(v) => onChange({ ...source, pinned: v })} />
-          </div>
+          </SettingRow>
         </>
       ) : (
         <p className="text-[11px] text-muted-foreground">
