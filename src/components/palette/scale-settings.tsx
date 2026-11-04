@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,6 @@ import {
   feasibleRange,
   maxRatioForDiff,
   ruleFeasibility,
-  systemGrades,
   targetLuminance,
 } from "@/lib/palette/scale";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
@@ -162,52 +161,37 @@ function materialize(scale: ScaleConfig): Record<string, number> {
   return out;
 }
 
-export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { referenceY: number }) {
-  const grades = systemGrades(scale).filter((g) => g > 0 && g < 1000);
-  const adjusted = scale.luminanceMode === "custom" ? Object.keys(scale.customLuminance).length > 0 : scale.luminanceMode === "uniform";
-
-  const setY = (grade: number, y: number) =>
-    onChange({
-      ...scale,
-      luminanceMode: "custom",
-      customLuminance: { ...(scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance), [String(grade)]: Math.min(1, Math.max(0, y)) },
-    });
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] text-muted-foreground">
-          Starts from Katie Riley&apos;s Envoy ranges and moves only as far as your contrast rules need. Drag a step or type a luminance to override it. The green band is the range that keeps every rule true.
-        </p>
-        {adjusted ? (
-          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>
-            <RotateCcw />
-            Reset
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="space-y-0.5">
-        <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 text-[10px] text-muted-foreground">
-          <span>Step</span>
-          <span className="flex justify-between">
-            <span>← Lighter</span>
-            <span>Darker →</span>
-          </span>
-          <span className="text-right" title="Relative luminance (WCAG Y): 1 is white, 0 is black. Contrast between two steps comes from the ratio of their luminance.">
-            Luminance
-          </span>
-          <span className="text-right">vs white</span>
-        </div>
-        {grades.map((g) => (
-          <TargetRow key={g} scale={scale} grade={g} referenceY={referenceY} onChange={(y) => setY(g, y)} />
-        ))}
-      </div>
-    </div>
-  );
+/** True when any step sits somewhere other than where its starting look puts it. */
+export function hasTargetOverrides(scale: ScaleConfig): boolean {
+  return scale.luminanceMode === "custom" ? Object.keys(scale.customLuminance).length > 0 : scale.luminanceMode === "uniform";
 }
 
-function TargetRow({ scale, grade, referenceY, onChange }: { scale: ScaleConfig; grade: number; referenceY: number; onChange: (y: number) => void }) {
+export function resetTargets(scale: ScaleConfig): ScaleConfig {
+  return { ...scale, luminanceMode: "envoy", customLuminance: {} };
+}
+
+/** Pins one step's luminance target. Every other step keeps following the rules. */
+export function setStepTarget(scale: ScaleConfig, grade: number, y: number): ScaleConfig {
+  return {
+    ...scale,
+    luminanceMode: "custom",
+    customLuminance: { ...(scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance), [String(grade)]: Math.min(1, Math.max(0, y)) },
+  };
+}
+
+export function isStepOverridden(scale: ScaleConfig, grade: number): boolean {
+  return scale.luminanceMode === "uniform" || (scale.luminanceMode === "custom" && String(grade) in scale.customLuminance);
+}
+
+export function clearStepTarget(scale: ScaleConfig, grade: number): ScaleConfig {
+  const base = scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance;
+  const { [String(grade)]: _removed, ...rest } = base;
+  void _removed;
+  return Object.keys(rest).length === 0 ? resetTargets(scale) : { ...scale, luminanceMode: "custom", customLuminance: rest };
+}
+
+/** One step's luminance target: a slider inside the window the rules allow, plus the exact value and its contrast against white. */
+export function StepTarget({ scale, grade, referenceY = 1, onChange }: { scale: ScaleConfig; grade: number; referenceY?: number; onChange: (y: number) => void }) {
   const y = targetLuminance(scale, grade);
   const range = feasibleRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
@@ -220,8 +204,7 @@ function TargetRow({ scale, grade, referenceY, onChange }: { scale: ScaleConfig;
   const [draft, setDraft] = React.useState<string | null>(null);
 
   return (
-    <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 py-0.5 hover:bg-muted/40">
-      <span className="font-mono text-xs tabular-nums">{grade}</span>
+    <div className="grid grid-cols-[1fr_4.5rem_3rem] items-center gap-2">
       <div className="relative py-1.5">
         <div aria-hidden className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 bg-muted" />
         <div
