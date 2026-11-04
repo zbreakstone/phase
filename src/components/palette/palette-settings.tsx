@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -11,6 +13,7 @@ import {
 import { GAMUTS, GAMUT_ORDER, type Gamut } from "@/lib/color/gamut";
 import { SPACES, SPACE_ORDER, type SpaceId } from "@/lib/color/spaces";
 import type { ScaleConfig } from "@/lib/palette/types";
+import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 import { RulesSettings } from "./scale-settings";
 
@@ -22,6 +25,10 @@ interface Props {
   /** Replaces everything with the starter palette. Recorded in the undo history. */
   /** More display rows, shown in the same group as color space / gamut / theme. */
   display?: React.ReactNode;
+  /** Deletes the saved palette and all its versions. Omitted when there is nothing saved to delete. */
+  onDelete?: () => void;
+  /** The palette's name, for the delete confirmation. */
+  name?: string;
 }
 
 /** A select whose options each explain themselves, so the sidebar doesn't need paragraphs under it. */
@@ -70,7 +77,11 @@ export function PaletteSettings({
   onSpace,
   onGamut,
   display,
+  onDelete,
+  name,
 }: Props) {
+  const [deleting, setDeleting] = React.useState(false);
+  const label = name?.trim() || "this palette";
   return (
     <>
       <CollapsibleSection id="display" title="Settings" className="space-y-3">
@@ -99,7 +110,21 @@ export function PaletteSettings({
           />
         </SettingRow>
         {display}
+        {onDelete ? (
+          <Button variant="destructive" className="mt-3 w-full" onClick={() => setDeleting(true)}>
+            <Trash2 />
+            Delete {label}
+          </Button>
+        ) : null}
       </CollapsibleSection>
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${label}?`}
+        description={`This removes ${label} and all of its versions. This can't be undone.`}
+        confirm="Delete palette"
+        onConfirm={() => onDelete?.()}
+      />
     </>
   );
 }

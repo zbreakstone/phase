@@ -21,7 +21,7 @@ import { MAX_GRADES, MIN_GRADES } from "@/lib/palette/scale";
 import { addStepBetween, midpointGrade, removeStep, renameStep } from "@/lib/palette/steps";
 import { setStepTweak } from "@/lib/palette/tweaks";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
-import { createPalette, createShare, getShared, loadLatest, renamePalette, saveVersion } from "@/lib/cloud/palettes";
+import { createPalette, createShare, deletePalette, getShared, loadLatest, renamePalette, saveVersion } from "@/lib/cloud/palettes";
 import { useSession } from "@/lib/cloud/use-session";
 import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
@@ -446,6 +446,19 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
     router.push("/");
   };
+  /** Deletes the saved palette and returns to the list, skipping the unsaved-changes prompt. */
+  const deleteCurrent = async () => {
+    const cloud = getCloud();
+    if (!cloud || !current) return;
+    try {
+      await deletePalette(cloud, current.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete that palette.");
+      return;
+    }
+    toast.success(`Deleted ${current.name}`);
+    router.push("/");
+  };
   const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
 
   // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
@@ -653,7 +666,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
                 </SectionGroup>
