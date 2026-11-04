@@ -11,7 +11,7 @@ import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { PanelSection } from "./panel-section";
+import { CollapsibleSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
 import { Hint } from "./hint";
@@ -103,7 +103,7 @@ export function HuePanel({
 
   return (
     <>
-      <PanelSection className="space-y-3">
+      <CollapsibleSection id="details" title="Details" className="space-y-6">
         <div className="flex items-center gap-2">
           <Input
             aria-label="Color name"
@@ -130,9 +130,6 @@ export function HuePanel({
             </Button>
           </Hint>
         </div>
-      </PanelSection>
-
-      <PanelSection className="space-y-6">
         <SourceEditor
           source={hue.source}
           analysis={generated.source}
@@ -142,7 +139,7 @@ export function HuePanel({
           <div className="flex items-center justify-between gap-2">
             <h3
               id="hue-steps"
-              className="flex items-center gap-1.5 text-sm font-semibold"
+              className="flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase"
             >
               Steps
               <Badge size="sm">{generated.shades.length}</Badge>
@@ -188,65 +185,67 @@ export function HuePanel({
             ))}
           </ul>
         </div>
-      </PanelSection>
+      </CollapsibleSection>
 
-      <PanelSection className="space-y-3">
-        <h3 className="text-sm font-semibold">Hue</h3>
-        <p className="text-[11px] text-muted-foreground">
-          Tints start at the lightest hue and end at the darkest one, so yellows
-          can turn orange instead of muddy olive. See the curve below the
-          square.
-        </p>
-        <SliderField
-          id="hue-light"
-          label="Lightest shade"
-          disabled={lockedLight}
-          hint={
-            lockedLight
-              ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it."
-              : undefined
-          }
-          value={hue.hueLight}
-          min={0}
-          max={360}
-          step={1}
-          unit="°"
-          onChange={(v) => onChange({ hueLight: v })}
-          trackStyle={lightGuide}
-        />
-        <SliderField
-          id="hue-dark"
-          label="Darkest shade"
-          disabled={lockedDark}
-          hint={
-            lockedDark
-              ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it."
-              : undefined
-          }
-          value={hue.hueDark}
-          min={0}
-          max={360}
-          step={1}
-          unit="°"
-          onChange={(v) => onChange({ hueDark: v })}
-          trackStyle={darkGuide}
-        />
-      </PanelSection>
+      <CollapsibleSection id="adjustments" title="Adjustments" className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold tracking-wide uppercase">Hue</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Tints start at the lightest hue and end at the darkest one, so yellows
+            can turn orange instead of muddy olive. See the curve below the
+            square.
+          </p>
+          <SliderField
+            id="hue-light"
+            label="Lightest shade"
+            disabled={lockedLight}
+            hint={
+              lockedLight
+                ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it."
+                : undefined
+            }
+            value={hue.hueLight}
+            min={0}
+            max={360}
+            step={1}
+            unit="°"
+            onChange={(v) => onChange({ hueLight: v })}
+            trackStyle={lightGuide}
+          />
+          <SliderField
+            id="hue-dark"
+            label="Darkest shade"
+            disabled={lockedDark}
+            hint={
+              lockedDark
+                ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it."
+                : undefined
+            }
+            value={hue.hueDark}
+            min={0}
+            max={360}
+            step={1}
+            unit="°"
+            onChange={(v) => onChange({ hueDark: v })}
+            trackStyle={darkGuide}
+          />
+        </div>
 
-      <PanelSection className="space-y-3">
-        <h3 className="text-sm font-semibold">Chroma</h3>
-        <SliderField
-          id="chroma"
-          label="Colorfulness"
-          disabled={lockedLight && lockedDark}
-          value={hue.chromaMid}
-          min={0}
-          max={def.chroma.max}
-          step={def.chroma.step}
-          decimals={def.chroma.decimals}
-          onChange={setChroma}
-        />
-      </PanelSection>
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold tracking-wide uppercase">Chroma</h3>
+          <SliderField
+            id="chroma"
+            label="Colorfulness"
+            disabled={lockedLight && lockedDark}
+            value={hue.chromaMid}
+            min={0}
+            max={def.chroma.max}
+            step={def.chroma.step}
+            decimals={def.chroma.decimals}
+            onChange={setChroma}
+          />
+        </div>
+      </CollapsibleSection>
 
       <ResetTweaksDialog
         open={confirming}

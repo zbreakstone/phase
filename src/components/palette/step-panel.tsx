@@ -12,7 +12,7 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import type { RGB } from "@/lib/color/convert";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { PanelSection } from "./panel-section";
+import { CollapsibleSection, PanelSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
 import { StepMenu, type StepHeaderActions } from "./step-header";
@@ -132,7 +132,7 @@ export function StepPanel({
         </div>
       </PanelSection>
 
-      <PanelSection>
+      <CollapsibleSection id="details" title="Details">
         <dl className="divide-y divide-border text-xs">
           {rows.map((r) => (
             <div
@@ -158,16 +158,13 @@ export function StepPanel({
             </div>
           ))}
         </dl>
-      </PanelSection>
+      </CollapsibleSection>
 
       {!shade.anchor ? (
-        <PanelSection className="space-y-3">
-          <div className="space-y-0.5">
-            <h3 className="text-sm font-semibold">Tune this step</h3>
-            <p className="text-[11px] text-muted-foreground">
-              Lightness doesn&apos;t change, so it keeps its contrast.
-            </p>
-          </div>
+        <CollapsibleSection id="adjustments" title="Adjustments" className="space-y-3">
+          <p className="text-[11px] text-muted-foreground">
+            Nudge the hue and colorfulness of this step. Lightness doesn&apos;t change, so it keeps its contrast.
+          </p>
           <SliderField
             id={`tune-hue-${shade.grade}`}
             label="Hue shift"
@@ -215,7 +212,7 @@ export function StepPanel({
               ) : null}
             </div>
           ) : null}
-        </PanelSection>
+        </CollapsibleSection>
       ) : null}
 
       {!shade.anchor ? (
