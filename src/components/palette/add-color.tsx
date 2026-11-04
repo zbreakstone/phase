@@ -57,8 +57,8 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={render}>{children}</PopoverTrigger>
-      <PopoverContent align={align} side={side} className="w-72 space-y-3">
-        <ColorPicker value={hex} format="hsba" onValueChange={(d) => set(d.value.toString("hex"))} className="flex-col gap-3">
+      <PopoverContent align={align} side={side} className="w-72 gap-0 p-0">
+        <ColorPicker value={hex} format="hsba" onValueChange={(d) => set(d.value.toString("hex"))} className="flex-col gap-3 p-2.5">
           <ColorPickerArea className="h-32">
             <ColorPickerAreaThumb />
           </ColorPickerArea>
@@ -74,40 +74,42 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
           </div>
         </ColorPicker>
 
-        <div className="space-y-2">
-          <Select items={GROUPS.map((g) => ({ value: g.id, label: g.label }))} value={groupId} onValueChange={(v) => v && setGroupId(v)}>
-            <SelectTrigger size="sm" className="w-full" aria-label="Quick picks">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {GROUPS.map((g) => (
-                <SelectItem key={g.id} value={g.id}>
-                  {g.label}
-                </SelectItem>
+        <div className="space-y-2.5 border-t border-border p-2.5">
+          <div className="space-y-2">
+            <Select items={GROUPS.map((g) => ({ value: g.id, label: g.label }))} value={groupId} onValueChange={(v) => v && setGroupId(v)}>
+              <SelectTrigger size="sm" className="w-full" aria-label="Quick picks">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUPS.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="grid grid-cols-9 gap-1">
+              {group.swatches.map((sw) => (
+                <button
+                  key={sw.hex}
+                  type="button"
+                  title={sw.name}
+                  aria-label={sw.name}
+                  aria-pressed={sw.hex.toLowerCase() === hex.toLowerCase()}
+                  onClick={() => set(sw.hex)}
+                  className={cn(
+                    "aspect-square rounded-md ring-1 ring-foreground/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    "aria-pressed:ring-2 aria-pressed:ring-foreground aria-pressed:ring-offset-1 aria-pressed:ring-offset-popover",
+                  )}
+                  style={{ backgroundColor: sw.hex }}
+                />
               ))}
-            </SelectContent>
-          </Select>
-          <div className="grid grid-cols-9 gap-1">
-            {group.swatches.map((sw) => (
-              <button
-                key={sw.hex}
-                type="button"
-                title={sw.name}
-                aria-label={sw.name}
-                aria-pressed={sw.hex.toLowerCase() === hex.toLowerCase()}
-                onClick={() => set(sw.hex)}
-                className={cn(
-                  "aspect-square rounded-md ring-1 ring-foreground/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                  "aria-pressed:ring-2 aria-pressed:ring-foreground aria-pressed:ring-offset-1 aria-pressed:ring-offset-popover",
-                )}
-                style={{ backgroundColor: sw.hex }}
-              />
-            ))}
+            </div>
           </div>
+          <Button className="w-full" onClick={submit}>
+            Add
+          </Button>
         </div>
-        <Button className="w-full" onClick={submit}>
-          Add
-        </Button>
       </PopoverContent>
     </Popover>
   );
