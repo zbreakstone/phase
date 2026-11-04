@@ -610,6 +610,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 <div ref={setHistorySlot} className="h-full" />
               ) : (
                 <>
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -644,7 +645,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                 </SectionGroup>
               )}
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} mode={mode} grain={grain} onGrain={setGrain} panel={openPanel} onPanel={setPanel} curvesDisabled={!focused} /> : null}
                 </>
               )}
             </ScrollFade>
