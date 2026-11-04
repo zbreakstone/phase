@@ -11,10 +11,10 @@ import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { PanelSection } from "./panel-section";
+import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
+import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
-import { Hint } from "./hint";
 
 interface Props {
   generated: GeneratedHue;
@@ -62,6 +62,7 @@ export function HuePanel({
   const lockedDark = generated.source?.grade === last?.grade && ramp.length > 1;
   const tuned = generated.shades.filter((s) => s.tweaked).length;
   const [confirming, setConfirming] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const lightGuide = React.useMemo(
     () =>
@@ -84,6 +85,16 @@ export function HuePanel({
     [space, gamut, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
 
+  const chromaGuide = React.useMemo(() => {
+    const y = ramp[Math.floor(ramp.length / 2)]?.targetLuminance ?? 0.2;
+    const h = (hue.hueLight + hue.hueDark) / 2;
+    const stops = Array.from({ length: 13 }, (_, i) => {
+      const c = solveForLuminance(def, y, h, (i / 12) * def.chroma.max, gamut);
+      return `${cssColor(c.hex, c.linear, gamut)} ${((i / 12) * 100).toFixed(1)}%`;
+    });
+    return { background: `linear-gradient(to right, ${stops.join(", ")})` } as React.CSSProperties;
+  }, [ramp, hue.hueLight, hue.hueDark, def, gamut]);
+
   const setChroma = (value: number) => {
     const factor = hue.chromaMid > 1e-9 ? value / hue.chromaMid : 0;
     if (hue.chromaMid > 1e-9) {
@@ -103,10 +114,10 @@ export function HuePanel({
 
   return (
     <>
-      <PanelSection className="space-y-3">
-        <div className="flex items-center gap-2">
+      <CollapsibleSection id="details" title="Details" className="space-y-6">
+        <SettingRow id="color-name" label="Name">
           <Input
-            aria-label="Color name"
+            id="color-name"
             value={hue.name}
             maxLength={32}
             placeholder="Unnamed"
@@ -115,24 +126,9 @@ export function HuePanel({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
             }}
-            // Reads as a title until you hover or click into it, like the palette name in the header. The
-            // negative margin lines the text up with the section's content while the field keeps its padding.
-            className="-ml-2 h-9 bg-transparent text-sm font-semibold shadow-none hover:bg-muted hover:shadow-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent dark:hover:bg-muted md:text-sm"
+            className="h-8 text-xs"
           />
-          <Hint label="Remove color">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove ${hue.name || "this color"}`}
-              onClick={onRemove}
-            >
-              <Trash2 />
-            </Button>
-          </Hint>
-        </div>
-      </PanelSection>
-
-      <PanelSection className="space-y-6">
+        </SettingRow>
         <SourceEditor
           source={hue.source}
           analysis={generated.source}
@@ -142,7 +138,7 @@ export function HuePanel({
           <div className="flex items-center justify-between gap-2">
             <h3
               id="hue-steps"
-              className="flex items-center gap-1.5 text-sm font-semibold"
+              className="flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase"
             >
               Steps
               <Badge size="sm">{generated.shades.length}</Badge>
@@ -157,17 +153,17 @@ export function HuePanel({
               </Button>
             ) : null}
           </div>
-          <ul>
+          <ul className="space-y-1.5">
             {generated.shades.map((s) => (
               <li key={s.grade}>
                 <button
                   type="button"
                   onClick={() => onOpenStep(s.grade)}
-                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="flex h-8 w-full items-center gap-2 rounded-lg bg-white pr-2.5 pl-1.5 text-left shadow-(--shadow-default) hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-input/30"
                 >
                   <span
                     aria-hidden
-                    className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15"
+                    className="relative size-5 shrink-0 rounded-md ring-1 ring-foreground/15"
                     style={{ backgroundColor: display(s) }}
                   >
                     {s.tweaked ? (
@@ -188,66 +184,84 @@ export function HuePanel({
             ))}
           </ul>
         </div>
-      </PanelSection>
+      </CollapsibleSection>
 
-      <PanelSection className="space-y-3">
-        <h3 className="text-sm font-semibold">Hue</h3>
-        <p className="text-[11px] text-muted-foreground">
-          Tints start at the lightest hue and end at the darkest one, so yellows
-          can turn orange instead of muddy olive. See the curve below the
-          square.
-        </p>
-        <SliderField
-          id="hue-light"
-          label="Lightest shade"
-          disabled={lockedLight}
-          hint={
-            lockedLight
-              ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it."
-              : undefined
-          }
-          value={hue.hueLight}
-          min={0}
-          max={360}
-          step={1}
-          unit="°"
-          onChange={(v) => onChange({ hueLight: v })}
-          trackStyle={lightGuide}
-        />
-        <SliderField
-          id="hue-dark"
-          label="Darkest shade"
-          disabled={lockedDark}
-          hint={
-            lockedDark
-              ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it."
-              : undefined
-          }
-          value={hue.hueDark}
-          min={0}
-          max={360}
-          step={1}
-          unit="°"
-          onChange={(v) => onChange({ hueDark: v })}
-          trackStyle={darkGuide}
-        />
-      </PanelSection>
+      <CollapsibleSection id="adjustments" title="Adjustments" className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold tracking-wide uppercase">Hue</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Tints start at the lightest hue and end at the darkest one, so yellows
+            can turn orange instead of muddy olive. See the curve below the
+            square.
+          </p>
+          <SliderField
+            id="hue-light"
+            label="Lightest shade"
+            disabled={lockedLight}
+            hint={
+              lockedLight
+                ? "Locked: your base color sits on the lightest step, so this end of the curve is fixed to its hue. Move the base color to a darker step to adjust it."
+                : undefined
+            }
+            value={hue.hueLight}
+            min={0}
+            max={360}
+            step={1}
+            unit="°"
+            onChange={(v) => onChange({ hueLight: v })}
+            trackStyle={lightGuide}
+          />
+          <SliderField
+            id="hue-dark"
+            label="Darkest shade"
+            disabled={lockedDark}
+            hint={
+              lockedDark
+                ? "Locked: your base color sits on the darkest step, so this end of the curve is fixed to its hue. Move the base color to a lighter step to adjust it."
+                : undefined
+            }
+            value={hue.hueDark}
+            min={0}
+            max={360}
+            step={1}
+            unit="°"
+            onChange={(v) => onChange({ hueDark: v })}
+            trackStyle={darkGuide}
+          />
+        </div>
 
-      <PanelSection className="space-y-3">
-        <h3 className="text-sm font-semibold">Chroma</h3>
-        <SliderField
-          id="chroma"
-          label="Colorfulness"
-          disabled={lockedLight && lockedDark}
-          value={hue.chromaMid}
-          min={0}
-          max={def.chroma.max}
-          step={def.chroma.step}
-          decimals={def.chroma.decimals}
-          onChange={setChroma}
-        />
-      </PanelSection>
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold tracking-wide uppercase">Chroma</h3>
+          <SliderField
+            id="chroma"
+            label="Colorfulness"
+            disabled={lockedLight && lockedDark}
+            value={hue.chromaMid}
+            min={0}
+            max={def.chroma.max}
+            step={def.chroma.step}
+            decimals={def.chroma.decimals}
+            trackStyle={chromaGuide}
+            onChange={setChroma}
+          />
+        </div>
+      </CollapsibleSection>
 
+      <CollapsibleSection id="danger" title="Danger zone">
+        <Button variant="destructive" className="w-full" onClick={() => setDeleting(true)}>
+          <Trash2 />
+          Delete {hue.name || "this color"}
+        </Button>
+      </CollapsibleSection>
+
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${hue.name || "this color"}?`}
+        description={`This removes ${hue.name || "this color"} and its ${tuned > 0 ? `${tuned} tuned ${tuned === 1 ? "step" : "steps"}` : "steps"} from the palette. You can undo it right after with ⌘Z.`}
+        confirm="Delete color"
+        onConfirm={onRemove}
+      />
       <ResetTweaksDialog
         open={confirming}
         onOpenChange={setConfirming}
