@@ -34,6 +34,15 @@ export function SettingRow({
   );
 }
 
+const SectionGroupContext = React.createContext<{ openId: string | null; setOpenId: (id: string | null) => void } | null>(null);
+
+/** Sections inside behave like an accordion: opening one closes the others. Without a group each section folds on its own. */
+export function SectionGroup({ defaultOpen = null, children }: { defaultOpen?: string | null; children: React.ReactNode }) {
+  const [openId, setOpenId] = React.useState<string | null>(defaultOpen);
+  const value = React.useMemo(() => ({ openId, setOpenId }), [openId]);
+  return <SectionGroupContext.Provider value={value}>{children}</SectionGroupContext.Provider>;
+}
+
 /**
  * A sidebar section with a semibold header that folds the body away. `action` sits at the right of the
  * header (e.g. an add button) and stays visible when the section is collapsed.
@@ -56,7 +65,10 @@ export function CollapsibleSection({
   className?: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = React.useState(defaultOpen);
+  const group = React.useContext(SectionGroupContext);
+  const [ownOpen, setOwnOpen] = React.useState(defaultOpen);
+  const open = group ? group.openId === id : ownOpen;
+  const toggle = () => (group ? group.setOpenId(open ? null : id) : setOwnOpen((o) => !o));
   return (
     <PanelSection role="region" aria-labelledby={`${id}-heading`}>
       <div className="flex min-h-8 items-center justify-between gap-2">
@@ -65,7 +77,7 @@ export function CollapsibleSection({
             type="button"
             aria-expanded={open}
             aria-controls={`${id}-body`}
-            onClick={() => setOpen((o) => !o)}
+            onClick={toggle}
             className="-mx-1 flex items-center gap-1 rounded-md px-1 py-0.5 outline-none hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             {title}
@@ -84,8 +96,18 @@ export function CollapsibleSection({
         </h2>
         {action}
       </div>
-      <div id={`${id}-body`} hidden={!open} className={cn("pt-3", className)}>
-        {children}
+      {/* Height animates through the grid row (0fr to 1fr); inert keeps a folded body out of the tab order. */}
+      <div
+        id={`${id}-body`}
+        inert={!open}
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className={cn("pt-3", className)}>{children}</div>
+        </div>
       </div>
     </PanelSection>
   );
