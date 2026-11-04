@@ -73,7 +73,7 @@ export function PaletteSettings({
 }: Props) {
   return (
     <>
-      <CollapsibleSection id="display" title="Display" className="space-y-3">
+      <CollapsibleSection id="display" title="Settings" className="space-y-3">
         <SettingRow id="settings-space" label="Color space">
           <DescribedSelect
             id="settings-space"

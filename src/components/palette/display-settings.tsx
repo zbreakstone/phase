@@ -124,7 +124,7 @@ export function DisplaySettings({
   );
   if (bare) return rows;
   return (
-    <CollapsibleSection id="display" title="Display" className="space-y-3">
+    <CollapsibleSection id="display" title="Settings" className="space-y-3">
       {rows}
     </CollapsibleSection>
   );
