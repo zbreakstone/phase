@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
@@ -14,7 +15,6 @@ import { SliderField } from "./fields";
 import { CollapsibleSection } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
-import { Hint } from "./hint";
 
 interface Props {
   generated: GeneratedHue;
@@ -104,9 +104,12 @@ export function HuePanel({
   return (
     <>
       <CollapsibleSection id="details" title="Details" className="space-y-6">
-        <div className="flex items-center gap-2">
+        <div className="space-y-2">
+          <Label htmlFor="color-name" className="text-xs font-semibold tracking-wide uppercase">
+            Name
+          </Label>
           <Input
-            aria-label="Color name"
+            id="color-name"
             value={hue.name}
             maxLength={32}
             placeholder="Unnamed"
@@ -115,20 +118,7 @@ export function HuePanel({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
             }}
-            // Reads as a title until you hover or click into it, like the palette name in the header. The
-            // negative margin lines the text up with the section's content while the field keeps its padding.
-            className="-ml-2 h-9 bg-transparent text-sm font-semibold shadow-none hover:bg-muted hover:shadow-none focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent dark:hover:bg-muted md:text-sm"
           />
-          <Hint label="Remove color">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove ${hue.name || "this color"}`}
-              onClick={onRemove}
-            >
-              <Trash2 />
-            </Button>
-          </Hint>
         </div>
         <SourceEditor
           source={hue.source}
@@ -245,6 +235,14 @@ export function HuePanel({
             onChange={setChroma}
           />
         </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection id="danger" title="Danger zone" className="space-y-2">
+        <p className="text-[11px] text-muted-foreground">Removes this color and its tuned steps from the palette.</p>
+        <Button variant="destructive" className="w-full" onClick={onRemove}>
+          <Trash2 />
+          Delete {hue.name || "this color"}
+        </Button>
       </CollapsibleSection>
 
       <ResetTweaksDialog
