@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { Gamut } from "@/lib/color/gamut";
-import { inGamut, maxChromaAt } from "@/lib/color/solve";
+import { type Gamut, toGamutSpace } from "@/lib/color/gamut";
+import { maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
@@ -39,8 +39,8 @@ interface Point {
   h: number;
 }
 
-const NX = 120;
-const NY = 72;
+const NX = 148;
+const NY = 90;
 const OKLCH = SPACES.oklch;
 
 const xAt = (t: number, lo: number, hi: number) => PAD_X + (hi === lo ? 0.5 : (t - lo) / (hi - lo)) * (W - PAD_X * 2);
@@ -64,7 +64,13 @@ function spline(p0: number, p1: number, p2: number, p3: number, t: number): numb
   return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3);
 }
 
-/** Where the screen can't show the color: lightness or hue values that clip, given the other two. `fill` is the hatched area, `edge` its outline. */
+/** How far a color is outside the screen's range: above 0 means it clips. Smooth, so the edge can be traced exactly. */
+function overshoot(rgb: [number, number, number], gamut: Gamut): number {
+  const c = toGamutSpace(rgb, gamut);
+  return Math.max(c[0] - 1, c[1] - 1, c[2] - 1, -c[0], -c[1], -c[2]);
+}
+
+/** Where the screen can't show the color: lightness or hue values that clip, given the other two. `fill` is the hatched area, `edge` its traced outline. */
 function unreachable(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): { fill: string; edge: string } {
   const [yMin, yMax] = domain;
   const ts = points.map((p) => p.t);
@@ -72,13 +78,20 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
   const hi = Math.max(...ts);
   const xs = points.map((p) => xAt(p.t, lo, hi));
   const cw = W / NX;
+  const ch = H / NY;
+  // Hues go the short way round the wheel between neighbors, so 350° to 20° doesn't sweep through every hue.
+  const hues = points.map((p) => p.h);
+  for (let n = 1; n < hues.length; n++) {
+    while (hues[n] - hues[n - 1] > 180) hues[n] -= 360;
+    while (hues[n] - hues[n - 1] < -180) hues[n] += 360;
+  }
   const vOfY = (y: number) => Math.min(yMax, Math.max(yMin, yMin + ((H - PAD_Y - y) / (H - PAD_Y * 2)) * (yMax - yMin)));
   const f1 = (n: number) => n.toFixed(1);
-  let fill = "";
-  let edge = "";
-  let prev: number[] = [];
-  for (let i = 0; i < NX; i++) {
-    const x = (i + 0.5) * cw;
+
+  // One value per grid corner.
+  const grid: number[][] = [];
+  for (let i = 0; i <= NX; i++) {
+    const x = i * cw;
     let k = 0;
     while (k < xs.length - 2 && x > xs[k + 1]) k++;
     const a = points[k];
@@ -88,48 +101,41 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
     const after = points[Math.min(points.length - 1, k + 2)];
     const L = spline(before.L, a.L, b.L, after.L, f);
     const C = Math.max(0, spline(before.C, a.C, b.C, after.C, f));
-    const h = spline(before.h, a.h, b.h, after.h, f);
-    const out = (y: number) => {
-      const v = vOfY(y);
-      const rgb = metric === "lightness" ? OKLCH.toLinear(v, C, h) : OKLCH.toLinear(L, C, ((v % 360) + 360) % 360);
-      return !inGamut(rgb, gamut);
-    };
-    // Sample down the column, then pin each in/out change to a fraction of a pixel.
-    const ys: number[] = [];
-    let runStart: number | null = null;
-    let last = out(0);
-    if (last) runStart = 0;
-    for (let j = 1; j <= NY; j++) {
-      const y = (j / NY) * H;
-      const now = out(y);
-      if (now !== last) {
-        let ya = ((j - 1) / NY) * H;
-        let yb = y;
-        for (let n = 0; n < 6; n++) {
-          const mid = (ya + yb) / 2;
-          if (out(mid) === last) ya = mid;
-          else yb = mid;
-        }
-        const edgeY = (ya + yb) / 2;
-        ys.push(edgeY);
-        if (now) runStart = edgeY;
-        else if (runStart !== null) {
-          fill += `M${f1(i * cw)} ${f1(runStart)}h${f1(cw + 0.3)}v${f1(edgeY - runStart)}h${f1(-cw - 0.3)}z`;
-          runStart = null;
-        }
-        last = now;
-      }
+    const h = spline(hues[Math.max(0, k - 1)], hues[k], hues[Math.min(k + 1, points.length - 1)], hues[Math.min(points.length - 1, k + 2)], f);
+    const col: number[] = [];
+    for (let j = 0; j <= NY; j++) {
+      const v = vOfY(j * ch);
+      col.push(overshoot(metric === "lightness" ? OKLCH.toLinear(v, C, h) : OKLCH.toLinear(L, C, ((v % 360) + 360) % 360), gamut));
     }
-    if (runStart !== null) fill += `M${f1(i * cw)} ${f1(runStart)}h${f1(cw + 0.3)}v${f1(H - runStart)}h${f1(-cw - 0.3)}z`;
-    // Join each change to the nearest one in the previous column, so the outline reads as a line.
-    if (i > 0) {
-      for (const y of ys) {
-        let best: number | null = null;
-        for (const p of prev) if (best === null || Math.abs(p - y) < Math.abs(best - y)) best = p;
-        if (best !== null && Math.abs(best - y) < 14) edge += `M${f1(x - cw)} ${f1(best)}L${f1(x)} ${f1(y)}`;
+    grid.push(col);
+  }
+
+  let fill = "";
+  let edge = "";
+  for (let i = 0; i < NX; i++) {
+    let runStart = -1;
+    for (let j = 0; j <= NY; j++) {
+      const out = j < NY && grid[i][j] + grid[i + 1][j] + grid[i][j + 1] + grid[i + 1][j + 1] > 0;
+      if (out && runStart < 0) runStart = j;
+      if (!out && runStart >= 0) {
+        fill += `M${f1(i * cw)} ${f1(runStart * ch)}h${f1(cw + 0.3)}v${f1((j - runStart) * ch)}h${f1(-cw - 0.3)}z`;
+        runStart = -1;
       }
+      if (j === NY) continue;
+      // Marching squares: where the edge crosses this square, by linear interpolation.
+      const v = [grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]];
+      const px = [i * cw, (i + 1) * cw, (i + 1) * cw, i * cw];
+      const py = [j * ch, j * ch, (j + 1) * ch, (j + 1) * ch];
+      const hits: [number, number][] = [];
+      for (let e = 0; e < 4; e++) {
+        const n = (e + 1) % 4;
+        if (v[e] > 0 !== v[n] > 0) {
+          const t = v[e] / (v[e] - v[n]);
+          hits.push([px[e] + (px[n] - px[e]) * t, py[e] + (py[n] - py[e]) * t]);
+        }
+      }
+      for (let m = 0; m + 1 < hits.length; m += 2) edge += `M${f1(hits[m][0])} ${f1(hits[m][1])}L${f1(hits[m + 1][0])} ${f1(hits[m + 1][1])}`;
     }
-    prev = ys;
   }
   return { fill, edge };
 }
