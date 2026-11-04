@@ -140,6 +140,73 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
   return { fill, edge };
 }
 
+const MORPH_MS = 380;
+
+interface Geo {
+  lines: { x: number; y: number }[][];
+}
+
+const sameShape = (a: Geo, b: Geo) => a.lines.length === b.lines.length && a.lines.every((l, i) => l.length === b.lines[i].length);
+
+const lerpGeo = (a: Geo, b: Geo, k: number): Geo => ({
+  lines: b.lines.map((l, i) => l.map((p, j) => ({ x: a.lines[i][j].x + (p.x - a.lines[i][j].x) * k, y: a.lines[i][j].y + (p.y - a.lines[i][j].y) * k }))),
+});
+
+/** Glides the lines to their new positions when a view changes but keeps the same shape. A different shape just swaps. */
+function useMorph(target: Geo | null): Geo | null {
+  const [shown, setShown] = React.useState(target);
+  const latest = React.useRef(target);
+  React.useEffect(() => {
+    const apply = (g: Geo | null) => {
+      latest.current = g;
+      setShown(g);
+    };
+    const from = latest.current;
+    if (!target || !from || !sameShape(from, target) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      apply(target);
+      return;
+    }
+    const start = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / MORPH_MS);
+      apply(lerpGeo(from, target, 1 - Math.pow(1 - k, 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return shown;
+}
+
+/** Keeps the previous layer around for a moment so it can fade out while the new one fades in. */
+function useCrossfade<T>(value: T, key: string): { current: T; previous: { key: string; value: T } | null } {
+  const [state, setState] = React.useState<{ key: string; value: T; previous: { key: string; value: T } | null }>({ key, value, previous: null });
+  if (state.key !== key) setState({ key, value, previous: { key: state.key, value: state.value } });
+  React.useEffect(() => {
+    if (!state.previous) return;
+    const t = window.setTimeout(() => setState((s) => ({ ...s, previous: null })), MORPH_MS);
+    return () => window.clearTimeout(t);
+  }, [state.key, state.previous]);
+  return { current: value, previous: state.previous };
+}
+
+/** The hatched areas and their outlines for one view. */
+function hatchMarks(layer: { cells: { fill: string; edge: string } | null; limit: { line: string; area: string } | null }, patternId: string) {
+  return (
+    <>
+      {layer.limit ? <path d={layer.limit.area} fill={`url(#${patternId}-hatch)`} /> : null}
+      {layer.cells ? (
+        <>
+          <path d={layer.cells.fill} fill={`url(#${patternId}-hatch)`} />
+          <path d={layer.cells.edge} fill="none" className="stroke-foreground/15" strokeWidth={1} strokeLinecap="round" />
+        </>
+      ) : null}
+      {layer.limit ? <path d={layer.limit.line} fill="none" className="stroke-foreground/15" strokeWidth={1} /> : null}
+    </>
+  );
+}
+
 /** Short label for the value row. */
 function short(metric: Metric, v: number): string {
   if (metric === "lightness") return (v * 100).toFixed(1);
@@ -236,25 +303,42 @@ export function PaletteChart({
     [metric, points, domain, gamut, showAll],
   );
 
-  if (points.length === 0) return null;
+  // Steps and colors both spread evenly across the width, inside the padding.
+  const scales = React.useMemo(() => {
+    const ts = points.map((p) => p.t);
+    const tLo = ts.length ? Math.min(...ts) : 0;
+    const tHi = ts.length ? Math.max(...ts) : 1;
+    const [yMin, yMax] = domain;
+    return {
+      tLo,
+      tHi,
+      xOf: (t: number) => xAt(t, tLo, tHi),
+      yOf: (v: number) => H - PAD_Y - ((Math.min(Math.max(v, yMin), yMax) - yMin) / (yMax - yMin)) * (H - PAD_Y * 2),
+    };
+  }, [points, domain]);
+  const { tLo, tHi, xOf, yOf } = scales;
 
-  // Steps spread by where they sit between white and black; colors spread evenly. Both stay inside the padding.
-  const ts = points.map((p) => p.t);
-  const tLo = Math.min(...ts);
-  const tHi = Math.max(...ts);
-  const xOf = (t: number) => xAt(t, tLo, tHi);
+  const geo = React.useMemo((): Geo | null => (points.length ? { lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))) } : null), [points, series, showAll, xOf, yOf]);
+  const morphed = useMorph(geo);
 
-  const [yMin, yMax] = domain;
-  const top = yMax;
-  const yOf = (v: number) => H - PAD_Y - ((Math.min(Math.max(v, yMin), yMax) - yMin) / (yMax - yMin)) * (H - PAD_Y * 2);
-  const xy = points.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }));
-  const line = smooth(xy);
-  const lines = showAll ? series.map((ss) => ({ key: ss[0]?.key ?? "", d: smooth(ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))), tone: (ss.find((p) => p.grade === level) ?? ss[Math.floor(ss.length / 2)]).hex })) : [];
   const showLimit = metric === "chroma" && !showAll;
-  const limitInner = showLimit ? points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? top) })) : [];
-  const limitPts = limitInner.length ? [{ x: 0, y: limitInner[0].y }, ...limitInner, { x: W, y: limitInner[limitInner.length - 1].y }] : [];
-  const limitLine = smooth(limitPts);
-  const hatch = showLimit ? `${limitLine} L${W} 0 L0 0 Z` : "";
+  const hatchLayer = React.useMemo(() => {
+    let limit: { line: string; area: string } | null = null;
+    if (showLimit && points.length) {
+      const inner = points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? domain[1]) }));
+      const line = smooth([{ x: 0, y: inner[0].y }, ...inner, { x: W, y: inner[inner.length - 1].y }]);
+      limit = { line, area: `${line} L${W} 0 L0 0 Z` };
+    }
+    return { cells: hatchCells, limit };
+  }, [showLimit, points, xOf, yOf, domain, hatchCells]);
+  const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}`;
+  const fade = useCrossfade(hatchLayer, viewKey);
+
+  if (points.length === 0 || !geo) return null;
+  const drawn = morphed && sameShape(morphed, geo) ? morphed : geo;
+
+  const paths = drawn.lines.map((l) => smooth(l));
+  const tones = showAll ? series.map((ss) => (ss.find((p) => p.grade === level) ?? ss[Math.floor(ss.length / 2)]).hex) : [];
   const gradientId = `${patternId}-line`;
 
   const active = points.find((p) => p.key === hover) ?? (focused && focusGrade !== null ? points.find((p) => p.grade === focusGrade) : null) ?? null;
@@ -274,82 +358,7 @@ export function PaletteChart({
 
   return (
     <div>
-      <div className="relative">
-      <svg
-        role="img"
-        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
-        viewBox={`0 0 ${W} ${H}`}
-        className="block h-auto w-full touch-none"
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-      >
-        <defs>
-          <pattern id={`${patternId}-hatch`} width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1={0} y1={0} x2={0} y2={4} className="stroke-foreground/15" strokeWidth={1} />
-          </pattern>
-          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={xOf(tLo)} x2={xOf(tHi)} y1={0} y2={0}>
-            {points.map((p) => (
-              <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />
-            ))}
-          </linearGradient>
-        </defs>
-        <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
-        {showLimit ? <path d={hatch} fill={`url(#${patternId}-hatch)`} /> : null}
-        {hatchCells ? (
-          <>
-            <path d={hatchCells.fill} fill={`url(#${patternId}-hatch)`} />
-            <path d={hatchCells.edge} fill="none" className="stroke-foreground/15" strokeWidth={1} strokeLinecap="round" />
-          </>
-        ) : null}
-        {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/15" strokeWidth={1} /> : null}
-        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H} className="stroke-foreground/25" strokeWidth={1} /> : null}
-        {showAll ? (
-          series.map((ss, n) => <path key={generated[n]?.hue.id ?? n} d={lines[n].d} fill="none" stroke={lines[n].tone} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />)
-        ) : (
-          <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </svg>
-      {(showAll ? (activeIndex >= 0 ? series.map((ss) => ss[activeIndex]) : []) : points).map((p, n) => {
-        const on = showAll || active?.key === p.key;
-        const x = xOf(p.t);
-        return (
-          <span
-            key={`${n}-${p.key}`}
-            aria-hidden
-            className={cn(
-              "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
-              on && !showAll ? "size-3.5" : "size-2.5",
-            )}
-            style={{ left: `${(x / W) * 100}%`, top: `${(yOf(p.value) / H) * 100}%`, backgroundColor: p.hex }}
-          />
-        );
-      })}
-      {!focused && active ? (
-        <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
-          {active.label}
-        </p>
-      ) : null}
-      </div>
-      <div
-        aria-hidden
-        className="h-0.5"
-        style={{ background: `linear-gradient(to right, ${points.map((p) => `${p.hex} ${((xOf(p.t) / W) * 100).toFixed(1)}%`).join(", ")})` }}
-      />
-      <div className="relative h-7" aria-hidden>
-        {points.map((p, i) => shown[i] && (
-          <span
-            key={p.key}
-            className={cn(
-              "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-[10px] tabular-nums transition-colors",
-              active?.key === p.key ? "font-medium text-foreground" : "text-muted-foreground",
-            )}
-            style={{ left: `${(xOf(p.t) / W) * 100}%` }}
-          >
-            {showAll ? p.label : short(metric, p.value)}
-          </span>
-        ))}
-      </div>
-      <div className="px-5 pt-2 pb-3">
+      <div className="px-5 pt-3 pb-2">
       <div className="flex items-center justify-between gap-2">
           <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
             {METRICS.map((m) => (
@@ -393,6 +402,77 @@ export function PaletteChart({
             </Select>
           )}
         </div>
+      </div>
+      <div key={`${showAll}|${focused?.hue.id ?? ""}`} className="animate-in fade-in relative duration-300">
+      <svg
+        role="img"
+        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
+        viewBox={`0 0 ${W} ${H}`}
+        className="block h-auto w-full touch-none"
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <defs>
+          <pattern id={`${patternId}-hatch`} width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1={0} y1={0} x2={0} y2={4} className="stroke-foreground/15" strokeWidth={1} />
+          </pattern>
+          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={xOf(tLo)} x2={xOf(tHi)} y1={0} y2={0}>
+            {points.map((p) => (
+              <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />
+            ))}
+          </linearGradient>
+        </defs>
+        <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
+        {fade.previous ? (
+          <g key={`prev-${fade.previous.key}`} className="animate-out fade-out-0 fill-mode-forwards duration-300">
+            {hatchMarks(fade.previous.value, patternId)}
+          </g>
+        ) : null}
+        <g key={viewKey} className="animate-in fade-in fill-mode-backwards duration-300">
+          {hatchMarks(fade.current, patternId)}
+        </g>
+        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H} className="stroke-foreground/25" strokeWidth={1} /> : null}
+        {showAll ? (
+          series.map((ss, n) => <path key={generated[n]?.hue.id ?? n} d={paths[n]} fill="none" stroke={tones[n]} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />)
+        ) : (
+          <path d={paths[0]} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        )}
+      </svg>
+      {(showAll ? (activeIndex >= 0 ? series.map((ss, n) => ({ p: ss[activeIndex], at: drawn.lines[n][activeIndex] })) : []) : points.map((p, i) => ({ p, at: drawn.lines[0][i] }))).map(({ p, at }, n) => (
+        <span
+          key={`${n}-${p.key}`}
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
+            !showAll && active?.key === p.key ? "size-3.5" : "size-2.5",
+          )}
+          style={{ left: `${(at.x / W) * 100}%`, top: `${(at.y / H) * 100}%`, backgroundColor: p.hex }}
+        />
+      ))}
+      {!focused && active ? (
+        <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
+          {active.label}
+        </p>
+      ) : null}
+      </div>
+      <div
+        aria-hidden
+        className="h-0.5"
+        style={{ background: `linear-gradient(to right, ${points.map((p) => `${p.hex} ${((xOf(p.t) / W) * 100).toFixed(1)}%`).join(", ")})` }}
+      />
+      <div className="relative h-7" aria-hidden>
+        {points.map((p, i) => shown[i] && (
+          <span
+            key={p.key}
+            className={cn(
+              "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-[10px] tabular-nums transition-colors",
+              active?.key === p.key ? "font-medium text-foreground" : "text-muted-foreground",
+            )}
+            style={{ left: `${(xOf(p.t) / W) * 100}%` }}
+          >
+            {showAll ? p.label : short(metric, p.value)}
+          </span>
+        ))}
       </div>
     </div>
   );
