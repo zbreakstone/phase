@@ -39,8 +39,8 @@ interface Point {
   h: number;
 }
 
-const NX = 64;
-const NY = 40;
+const NX = 120;
+const NY = 72;
 const OKLCH = SPACES.oklch;
 
 const xAt = (t: number, lo: number, hi: number) => PAD_X + (hi === lo ? 0.5 : (t - lo) / (hi - lo)) * (W - PAD_X * 2);
@@ -57,16 +57,26 @@ function domainFor(metric: Metric, points: Point[]): [number, number] {
   return [start, start + span];
 }
 
-/** Hatched cells where the screen can't show the color: lightness or hue values that clip, given the other two. */
-function unreachable(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): string {
+/** Catmull-Rom through four values, so the area around the line bends the way the line does. */
+function spline(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3);
+}
+
+/** Where the screen can't show the color: lightness or hue values that clip, given the other two. `fill` is the hatched area, `edge` its outline. */
+function unreachable(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): { fill: string; edge: string } {
   const [yMin, yMax] = domain;
   const ts = points.map((p) => p.t);
   const lo = Math.min(...ts);
   const hi = Math.max(...ts);
   const xs = points.map((p) => xAt(p.t, lo, hi));
   const cw = W / NX;
-  const ch = H / NY;
-  let d = "";
+  const vOfY = (y: number) => Math.min(yMax, Math.max(yMin, yMin + ((H - PAD_Y - y) / (H - PAD_Y * 2)) * (yMax - yMin)));
+  const f1 = (n: number) => n.toFixed(1);
+  let fill = "";
+  let edge = "";
+  let prev: number[] = [];
   for (let i = 0; i < NX; i++) {
     const x = (i + 0.5) * cw;
     let k = 0;
@@ -74,26 +84,54 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
     const a = points[k];
     const b = points[Math.min(k + 1, points.length - 1)];
     const f = xs[k + 1] === undefined || xs[k + 1] === xs[k] ? 0 : Math.min(1, Math.max(0, (x - xs[k]) / (xs[k + 1] - xs[k])));
-    const L = a.L + (b.L - a.L) * f;
-    const C = a.C + (b.C - a.C) * f;
-    const h = a.h + (b.h - a.h) * f;
-    let runStart = -1;
-    for (let j = 0; j <= NY; j++) {
-      let out = false;
-      if (j < NY) {
-        const y = (j + 0.5) * ch;
-        const v = Math.min(yMax, Math.max(yMin, yMin + ((H - PAD_Y - y) / (H - PAD_Y * 2)) * (yMax - yMin)));
-        const rgb = metric === "lightness" ? OKLCH.toLinear(v, C, h) : OKLCH.toLinear(L, C, ((v % 360) + 360) % 360);
-        out = !inGamut(rgb, gamut);
-      }
-      if (out && runStart < 0) runStart = j;
-      if (!out && runStart >= 0) {
-        d += `M${(i * cw).toFixed(1)} ${(runStart * ch).toFixed(1)}h${(cw + 0.3).toFixed(1)}v${((j - runStart) * ch).toFixed(1)}h${(-cw - 0.3).toFixed(1)}z`;
-        runStart = -1;
+    const before = points[Math.max(0, k - 1)];
+    const after = points[Math.min(points.length - 1, k + 2)];
+    const L = spline(before.L, a.L, b.L, after.L, f);
+    const C = Math.max(0, spline(before.C, a.C, b.C, after.C, f));
+    const h = spline(before.h, a.h, b.h, after.h, f);
+    const out = (y: number) => {
+      const v = vOfY(y);
+      const rgb = metric === "lightness" ? OKLCH.toLinear(v, C, h) : OKLCH.toLinear(L, C, ((v % 360) + 360) % 360);
+      return !inGamut(rgb, gamut);
+    };
+    // Sample down the column, then pin each in/out change to a fraction of a pixel.
+    const ys: number[] = [];
+    let runStart: number | null = null;
+    let last = out(0);
+    if (last) runStart = 0;
+    for (let j = 1; j <= NY; j++) {
+      const y = (j / NY) * H;
+      const now = out(y);
+      if (now !== last) {
+        let ya = ((j - 1) / NY) * H;
+        let yb = y;
+        for (let n = 0; n < 6; n++) {
+          const mid = (ya + yb) / 2;
+          if (out(mid) === last) ya = mid;
+          else yb = mid;
+        }
+        const edgeY = (ya + yb) / 2;
+        ys.push(edgeY);
+        if (now) runStart = edgeY;
+        else if (runStart !== null) {
+          fill += `M${f1(i * cw)} ${f1(runStart)}h${f1(cw + 0.3)}v${f1(edgeY - runStart)}h${f1(-cw - 0.3)}z`;
+          runStart = null;
+        }
+        last = now;
       }
     }
+    if (runStart !== null) fill += `M${f1(i * cw)} ${f1(runStart)}h${f1(cw + 0.3)}v${f1(H - runStart)}h${f1(-cw - 0.3)}z`;
+    // Join each change to the nearest one in the previous column, so the outline reads as a line.
+    if (i > 0) {
+      for (const y of ys) {
+        let best: number | null = null;
+        for (const p of prev) if (best === null || Math.abs(p - y) < Math.abs(best - y)) best = p;
+        if (best !== null && Math.abs(best - y) < 14) edge += `M${f1(x - cw)} ${f1(best)}L${f1(x)} ${f1(y)}`;
+      }
+    }
+    prev = ys;
   }
-  return d;
+  return { fill, edge };
 }
 
 /** Short label for the value row. */
@@ -178,7 +216,7 @@ export function PaletteChart({
 
   const domain = React.useMemo(() => (points.length ? domainFor(metric, points) : ([0, 1] as [number, number])), [metric, points]);
   const hatchCells = React.useMemo(
-    () => (points.length && metric !== "chroma" ? unreachable(metric, points, domain, gamut) : ""),
+    () => (points.length && metric !== "chroma" ? unreachable(metric, points, domain, gamut) : null),
     [metric, points, domain, gamut],
   );
 
@@ -212,12 +250,46 @@ export function PaletteChart({
 
   return (
     <div>
+      <svg
+        role="img"
+        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : `of every color at step ${level}`}`}
+        viewBox={`0 0 ${W} ${H}`}
+        className="block h-auto w-full touch-none"
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <defs>
+          <pattern id={`${patternId}-hatch`} width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1={0} y1={0} x2={0} y2={4} className="stroke-foreground/30" strokeWidth={1} />
+          </pattern>
+          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={xOf(tLo)} x2={xOf(tHi)} y1={0} y2={0}>
+            {points.map((p) => (
+              <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />
+            ))}
+          </linearGradient>
+        </defs>
+        <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
+        {showLimit ? <path d={hatch} fill={`url(#${patternId}-hatch)`} /> : null}
+        {hatchCells ? (
+          <>
+            <path d={hatchCells.fill} fill={`url(#${patternId}-hatch)`} />
+            <path d={hatchCells.edge} fill="none" className="stroke-foreground/35" strokeWidth={1} strokeLinecap="round" />
+          </>
+        ) : null}
+        {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/40" strokeWidth={1} /> : null}
+        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
+        <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => {
+          const on = active?.key === p.key;
+          return <circle key={p.key} cx={xy[i].x} cy={xy[i].y} r={on ? 4.5 : 3} fill={p.hex} stroke="white" strokeWidth={on ? 2 : 1.5} />;
+        })}
+      </svg>
       <div
         aria-hidden
         className="h-0.5"
         style={{ background: `linear-gradient(to right, ${points.map((p) => `${p.hex} ${((xOf(p.t) / W) * 100).toFixed(1)}%`).join(", ")})` }}
       />
-      <div className="relative h-7 border-b border-border/60 bg-muted/30" aria-hidden>
+      <div className="relative h-7 bg-muted/30" aria-hidden>
         {points.map((p) => (
           <span
             key={p.key}
@@ -231,35 +303,6 @@ export function PaletteChart({
           </span>
         ))}
       </div>
-      <svg
-        role="img"
-        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : `of every color at step ${level}`}`}
-        viewBox={`0 0 ${W} ${H}`}
-        className="block h-auto w-full touch-none"
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-      >
-        <defs>
-          <pattern id={`${patternId}-hatch`} width={4} height={4} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1={0} y1={0} x2={0} y2={4} className="stroke-foreground/15" strokeWidth={1} />
-          </pattern>
-          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={xOf(tLo)} x2={xOf(tHi)} y1={0} y2={0}>
-            {points.map((p) => (
-              <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />
-            ))}
-          </linearGradient>
-        </defs>
-        <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
-        {showLimit ? <path d={hatch} fill={`url(#${patternId}-hatch)`} /> : null}
-        {hatchCells ? <path d={hatchCells} fill={`url(#${patternId}-hatch)`} /> : null}
-        {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/20" strokeWidth={1} /> : null}
-        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
-        <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => {
-          const on = active?.key === p.key;
-          return <circle key={p.key} cx={xy[i].x} cy={xy[i].y} r={on ? 4.5 : 3} fill={p.hex} stroke="white" strokeWidth={on ? 2 : 1.5} />;
-        })}
-      </svg>
       <div className="px-5 pt-2 pb-3">
       <div className="flex items-center justify-between gap-2">
           <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
