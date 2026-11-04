@@ -279,10 +279,10 @@ export function PaletteChart({
         {hatchCells ? (
           <>
             <path d={hatchCells.fill} fill={`url(#${patternId}-hatch)`} />
-            <path d={hatchCells.edge} fill="none" className="stroke-foreground/25" strokeWidth={1} strokeLinecap="round" />
+            <path d={hatchCells.edge} fill="none" className="stroke-foreground/15" strokeWidth={1} strokeLinecap="round" />
           </>
         ) : null}
-        {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/25" strokeWidth={1} /> : null}
+        {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/15" strokeWidth={1} /> : null}
         {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
         <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => {
