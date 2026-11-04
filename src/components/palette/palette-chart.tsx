@@ -17,7 +17,7 @@ const METRICS: { id: Metric; label: string; title: string }[] = [
 ];
 
 const W = 296;
-const H = 108;
+const H = 128;
 const PAD_X = 20;
 const PAD_Y = 12;
 
@@ -46,9 +46,9 @@ const OKLCH = SPACES.oklch;
 const xAt = (t: number, lo: number, hi: number) => PAD_X + (hi === lo ? 0.5 : (t - lo) / (hi - lo)) * (W - PAD_X * 2);
 
 /** What the y axis covers for a metric. Hue zooms in on where the colors are so the line has some shape. */
-function domainFor(metric: Metric, points: Point[]): [number, number] {
+function domainFor(metric: Metric, points: Point[], useLimit = true): [number, number] {
   if (metric === "lightness") return [0, 1];
-  if (metric === "chroma") return [0, Math.max(0.1, ...points.flatMap((p) => [p.value, p.limit ?? 0]))];
+  if (metric === "chroma") return [0, Math.max(0.1, ...points.flatMap((p) => [p.value, useLimit ? (p.limit ?? 0) : 0]))];
   const hs = points.map((p) => p.value);
   const lo = Math.min(...hs);
   const hi = Math.max(...hs);
@@ -188,16 +188,18 @@ export function PaletteChart({
   gamut: Gamut;
 }) {
   const [metric, setMetric] = React.useState<Metric>("chroma");
-  const [grade, setGrade] = React.useState(500);
+  const [grade, setGrade] = React.useState<number | "all">(500);
   const [hover, setHover] = React.useState<string | null>(null);
   const patternId = React.useId().replace(/:/g, "");
   const def = SPACES[space];
 
   const focused = generated.find((g) => g.hue.id === focusId) ?? null;
   const grades = React.useMemo(() => [...new Set(generated.flatMap((g) => g.shades.map((s) => s.grade)))].sort((a, b) => a - b), [generated]);
-  const level = grades.length ? grades.reduce((best, g) => (Math.abs(g - grade) < Math.abs(best - grade) ? g : best), grades[0]) : grade;
+  const showAll = !focused && grade === "all";
+  const target = grade === "all" ? 500 : grade;
+  const level = grades.length ? grades.reduce((best, g) => (Math.abs(g - target) < Math.abs(best - target) ? g : best), grades[0]) : target;
 
-  const points: Point[] = React.useMemo(() => {
+  const { points, series } = React.useMemo((): { points: Point[]; series: Point[][] } => {
     const make = (s: Shade, key: string, label: string, t: number): Point => ({
       key,
       label,
@@ -211,19 +213,27 @@ export function PaletteChart({
       C: s.oklch.C,
       h: s.oklch.h,
     });
+    const steps = (g: GeneratedHue) =>
+      [...g.shades].sort((a, b) => a.grade - b.grade).map((s, i, all) => make(s, String(s.grade), String(s.grade), all.length > 1 ? i / (all.length - 1) : 0.5));
     if (focused) {
-      return [...focused.shades].sort((a, b) => a.grade - b.grade).map((s, i, all) => make(s, String(s.grade), String(s.grade), all.length > 1 ? i / (all.length - 1) : 0.5));
+      const pts = steps(focused);
+      return { points: pts, series: [pts] };
     }
-    return generated.flatMap((g, i) => {
+    if (showAll) {
+      const all = generated.map(steps);
+      return { points: all[0] ?? [], series: all };
+    }
+    const pts = generated.flatMap((g, i) => {
       const s = g.shades.find((x) => x.grade === level);
       return s ? [make(s, g.hue.id, g.hue.name || "Unnamed", generated.length > 1 ? i / (generated.length - 1) : 0.5)] : [];
     });
-  }, [focused, generated, level, metric, def, gamut]);
+    return { points: pts, series: [pts] };
+  }, [focused, showAll, generated, level, metric, def, gamut]);
 
-  const domain = React.useMemo(() => (points.length ? domainFor(metric, points) : ([0, 1] as [number, number])), [metric, points]);
+  const domain = React.useMemo(() => (points.length ? domainFor(metric, showAll ? series.flat() : points, !showAll) : ([0, 1] as [number, number])), [metric, points, series, showAll]);
   const hatchCells = React.useMemo(
-    () => (points.length && metric !== "chroma" ? unreachable(metric, points, domain, gamut) : null),
-    [metric, points, domain, gamut],
+    () => (points.length && metric !== "chroma" && !showAll ? unreachable(metric, points, domain, gamut) : null),
+    [metric, points, domain, gamut, showAll],
   );
 
   if (points.length === 0) return null;
@@ -239,7 +249,8 @@ export function PaletteChart({
   const yOf = (v: number) => H - PAD_Y - ((Math.min(Math.max(v, yMin), yMax) - yMin) / (yMax - yMin)) * (H - PAD_Y * 2);
   const xy = points.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }));
   const line = smooth(xy);
-  const showLimit = metric === "chroma";
+  const lines = showAll ? series.map((ss) => ({ key: ss[0]?.key ?? "", d: smooth(ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))), tone: (ss.find((p) => p.grade === level) ?? ss[Math.floor(ss.length / 2)]).hex })) : [];
+  const showLimit = metric === "chroma" && !showAll;
   const limitInner = showLimit ? points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? top) })) : [];
   const limitPts = limitInner.length ? [{ x: 0, y: limitInner[0].y }, ...limitInner, { x: W, y: limitInner[limitInner.length - 1].y }] : [];
   const limitLine = smooth(limitPts);
@@ -266,7 +277,7 @@ export function PaletteChart({
       <div className="relative">
       <svg
         role="img"
-        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : `of every color at step ${level}`}`}
+        aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
         viewBox={`0 0 ${W} ${H}`}
         className="block h-auto w-full touch-none"
         onPointerMove={onMove}
@@ -292,19 +303,27 @@ export function PaletteChart({
         ) : null}
         {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/15" strokeWidth={1} /> : null}
         {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H} className="stroke-foreground/25" strokeWidth={1} /> : null}
-        <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        {showAll ? (
+          series.map((ss, n) => <path key={generated[n]?.hue.id ?? n} d={lines[n].d} fill="none" stroke={lines[n].tone} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />)
+        ) : (
+          <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        )}
       </svg>
-      {points.map((p, i) => (
-        <span
-          key={p.key}
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
-            active?.key === p.key ? "size-3" : "size-2",
-          )}
-          style={{ left: `${(xy[i].x / W) * 100}%`, top: `${(xy[i].y / H) * 100}%`, backgroundColor: p.hex }}
-        />
-      ))}
+      {(showAll ? (activeIndex >= 0 ? series.map((ss) => ss[activeIndex]) : []) : points).map((p, n) => {
+        const on = showAll || active?.key === p.key;
+        const x = xOf(p.t);
+        return (
+          <span
+            key={`${n}-${p.key}`}
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
+              on && !showAll ? "size-3.5" : "size-2.5",
+            )}
+            style={{ left: `${(x / W) * 100}%`, top: `${(yOf(p.value) / H) * 100}%`, backgroundColor: p.hex }}
+          />
+        );
+      })}
       {!focused && active ? (
         <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
           {active.label}
@@ -326,7 +345,7 @@ export function PaletteChart({
             )}
             style={{ left: `${(xOf(p.t) / W) * 100}%` }}
           >
-            {short(metric, p.value)}
+            {showAll ? p.label : short(metric, p.value)}
           </span>
         ))}
       </div>
@@ -355,11 +374,16 @@ export function PaletteChart({
               {active ? ` · ${active.label} · ${format(metric, active.value)}` : ""}
             </p>
           ) : (
-            <Select items={grades.map((g) => ({ value: String(g), label: `Step ${g}` }))} value={String(level)} onValueChange={(v) => v && setGrade(Number(v))}>
+            <Select
+              items={[{ value: "all", label: "All steps" }, ...grades.map((g) => ({ value: String(g), label: `Step ${g}` }))]}
+              value={showAll ? "all" : String(level)}
+              onValueChange={(v) => v && setGrade(v === "all" ? "all" : Number(v))}
+            >
               <SelectTrigger size="sm" aria-label="Step shown" className="h-6 w-auto gap-1 border-0 bg-transparent px-1.5 font-mono text-[11px] shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent align="end">
+                <SelectItem value="all">All steps</SelectItem>
                 {grades.map((g) => (
                   <SelectItem key={g} value={String(g)}>
                     Step {g}
