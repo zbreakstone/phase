@@ -12,6 +12,8 @@ import {
 } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import type { RGB } from "@/lib/color/convert";
+import { solveForLuminance } from "@/lib/color/solve";
+import { SPACES } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
 import { CollapsibleSection, PanelSection, SettingRow } from "./panel-section";
@@ -32,6 +34,21 @@ interface Props {
   onNext: (() => void) | null;
   /** Rename and delete for this step, which changes it in every color. */
   stepActions: StepHeaderActions;
+}
+
+/** A left-to-right gradient of this step's lightness with `at(t)` supplying hue and chroma for t in 0..1. */
+function guide(
+  y: number,
+  gamut: Gamut,
+  at: (t: number) => { h: number; c: number },
+): React.CSSProperties {
+  const stops = Array.from({ length: 13 }, (_, i) => {
+    const t = i / 12;
+    const { h, c } = at(t);
+    const col = solveForLuminance(SPACES.oklch, y, h, c, gamut);
+    return `${cssColor(col.hex, col.linear, gamut)} ${(t * 100).toFixed(1)}%`;
+  });
+  return { background: `linear-gradient(to right, ${stops.join(", ")})` };
 }
 
 const WHITE: RGB = [1, 1, 1];
@@ -72,6 +89,10 @@ export function StepPanel({
       toast.message("Couldn't copy. Select the value and copy it by hand.");
     }
   };
+
+  const base = { h: shade.oklch.h - tweak.dh, c: shade.oklch.C };
+  const hueGuide = guide(shade.luminance, gamut, (t) => ({ h: base.h + (t * 120 - 60), c: base.c }));
+  const chromaGuide = guide(shade.luminance, gamut, (t) => ({ h: base.h + tweak.dh, c: Math.max(0, base.c * (1 + (t * 2 - 1))) }));
 
   const rows: { label: string; value: string; copy?: string }[] = [
     { label: "Hex", value: shade.hex, copy: shade.hex },
@@ -199,6 +220,7 @@ export function StepPanel({
             max={60}
             step={1}
             unit="°"
+            trackStyle={hueGuide}
             onChange={(v) => onTweak({ dh: v })}
           />
           <SliderField
@@ -209,6 +231,7 @@ export function StepPanel({
             max={100}
             step={5}
             unit="%"
+            trackStyle={chromaGuide}
             onChange={(v) => onTweak({ dc: v / 100 })}
           />
           {shade.clipped ? (
