@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { parseStepName } from "@/lib/palette/steps";
 import {
   apcaContrastLinear,
   contrastFromLuminance,
@@ -12,10 +14,10 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import type { RGB } from "@/lib/color/convert";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
-import { CollapsibleSection, PanelSection } from "./panel-section";
+import { CollapsibleSection, PanelSection, SettingRow } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
-import { StepMenu, type StepHeaderActions } from "./step-header";
+import type { StepHeaderActions } from "./step-header";
 
 interface Props {
   generated: GeneratedHue;
@@ -55,6 +57,12 @@ export function StepPanel({
   const tuned = generated.shades.filter((s) => s.tweaked).length;
   const others = tuned - (here ? 1 : 0);
   const [confirming, setConfirming] = React.useState(false);
+  const [nameDraft, setNameDraft] = React.useState<string | null>(null);
+  const nameResult = parseStepName(nameDraft ?? String(shade.grade), stepActions.grades, shade.grade);
+  const commitName = () => {
+    if (nameResult.ok && nameResult.grade !== shade.grade) stepActions.onRenameStep(shade.grade, nameResult.grade);
+    if (nameResult.ok) setNameDraft(null);
+  };
 
   const copy = async (text: string) => {
     try {
@@ -133,31 +141,49 @@ export function StepPanel({
       </PanelSection>
 
       <CollapsibleSection id="details" title="Details">
-        <dl className="divide-y divide-border text-xs">
+        <div className="space-y-3">
+          {!shade.anchor ? (
+            <SettingRow id="step-name" label="Step name">
+              <Input
+                id="step-name"
+                value={nameDraft ?? String(shade.grade)}
+                inputMode="numeric"
+                aria-invalid={nameResult.ok ? undefined : true}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setNameDraft(null);
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="h-8 font-mono text-xs"
+              />
+            </SettingRow>
+          ) : null}
+          {!nameResult.ok ? <p className="text-[11px] text-destructive">{nameResult.error}</p> : null}
           {rows.map((r) => (
-            <div
-              key={r.label}
-              className="flex items-center justify-between gap-3 py-1.5"
-            >
-              <dt className="text-muted-foreground">{r.label}</dt>
-              <dd className="flex min-w-0 items-center gap-1.5 font-mono tabular-nums">
-                <span className="truncate">{r.value}</span>
+            <SettingRow key={r.label} label={r.label}>
+              <div className="flex h-8 w-full min-w-0 items-center gap-1 rounded-lg bg-white pr-1 pl-2.5 shadow-(--shadow-default) dark:bg-input/30">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums">{r.value}</span>
                 {r.copy ? (
                   <Hint label={`Copy ${r.label}`}>
                     <button
                       type="button"
                       aria-label={`Copy ${r.label}`}
                       onClick={() => copy(r.copy as string)}
-                      className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
                       <Copy className="size-3" />
                     </button>
                   </Hint>
                 ) : null}
-              </dd>
-            </div>
+              </div>
+            </SettingRow>
           ))}
-        </dl>
+        </div>
       </CollapsibleSection>
 
       {!shade.anchor ? (
@@ -216,20 +242,23 @@ export function StepPanel({
       ) : null}
 
       {!shade.anchor ? (
-        <PanelSection className="flex items-center justify-between gap-3">
+        <CollapsibleSection id="danger" title="Danger zone" className="space-y-2">
           <p className="text-[11px] text-muted-foreground">
-            Step {shade.grade} is shared by every color.
+            Step {shade.grade} is shared by every color, so deleting it removes it from all of them.
           </p>
-          <StepMenu
-            grade={shade.grade}
-            actions={stepActions}
-            trigger={
-              <Button variant="outline" size="sm">
-                Rename or delete
-              </Button>
-            }
-          />
-        </PanelSection>
+          <Button
+            variant="destructive"
+            className="w-full"
+            disabled={stepActions.stepLimit === "min"}
+            onClick={() => stepActions.onRemoveStep(shade.grade)}
+          >
+            <Trash2 />
+            Delete step {shade.grade}
+          </Button>
+          {stepActions.stepLimit === "min" ? (
+            <p className="text-[11px] text-muted-foreground">A scale needs at least 3 steps.</p>
+          ) : null}
+        </CollapsibleSection>
       ) : null}
 
       <ResetTweaksDialog
