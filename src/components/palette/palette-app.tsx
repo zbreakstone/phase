@@ -616,8 +616,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               {historyOpen ? (
                 <div ref={setHistorySlot} className="h-full" />
               ) : (
-                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "display"}>
-              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null}
+                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -646,12 +645,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 />
               ) : (
                 <>
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
+              {focused ? <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null}
                 </SectionGroup>
               )}
             </ScrollFade>
