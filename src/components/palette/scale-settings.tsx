@@ -61,12 +61,15 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
         return { ...next, ratio: Math.min(next.ratio, maxRatioForDiff(next.minDiff)) };
       }),
     });
-  const presetId =
-    RULE_PRESETS.find(
-      (p) =>
-        p.rules.length === scale.rules.length &&
-        p.rules.every((r, i) => r.minDiff === scale.rules[i]?.minDiff && r.ratio === scale.rules[i]?.ratio),
-    )?.id ?? "custom";
+  // Presets are read-only. Choosing Custom starts from the rules you were on and unlocks them.
+  const [pickedCustom, setPickedCustom] = React.useState(false);
+  const matched = RULE_PRESETS.find(
+    (p) =>
+      p.rules.length === scale.rules.length &&
+      p.rules.every((r, i) => r.minDiff === scale.rules[i]?.minDiff && r.ratio === scale.rules[i]?.ratio),
+  );
+  const editable = pickedCustom || !matched;
+  const presetId = editable ? "custom" : matched.id;
   const items = [...RULE_PRESETS.map((p) => ({ value: p.id, label: p.label })), { value: "custom", label: "Custom rules" }];
 
   return (
@@ -78,7 +81,12 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
         items={items}
         value={presetId}
         onValueChange={(v) => {
-          if (v !== "custom") onChange({ ...scale, rules: makeRules(v as string) });
+          if (v === "custom") {
+            setPickedCustom(true);
+            return;
+          }
+          setPickedCustom(false);
+          onChange({ ...scale, rules: makeRules(v as string) });
         }}
       >
         <SelectTrigger size="sm" className="w-full" aria-label="Rule preset">
@@ -86,7 +94,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
         </SelectTrigger>
         <SelectContent>
           {items.map((i) => (
-            <SelectItem key={i.value} value={i.value} disabled={i.value === "custom"}>
+            <SelectItem key={i.value} value={i.value}>
               {i.label}
             </SelectItem>
           ))}
@@ -95,7 +103,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
 
       {scale.rules.length === 0 ? (
         <p className="border border-dashed border-border p-3 text-xs text-muted-foreground">
-          No rules yet. Add one to start enforcing contrast between steps.
+          {editable ? "No rules yet. Add one to start enforcing contrast between steps." : "This preset has no rules. Choose Custom rules to add some."}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -103,6 +111,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
             const maxed = rule.ratio >= maxRatioForDiff(rule.minDiff);
             return (
               <li key={rule.id} className="space-y-1">
+                {editable ? (
                 <div className="flex items-center gap-1.5">
                   <NumberField
                     aria-label="Minimum step difference"
@@ -134,7 +143,12 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
                     <Trash2 />
                   </Button>
                 </div>
-                {maxed ? (
+                ) : (
+                  <p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
+                    <span className="font-mono text-foreground">{rule.minDiff}</span> apart reach <span className="font-mono text-foreground">{rule.ratio}</span>:1
+                  </p>
+                )}
+                {editable && maxed ? (
                   <p className="text-[11px] text-muted-foreground">{uniformRatio.toFixed(2)}:1 is the most steps {rule.minDiff} apart can reach, so this is as high as it goes.</p>
                 ) : null}
               </li>
@@ -142,6 +156,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
           })}
         </ul>
       )}
+      {editable ? (
       <Button
         variant="outline"
         size="sm"
@@ -151,6 +166,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
         <Plus />
         Add rule
       </Button>
+      ) : null}
     </div>
   );
 }
