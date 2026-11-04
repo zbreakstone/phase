@@ -136,11 +136,11 @@ export function ViewToolbar({
             apply(v as Lens);
           }}
         >
-          <Hint label="Preview mode" shortcut={["P"]}>
+          <Hint label="Change preview mode" shortcut={["P"]}>
             <SelectTrigger
               size="sm"
               className="w-40"
-              aria-label="Preview mode"
+              aria-label="Change preview mode"
             >
               <SelectValue />
             </SelectTrigger>
