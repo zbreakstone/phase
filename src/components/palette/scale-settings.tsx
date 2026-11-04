@@ -1,19 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { CircleCheck, Plus, RotateCcw, Trash2, TriangleAlert } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Plus, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { contrastFromLuminance } from "@/lib/color/contrast";
 import { makeRules, uid } from "@/lib/palette/defaults";
 import {
   RULE_PRESETS,
-  checkTargets,
   feasibleRange,
+  maxRatioForDiff,
   ruleFeasibility,
   systemGrades,
   targetLuminance,
@@ -28,10 +26,42 @@ interface ScaleProps {
   onChange: (next: ScaleConfig) => void;
 }
 
+/** A number box that lets you type freely and only clamps when you leave it, so clearing or retyping never jumps. */
+function NumberField({ value, onCommit, className, ...rest }: { value: number; onCommit: (n: number) => void; className?: string } & Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "onBlur" | "className">) {
+  const [draft, setDraft] = React.useState<string | null>(null);
+  const commit = () => {
+    const n = Number(draft);
+    if (draft !== null && draft.trim() !== "" && Number.isFinite(n)) onCommit(n);
+    setDraft(null);
+  };
+  return (
+    <Input
+      {...rest}
+      type="number"
+      value={draft ?? String(value)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setDraft(null);
+      }}
+      className={className}
+    />
+  );
+}
+
 export function RulesSettings({ scale, onChange }: ScaleProps) {
   const feas = ruleFeasibility(scale.rules);
   const setRule = (id: string, patch: Partial<ContrastRule>) =>
-    onChange({ ...scale, rules: scale.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+    onChange({
+      ...scale,
+      rules: scale.rules.map((r) => {
+        if (r.id !== id) return r;
+        const next = { ...r, ...patch };
+        // A ratio the gap can't reach is held at the most it can.
+        return { ...next, ratio: Math.min(next.ratio, maxRatioForDiff(next.minDiff)) };
+      }),
+    });
   const presetId =
     RULE_PRESETS.find(
       (p) =>
@@ -43,7 +73,7 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-muted-foreground">
-        Two shades whose step names differ by at least the first number are guaranteed at least the second as a WCAG 2 contrast ratio, for any hue.
+        Any two steps this far apart or more always reach at least this contrast, for every color. Luminance targets move to keep each rule true.
       </p>
       <Select
         items={items}
@@ -70,49 +100,47 @@ export function RulesSettings({ scale, onChange }: ScaleProps) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {feas.map(({ rule, uniformRatio, feasible }) => (
-            <li key={rule.id} className="space-y-1">
-              <div className="flex items-center gap-1.5">
-                <Input
-                  aria-label="Minimum step difference"
-                  type="number"
-                  min={1}
-                  max={1000}
-                  step={50}
-                  value={rule.minDiff}
-                  onChange={(e) => setRule(rule.id, { minDiff: Math.min(1000, Math.max(1, Math.round(Number(e.target.value) || 1))) })}
-                  className="h-8 w-20 font-mono text-xs"
-                />
-                <span className="text-xs text-muted-foreground">+ apart ≥</span>
-                <Input
-                  aria-label="Minimum contrast ratio"
-                  type="number"
-                  min={1}
-                  max={21}
-                  step={0.1}
-                  value={rule.ratio}
-                  onChange={(e) => setRule(rule.id, { ratio: Math.min(21, Math.max(1, Number(e.target.value) || 1)) })}
-                  className="h-8 w-16 font-mono text-xs"
-                />
-                <span className="text-xs text-muted-foreground">:1</span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="ml-auto"
-                  aria-label="Remove rule"
-                  onClick={() => onChange({ ...scale, rules: scale.rules.filter((r) => r.id !== rule.id) })}
-                >
-                  <Trash2 />
-                </Button>
-              </div>
-              <p className={`flex items-center gap-1.5 text-[11px] ${feasible ? "text-muted-foreground" : "text-destructive"}`}>
-                {feasible ? <CircleCheck className="size-3.5 text-emerald-400" /> : <TriangleAlert className="size-3.5" />}
-                {feasible
-                  ? `White to black gives ${uniformRatio.toFixed(2)}:1 at this gap.`
-                  : `Impossible: steps ${rule.minDiff} apart reach at most ${uniformRatio.toFixed(2)}:1.`}
-              </p>
-            </li>
-          ))}
+          {feas.map(({ rule, uniformRatio }) => {
+            const maxed = rule.ratio >= maxRatioForDiff(rule.minDiff);
+            return (
+              <li key={rule.id} className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <NumberField
+                    aria-label="Minimum step difference"
+                    min={1}
+                    max={1000}
+                    step={50}
+                    value={rule.minDiff}
+                    onCommit={(n) => setRule(rule.id, { minDiff: Math.min(1000, Math.max(1, Math.round(n))) })}
+                    className="h-8 w-20 font-mono text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">apart reach</span>
+                  <NumberField
+                    aria-label="Minimum contrast ratio"
+                    min={1}
+                    max={21}
+                    step={0.1}
+                    value={rule.ratio}
+                    onCommit={(n) => setRule(rule.id, { ratio: Math.max(1, Math.round(n * 100) / 100) })}
+                    className="h-8 w-16 font-mono text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">:1</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="ml-auto"
+                    aria-label="Remove rule"
+                    onClick={() => onChange({ ...scale, rules: scale.rules.filter((r) => r.id !== rule.id) })}
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+                {maxed ? (
+                  <p className="text-[11px] text-muted-foreground">{uniformRatio.toFixed(2)}:1 is the most steps {rule.minDiff} apart can reach, so this is as high as it goes.</p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
       <Button
@@ -136,65 +164,28 @@ function materialize(scale: ScaleConfig): Record<string, number> {
 
 export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { referenceY: number }) {
   const grades = systemGrades(scale).filter((g) => g > 0 && g < 1000);
-  const violations = checkTargets(scale);
-  const custom = scale.luminanceMode === "custom";
+  const adjusted = scale.luminanceMode === "custom" ? Object.keys(scale.customLuminance).length > 0 : scale.luminanceMode === "uniform";
 
   const setY = (grade: number, y: number) =>
     onChange({
       ...scale,
       luminanceMode: "custom",
-      customLuminance: { ...materialize(scale), [String(grade)]: Math.min(1, Math.max(0, y)) },
+      customLuminance: { ...(scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance), [String(grade)]: Math.min(1, Math.max(0, y)) },
     });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <ToggleGroup
-          value={[scale.luminanceMode]}
-          onValueChange={(v) => {
-            if (v[0] === "envoy" || v[0] === "uniform") onChange({ ...scale, luminanceMode: v[0], customLuminance: {} });
-            if (v[0] === "custom") onChange({ ...scale, luminanceMode: "custom", customLuminance: materialize(scale) });
-          }}
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label="Luminance mode"
-        >
-          <ToggleGroupItem value="envoy">Envoy</ToggleGroupItem>
-          <ToggleGroupItem value="uniform">Even contrast</ToggleGroupItem>
-          <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
-        </ToggleGroup>
-        {custom ? (
-          <Button variant="ghost" size="sm" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          Starts from Katie Riley&apos;s Envoy ranges and moves only as far as your contrast rules need. Drag a step or type a luminance to override it. The green band is the range that keeps every rule true.
+        </p>
+        {adjusted ? (
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => onChange({ ...scale, luminanceMode: "envoy", customLuminance: {} })}>
             <RotateCcw />
             Reset
           </Button>
         ) : null}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {custom
-          ? "Drag a step or type a luminance. The green band is the window that keeps every rule intact. Its ends and middle have marks the handle snaps to."
-          : scale.luminanceMode === "envoy"
-            ? "Tuned from Katie Riley's Envoy ranges: brighter mid-dark shades, with 800 and 900 kept close to black. Switch to Custom to move individual steps."
-            : "Each step multiplies contrast by the same factor, so ratio depends only on how far apart two steps are. Switch to Custom to move individual steps."}
-      </p>
-
-      {violations.length > 0 ? (
-        <Alert variant="destructive">
-          <TriangleAlert />
-          <AlertTitle>These targets break your rules</AlertTitle>
-          <AlertDescription>
-            <ul className="list-inside list-disc text-xs">
-              {violations.slice(0, 3).map((v) => (
-                <li key={`${v.a}-${v.b}`}>
-                  {v.a} and {v.b} reach {v.actual.toFixed(2)}:1, need {v.required}:1.
-                </li>
-              ))}
-              {violations.length > 3 ? <li>and {violations.length - 3} more</li> : null}
-            </ul>
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       <div className="space-y-0.5">
         <div className="grid grid-cols-[2.25rem_1fr_4.5rem_3rem] items-center gap-2 px-1 text-[10px] text-muted-foreground">
@@ -209,14 +200,14 @@ export function TargetCurve({ scale, referenceY, onChange }: ScaleProps & { refe
           <span className="text-right">vs white</span>
         </div>
         {grades.map((g) => (
-          <TargetRow key={g} scale={scale} grade={g} custom={custom} referenceY={referenceY} onChange={(y) => setY(g, y)} />
+          <TargetRow key={g} scale={scale} grade={g} referenceY={referenceY} onChange={(y) => setY(g, y)} />
         ))}
       </div>
     </div>
   );
 }
 
-function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: ScaleConfig; grade: number; custom: boolean; referenceY: number; onChange: (y: number) => void }) {
+function TargetRow({ scale, grade, referenceY, onChange }: { scale: ScaleConfig; grade: number; referenceY: number; onChange: (y: number) => void }) {
   const y = targetLuminance(scale, grade);
   const range = feasibleRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
@@ -247,7 +238,6 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
           min={0}
           max={1}
           step={0.002}
-          disabled={!custom}
           // Center alignment puts the handle exactly at value% of the width, which is where the band and ticks are drawn.
           thumbAlignment="center"
           onValueChange={(v) => {
@@ -264,7 +254,6 @@ function TargetRow({ scale, grade, custom, referenceY, onChange }: { scale: Scal
         min={0}
         max={1}
         step={0.001}
-        disabled={!custom}
         value={draft ?? y.toFixed(3)}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={(e) => {
