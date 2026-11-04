@@ -71,9 +71,6 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
                 className="min-w-0 flex-1 bg-transparent pr-2.5 text-right font-mono text-xs uppercase outline-none"
               />
             </label>
-            <Button size="sm" onClick={submit}>
-              Add
-            </Button>
           </div>
         </ColorPicker>
 
@@ -108,6 +105,9 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
             ))}
           </div>
         </div>
+        <Button className="w-full" onClick={submit}>
+          Add
+        </Button>
       </PopoverContent>
     </Popover>
   );
