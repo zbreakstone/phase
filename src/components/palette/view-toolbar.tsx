@@ -178,8 +178,8 @@ export function ViewToolbar({
       </div>
       <div className="flex items-center justify-end gap-2">
         <DropdownMenu open={themeOpen} onOpenChange={setThemeOpen}>
-          <Hint label="Theme" shortcut={["T"]}>
-            <DropdownMenuTrigger aria-label="Theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
+          <Hint label="Change theme" shortcut={["T"]}>
+            <DropdownMenuTrigger aria-label="Change theme" className={toggleVariants({ variant: "outline", size: "sm" })}>
               {theme === "light" ? <Sun /> : theme === "dark" ? <Moon /> : <SunMoon />}
             </DropdownMenuTrigger>
           </Hint>
@@ -193,8 +193,8 @@ export function ViewToolbar({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Hint label={mode === "smooth" ? "Grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
-          <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Grain">
+        <Hint label={mode === "smooth" ? "Toggle grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
+          <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Toggle grain">
             <Wheat />
           </Toggle>
         </Hint>
