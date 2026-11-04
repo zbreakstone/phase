@@ -206,13 +206,13 @@ export function ViewToolbar({
           spacing={0}
           aria-label="How the square is drawn"
         >
-          <Hint label="Smooth: colors melt into each other" shortcut={["["]}>
-            <ToggleGroupItem value="smooth" aria-label="Smooth">
+          <Hint label="Show smooth view: colors melt into each other" shortcut={["["]}>
+            <ToggleGroupItem value="smooth" aria-label="Show smooth view">
               <Contrast />
             </ToggleGroupItem>
           </Hint>
-          <Hint label="Cells: every swatch stays crisp" shortcut={["]"]}>
-            <ToggleGroupItem value="cells" aria-label="Cells">
+          <Hint label="Show cells view: every swatch stays crisp" shortcut={["]"]}>
+            <ToggleGroupItem value="cells" aria-label="Show cells view">
               <SwatchBook />
             </ToggleGroupItem>
           </Hint>
