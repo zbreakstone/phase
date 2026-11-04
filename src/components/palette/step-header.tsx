@@ -57,7 +57,8 @@ export function StepHeader({
 }
 
 /** The rename and delete popover for one step. By default the number is the trigger; pass `trigger` to use your own button. */
-export function StepMenu({ grade, actions, trigger }: { grade: number; actions: StepHeaderActions; trigger?: React.ReactElement }) {
+export function StepMenu({ grade, actions, trigger, addBefore }: { grade: number; actions: StepHeaderActions; trigger?: React.ReactElement; addBefore?: number }) {
+  const added = addBefore === undefined ? null : midpointGrade(grade, addBefore);
   const [open, setOpen] = React.useState(false);
   const [text, setText] = React.useState(String(grade));
   const result = parseStepName(text, actions.grades, grade);
@@ -125,6 +126,24 @@ export function StepMenu({ grade, actions, trigger }: { grade: number; actions: 
           {!result.ok ? <p className="text-[11px] text-destructive">{result.error}</p> : null}
         </form>
         <div className="space-y-1 border-t border-border pt-2.5">
+          {addBefore !== undefined ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                disabled={actions.stepLimit === "max" || added === null}
+                onClick={() => {
+                  setOpen(false);
+                  actions.onAddStep(grade, addBefore);
+                }}
+              >
+                <Plus />
+                {added === null ? "No room after this step" : `Add step ${added} after`}
+              </Button>
+              {actions.stepLimit === "max" ? <p className="text-[11px] text-muted-foreground">A scale can have at most 16 steps.</p> : null}
+            </>
+          ) : null}
           <Button
             variant="destructive"
             size="sm"

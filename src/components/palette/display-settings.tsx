@@ -12,7 +12,7 @@ import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 import type { SquareMode } from "./palette-square";
 
-export type Panel = "curves" | "report" | "targets";
+export type Panel = "curves" | "report";
 
 interface Props {
   overlay: Overlay;
@@ -45,7 +45,6 @@ const PANELS: { id: Panel | "none"; label: string }[] = [
   { id: "none", label: "None" },
   { id: "curves", label: "Curves" },
   { id: "report", label: "Contrast report" },
-  { id: "targets", label: "Luminance targets" },
 ];
 
 /** How the square is drawn, what's printed on it, and which secondary panel sits under it. Shown at every level of the sidebar. */

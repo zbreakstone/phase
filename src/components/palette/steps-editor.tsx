@@ -1,72 +1,114 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import * as React from "react";
+import { ChevronDown, Ellipsis, Plus, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { contrastFromLuminance } from "@/lib/color/contrast";
+import { targetLuminance } from "@/lib/palette/scale";
+import type { ScaleConfig } from "@/lib/palette/types";
 import { midpointGrade } from "@/lib/palette/steps";
 import { CollapsibleSection } from "./panel-section";
 import { StepMenu, type StepHeaderActions } from "./step-header";
+import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, resetTargets, setStepTarget } from "./scale-settings";
 
 /**
- * The scale's step names, one per row. Click a name to rename it; the trash on a row deletes the
- * step, and the "+" adds a step halfway to the next one. White (0) and black (1000) always bookend the scale.
+ * The scale's steps, one per row: name, luminance target and contrast against white. Click a row to adjust its
+ * target; the "..." menu renames, adds after, or deletes it. White (0) and black (1000) always bookend the scale.
  */
-export function StepsEditor({ actions }: { actions: StepHeaderActions }) {
+export function StepsEditor({ actions, scale, onScale }: { actions: StepHeaderActions; scale: ScaleConfig; onScale: (scale: ScaleConfig) => void }) {
   const { grades } = actions;
+  const [editing, setEditing] = React.useState<number | null>(null);
+
+  // The header "+" drops a new step into the widest gap, so the scale stays evenly filled.
+  const addInWidestGap = () => {
+    const edges = [0, ...grades, 1000];
+    let best: [number, number] | null = null;
+    for (let i = 0; i < edges.length - 1; i++) {
+      if (midpointGrade(edges[i], edges[i + 1]) !== null && (best === null || edges[i + 1] - edges[i] > best[1] - best[0])) best = [edges[i], edges[i + 1]];
+    }
+    if (best) actions.onAddStep(best[0], best[1]);
+  };
+
   return (
-    <CollapsibleSection id="steps" title="Steps" count={grades.length} className="space-y-2 pt-2">
+    <CollapsibleSection
+      id="steps"
+      title="Steps"
+      count={grades.length}
+      className="space-y-2 pt-2"
+      action={
+        <Button variant="ghost" size="icon-sm" aria-label="Add a step" title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : "Add a step"} disabled={actions.stepLimit === "max"} onClick={addInWidestGap}>
+          <Plus />
+        </Button>
+      }
+    >
       <p className="text-[11px] text-muted-foreground">
-        Shared by every color. The number is where a step sits between white and
-        black.
+        Shared by every color. Each step has a luminance target: how bright it is between white and black. Open one to adjust it within what your contrast rules allow.
       </p>
+      <div className="grid grid-cols-[1fr_3.5rem_3.5rem_1.5rem] gap-2 px-0 text-[10px] text-muted-foreground">
+        <span>Step</span>
+        <span className="text-right" title="Relative luminance (WCAG Y): 1 is white, 0 is black.">Luminance</span>
+        <span className="text-right">vs white</span>
+        <span />
+      </div>
       <ul>
         {grades.map((grade, i) => {
           const next = grades[i + 1] ?? 1000;
-          const mid = midpointGrade(grade, next);
+          const y = targetLuminance(scale, grade);
+          const open = editing === grade;
           return (
-            <li
-              key={grade}
-              className="group/step -mx-2 flex items-center justify-between rounded-lg px-2 py-0.5 font-mono text-sm tabular-nums hover:bg-muted"
-            >
-              <StepMenu grade={grade} actions={actions} />
-              <div className="flex items-center">
+            <li key={grade} className="-mx-2 rounded-lg px-2 font-mono text-sm tabular-nums hover:bg-muted/60">
+              <div className="grid grid-cols-[1fr_3.5rem_3.5rem_1.5rem] items-center gap-2">
                 <button
                   type="button"
-                  disabled={actions.stepLimit === "min"}
-                  onClick={() => actions.onRemoveStep(grade)}
-                  aria-label={`Delete step ${grade}`}
-                  title={
-                    actions.stepLimit === "min"
-                      ? "A scale needs at least 3 steps."
-                      : `Delete step ${grade}`
-                  }
-                  className="flex size-6 items-center justify-center rounded-md text-muted-foreground/0 group-hover/step:text-muted-foreground hover:bg-background hover:text-destructive focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-0"
+                  onClick={() => setEditing(open ? null : grade)}
+                  aria-expanded={open}
+                  aria-label={`Luminance target for step ${grade}`}
+                  className="col-span-3 -mx-2 grid min-h-8 grid-cols-subgrid items-center rounded-lg px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Trash2 className="size-3.5" />
+                  <span className="flex items-center gap-1.5">
+                    {grade}
+                    {isStepOverridden(scale, grade) ? <span aria-hidden title="Adjusted" className="size-1.5 rounded-full bg-foreground/60" /> : null}
+                    <ChevronDown aria-hidden className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+                  </span>
+                  <span className="text-right text-xs text-muted-foreground">{y.toFixed(3)}</span>
+                  <span className="text-right text-xs text-muted-foreground">{contrastFromLuminance(1, y).toFixed(2)}</span>
                 </button>
-                <button
-                  type="button"
-                  disabled={actions.stepLimit === "max" || mid === null}
-                  onClick={() => actions.onAddStep(grade, next)}
-                  aria-label={
-                    mid === null
-                      ? `No room after ${grade}`
-                      : `Add step ${mid}, between ${grade} and ${next}`
+                <StepMenu
+                  grade={grade}
+                  actions={actions}
+                  addBefore={next}
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label={`Step ${grade} options`}
+                      className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                      <Ellipsis className="size-4" />
+                    </button>
                   }
-                  title={
-                    actions.stepLimit === "max"
-                      ? "A scale can have at most 16 steps."
-                      : mid === null
-                        ? undefined
-                        : `Add step ${mid}`
-                  }
-                  className="flex size-6 items-center justify-center rounded-md text-muted-foreground/0 group-hover/step:text-muted-foreground hover:bg-background hover:text-foreground focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-0"
-                >
-                  <Plus className="size-3.5" />
-                </button>
+                />
               </div>
+              {open ? (
+                <div className="space-y-2 pb-2">
+                  <StepTarget scale={scale} grade={grade} onChange={(y) => onScale(setStepTarget(scale, grade, y))} />
+                  {isStepOverridden(scale, grade) ? (
+                    <Button variant="ghost" size="xs" onClick={() => onScale(clearStepTarget(scale, grade))}>
+                      <RotateCcw />
+                      Reset step {grade}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
             </li>
           );
         })}
       </ul>
+      {hasTargetOverrides(scale) ? (
+        <Button variant="ghost" size="sm" onClick={() => onScale(resetTargets(scale))}>
+          <RotateCcw />
+          Reset all targets
+        </Button>
+      ) : null}
     </CollapsibleSection>
   );
 }

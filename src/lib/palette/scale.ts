@@ -108,7 +108,8 @@ export function envoyLuminance(grade: number): number {
   return uniformLuminance(grade);
 }
 
-export function targetLuminance(scale: ScaleConfig, grade: number): number {
+/** The look a step starts from, before the contrast rules move it: Envoy, the even scale, or a manual override. */
+function baseLuminance(scale: ScaleConfig, grade: number): number {
   if (grade <= 0) return WHITE_Y;
   if (grade >= SCALE_MAX) return BLACK_Y;
   if (scale.luminanceMode === "custom") {
@@ -118,6 +119,67 @@ export function targetLuminance(scale: ScaleConfig, grade: number): number {
   // A custom scale with no value for this step reads as Envoy, the same default custom mode starts from.
   if (scale.luminanceMode === "envoy" || scale.luminanceMode === "custom") return envoyLuminance(grade);
   return uniformLuminance(grade);
+}
+
+const resolvedCache = new WeakMap<ScaleConfig, Map<number, number>>();
+
+/**
+ * Moves the base targets as little as needed so every contrast rule holds. Contrast between two steps is
+ * the ratio of (Y + 0.05), so the work is done on ln(Y + 0.05), where each rule becomes "this step is at
+ * least ln(ratio) above that one". White and black stay put; violating pairs are pulled apart until none remain.
+ */
+function resolveTargets(scale: ScaleConfig): Map<number, number> {
+  const cached = resolvedCache.get(scale);
+  if (cached) return cached;
+
+  const grades = systemGrades(scale);
+  const last = grades.length - 1;
+  const u = grades.map((g) => Math.log(baseLuminance(scale, g) + 0.05));
+  // A rule that no scale could satisfy is held at the most the gap can reach.
+  const rules = scale.rules.map((r) => ({ ...r, ratio: Math.min(r.ratio, uniformRatioForDiff(r.minDiff) * (1 - 1e-7)) }));
+  const pairs: { i: number; j: number; c: number }[] = [];
+  for (let i = 0; i < grades.length; i++) {
+    for (let j = i + 1; j < grades.length; j++) {
+      const required = requiredRatio(grades[j] - grades[i], rules);
+      if (required !== null) pairs.push({ i, j, c: Math.log(required) + 1e-9 });
+    }
+  }
+
+  for (let sweep = 0; sweep < 3000; sweep++) {
+    let worst = 0;
+    for (const { i, j, c } of pairs) {
+      const v = c - (u[i] - u[j]);
+      if (v <= 0) continue;
+      worst = Math.max(worst, v);
+      if (i === 0 && j === last) continue;
+      if (i === 0) u[j] -= v;
+      else if (j === last) u[i] += v;
+      else {
+        u[i] += v / 2;
+        u[j] -= v / 2;
+      }
+    }
+    if (worst < 1e-12) break;
+  }
+
+  const lo = Math.log(BLACK_Y + 0.05);
+  const hi = Math.log(WHITE_Y + 0.05);
+  const out = new Map<number, number>();
+  grades.forEach((g, k) => out.set(g, Math.exp(Math.min(hi, Math.max(lo, u[k]))) - 0.05));
+  resolvedCache.set(scale, out);
+  return out;
+}
+
+/** Luminance for a step: its base look, moved just enough that every contrast rule is true. */
+export function targetLuminance(scale: ScaleConfig, grade: number): number {
+  if (grade <= 0) return WHITE_Y;
+  if (grade >= SCALE_MAX) return BLACK_Y;
+  return resolveTargets(scale).get(grade) ?? baseLuminance(scale, grade);
+}
+
+/** The highest contrast steps `diff` apart can be held to. Rules above this can't be met by any scale. */
+export function maxRatioForDiff(diff: number): number {
+  return Math.floor(uniformRatioForDiff(diff) * 100) / 100;
 }
 
 /**
