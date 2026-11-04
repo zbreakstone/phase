@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Gamut } from "@/lib/color/gamut";
-import { maxChromaAt } from "@/lib/color/solve";
+import { inGamut, maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,8 @@ const METRICS: { id: Metric; label: string; title: string }[] = [
 
 const W = 296;
 const H = 108;
-const PAD_X = 10;
+const PAD_X = 20;
 const PAD_Y = 12;
-const SCALE_MAX = 1000;
 
 interface Point {
   key: string;
@@ -34,6 +33,74 @@ interface Point {
   /** What the curve asked for. Chroma only. */
   asked?: number;
   grade: number | null;
+  /** The color in OKLCH, used to find what the screen can show around it. */
+  L: number;
+  C: number;
+  h: number;
+}
+
+const NX = 64;
+const NY = 40;
+const OKLCH = SPACES.oklch;
+
+const xAt = (t: number, lo: number, hi: number) => PAD_X + (hi === lo ? 0.5 : (t - lo) / (hi - lo)) * (W - PAD_X * 2);
+
+/** What the y axis covers for a metric. Hue zooms in on where the colors are so the line has some shape. */
+function domainFor(metric: Metric, points: Point[]): [number, number] {
+  if (metric === "lightness") return [0, 1];
+  if (metric === "chroma") return [0, Math.max(0.1, ...points.flatMap((p) => [p.value, p.limit ?? 0]))];
+  const hs = points.map((p) => p.value);
+  const lo = Math.min(...hs);
+  const hi = Math.max(...hs);
+  const span = Math.min(360, Math.max(60, (hi - lo) * 1.6));
+  const start = Math.min(360 - span, Math.max(0, (lo + hi) / 2 - span / 2));
+  return [start, start + span];
+}
+
+/** Hatched cells where the screen can't show the color: lightness or hue values that clip, given the other two. */
+function unreachable(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): string {
+  const [yMin, yMax] = domain;
+  const ts = points.map((p) => p.t);
+  const lo = Math.min(...ts);
+  const hi = Math.max(...ts);
+  const xs = points.map((p) => xAt(p.t, lo, hi));
+  const cw = W / NX;
+  const ch = H / NY;
+  let d = "";
+  for (let i = 0; i < NX; i++) {
+    const x = (i + 0.5) * cw;
+    let k = 0;
+    while (k < xs.length - 2 && x > xs[k + 1]) k++;
+    const a = points[k];
+    const b = points[Math.min(k + 1, points.length - 1)];
+    const f = xs[k + 1] === undefined || xs[k + 1] === xs[k] ? 0 : Math.min(1, Math.max(0, (x - xs[k]) / (xs[k + 1] - xs[k])));
+    const L = a.L + (b.L - a.L) * f;
+    const C = a.C + (b.C - a.C) * f;
+    const h = a.h + (b.h - a.h) * f;
+    let runStart = -1;
+    for (let j = 0; j <= NY; j++) {
+      let out = false;
+      if (j < NY) {
+        const y = (j + 0.5) * ch;
+        const v = Math.min(yMax, Math.max(yMin, yMin + ((H - PAD_Y - y) / (H - PAD_Y * 2)) * (yMax - yMin)));
+        const rgb = metric === "lightness" ? OKLCH.toLinear(v, C, h) : OKLCH.toLinear(L, C, ((v % 360) + 360) % 360);
+        out = !inGamut(rgb, gamut);
+      }
+      if (out && runStart < 0) runStart = j;
+      if (!out && runStart >= 0) {
+        d += `M${(i * cw).toFixed(1)} ${(runStart * ch).toFixed(1)}h${(cw + 0.3).toFixed(1)}v${((j - runStart) * ch).toFixed(1)}h${(-cw - 0.3).toFixed(1)}z`;
+        runStart = -1;
+      }
+    }
+  }
+  return d;
+}
+
+/** Short label for the value row. */
+function short(metric: Metric, v: number): string {
+  if (metric === "lightness") return (v * 100).toFixed(1);
+  if (metric === "hue") return v.toFixed(0);
+  return v.toFixed(3).replace(/^0/, "");
 }
 
 function format(metric: Metric, v: number): string {
@@ -96,9 +163,12 @@ export function PaletteChart({
       value: metric === "lightness" ? s.oklch.L : metric === "chroma" ? s.chroma : s.hue,
       limit: metric === "chroma" ? maxChromaAt(def, s.targetLuminance, s.hue, gamut) : undefined,
       asked: metric === "chroma" ? s.requestedChroma : undefined,
+      L: s.oklch.L,
+      C: s.oklch.C,
+      h: s.oklch.h,
     });
     if (focused) {
-      return [...focused.shades].sort((a, b) => a.grade - b.grade).map((s) => make(s, String(s.grade), String(s.grade), s.grade / SCALE_MAX));
+      return [...focused.shades].sort((a, b) => a.grade - b.grade).map((s, i, all) => make(s, String(s.grade), String(s.grade), all.length > 1 ? i / (all.length - 1) : 0.5));
     }
     return generated.flatMap((g, i) => {
       const s = g.shades.find((x) => x.grade === level);
@@ -106,22 +176,30 @@ export function PaletteChart({
     });
   }, [focused, generated, level, metric, def, gamut]);
 
+  const domain = React.useMemo(() => (points.length ? domainFor(metric, points) : ([0, 1] as [number, number])), [metric, points]);
+  const hatchCells = React.useMemo(
+    () => (points.length && metric !== "chroma" ? unreachable(metric, points, domain, gamut) : ""),
+    [metric, points, domain, gamut],
+  );
+
   if (points.length === 0) return null;
 
   // Steps spread by where they sit between white and black; colors spread evenly. Both stay inside the padding.
   const ts = points.map((p) => p.t);
-  const tLo = focused ? 0 : Math.min(...ts);
-  const tHi = focused ? 1 : Math.max(...ts);
-  const xOf = (t: number) => PAD_X + (tHi === tLo ? 0.5 : (t - tLo) / (tHi - tLo)) * (W - PAD_X * 2);
+  const tLo = Math.min(...ts);
+  const tHi = Math.max(...ts);
+  const xOf = (t: number) => xAt(t, tLo, tHi);
 
-  const top = metric === "lightness" ? 1 : metric === "hue" ? 360 : Math.max(0.1, ...points.flatMap((p) => [p.value, p.limit ?? 0]));
-  const yOf = (v: number) => H - PAD_Y - (Math.min(v, top) / top) * (H - PAD_Y * 2);
+  const [yMin, yMax] = domain;
+  const top = yMax;
+  const yOf = (v: number) => H - PAD_Y - ((Math.min(Math.max(v, yMin), yMax) - yMin) / (yMax - yMin)) * (H - PAD_Y * 2);
   const xy = points.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }));
   const line = smooth(xy);
   const showLimit = metric === "chroma";
-  const limitPts = showLimit ? points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? top) })) : [];
+  const limitInner = showLimit ? points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? top) })) : [];
+  const limitPts = limitInner.length ? [{ x: 0, y: limitInner[0].y }, ...limitInner, { x: W, y: limitInner[limitInner.length - 1].y }] : [];
   const limitLine = smooth(limitPts);
-  const hatch = showLimit ? `${limitLine} L${xOf(tHi).toFixed(1)} ${PAD_Y - 4} L${xOf(tLo).toFixed(1)} ${PAD_Y - 4} Z` : "";
+  const hatch = showLimit ? `${limitLine} L${W} 0 L0 0 Z` : "";
   const gradientId = `${patternId}-line`;
 
   const active = points.find((p) => p.key === hover) ?? (focused && focusGrade !== null ? points.find((p) => p.grade === focusGrade) : null) ?? null;
@@ -133,50 +211,31 @@ export function PaletteChart({
   };
 
   return (
-    <div className="px-5 pt-4 pb-3">
-      <div className="flex items-center justify-between gap-2">
-        <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
-          {METRICS.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              title={m.title}
-              aria-pressed={metric === m.id}
-              onClick={() => setMetric(m.id)}
-              className={cn(
-                "rounded-md px-1.5 py-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                metric === m.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        {focused ? (
-          <p className="min-w-0 truncate font-mono text-[11px] text-muted-foreground tabular-nums">
-            {focused.hue.name || "Unnamed"}
-            {active ? ` · ${active.label} · ${format(metric, active.value)}` : ""}
-          </p>
-        ) : (
-          <Select items={grades.map((g) => ({ value: String(g), label: `Step ${g}` }))} value={String(level)} onValueChange={(v) => v && setGrade(Number(v))}>
-            <SelectTrigger size="sm" aria-label="Step shown" className="h-6 w-auto gap-1 border-0 bg-transparent px-1.5 font-mono text-[11px] shadow-none">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {grades.map((g) => (
-                <SelectItem key={g} value={String(g)}>
-                  Step {g}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+    <div>
+      <div
+        aria-hidden
+        className="h-0.5"
+        style={{ background: `linear-gradient(to right, ${points.map((p) => `${p.hex} ${((xOf(p.t) / W) * 100).toFixed(1)}%`).join(", ")})` }}
+      />
+      <div className="relative h-7 border-b border-border/60 bg-muted/30" aria-hidden>
+        {points.map((p) => (
+          <span
+            key={p.key}
+            className={cn(
+              "absolute top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono text-[10px] tabular-nums transition-colors",
+              active?.key === p.key ? "font-medium text-foreground" : "text-muted-foreground",
+            )}
+            style={{ left: `${(xOf(p.t) / W) * 100}%` }}
+          >
+            {short(metric, p.value)}
+          </span>
+        ))}
       </div>
       <svg
         role="img"
         aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : `of every color at step ${level}`}`}
         viewBox={`0 0 ${W} ${H}`}
-        className="mt-1 block h-auto w-full touch-none overflow-visible"
+        className="block h-auto w-full touch-none"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
       >
@@ -190,19 +249,60 @@ export function PaletteChart({
             ))}
           </linearGradient>
         </defs>
-        <rect x={PAD_X} y={PAD_Y - 4} width={W - PAD_X * 2} height={H - PAD_Y * 2 + 4} rx={4} className="fill-muted/40" />
+        <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
         {showLimit ? <path d={hatch} fill={`url(#${patternId}-hatch)`} /> : null}
+        {hatchCells ? <path d={hatchCells} fill={`url(#${patternId}-hatch)`} /> : null}
         {showLimit ? <path d={limitLine} fill="none" className="stroke-foreground/20" strokeWidth={1} /> : null}
-        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={PAD_Y - 4} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
+        {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H - PAD_Y} className="stroke-foreground/25" strokeWidth={1} /> : null}
         <path d={line} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => {
           const on = active?.key === p.key;
           return <circle key={p.key} cx={xy[i].x} cy={xy[i].y} r={on ? 4.5 : 3} fill={p.hex} stroke="white" strokeWidth={on ? 2 : 1.5} />;
         })}
       </svg>
-      {!focused ? (
-        <p className="mt-1 h-4 truncate font-mono text-[11px] text-muted-foreground tabular-nums">{active ? `${active.label} · ${format(metric, active.value)}` : ""}</p>
-      ) : null}
+      <div className="px-5 pt-2 pb-3">
+      <div className="flex items-center justify-between gap-2">
+          <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
+            {METRICS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                title={m.title}
+                aria-pressed={metric === m.id}
+                onClick={() => setMetric(m.id)}
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  metric === m.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {focused ? (
+            <p className="min-w-0 truncate font-mono text-[11px] text-muted-foreground tabular-nums">
+              {focused.hue.name || "Unnamed"}
+              {active ? ` · ${active.label} · ${format(metric, active.value)}` : ""}
+            </p>
+          ) : (
+            <Select items={grades.map((g) => ({ value: String(g), label: `Step ${g}` }))} value={String(level)} onValueChange={(v) => v && setGrade(Number(v))}>
+              <SelectTrigger size="sm" aria-label="Step shown" className="h-6 w-auto gap-1 border-0 bg-transparent px-1.5 font-mono text-[11px] shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                {grades.map((g) => (
+                  <SelectItem key={g} value={String(g)}>
+                    Step {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+        {!focused ? (
+          <p className="mt-1 h-4 truncate font-mono text-[11px] text-muted-foreground tabular-nums">{active ? `${active.label} · ${format(metric, active.value)}` : ""}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
