@@ -114,7 +114,7 @@ export function HuePanel({
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
             }}
-            className="h-8 text-right text-xs"
+            className="h-8 text-xs"
           />
         </SettingRow>
         <SourceEditor
@@ -141,17 +141,17 @@ export function HuePanel({
               </Button>
             ) : null}
           </div>
-          <ul>
+          <ul className="space-y-1.5">
             {generated.shades.map((s) => (
               <li key={s.grade}>
                 <button
                   type="button"
                   onClick={() => onOpenStep(s.grade)}
-                  className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2.5 rounded-lg px-2 py-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="flex h-8 w-full items-center gap-2 rounded-lg bg-white pr-2.5 pl-1.5 text-left shadow-(--shadow-default) hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-input/30"
                 >
                   <span
                     aria-hidden
-                    className="relative size-6 shrink-0 rounded-md ring-1 ring-foreground/15"
+                    className="relative size-5 shrink-0 rounded-md ring-1 ring-foreground/15"
                     style={{ backgroundColor: display(s) }}
                   >
                     {s.tweaked ? (

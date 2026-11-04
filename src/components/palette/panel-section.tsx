@@ -105,7 +105,7 @@ export function CollapsibleSection({
           open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
-        <div className="-mx-2 min-h-0 overflow-hidden px-2">
+        <div className="-mx-2 -mb-2 min-h-0 overflow-hidden px-2 pb-2">
           <div className={cn("pt-3", className)}>{children}</div>
         </div>
       </div>

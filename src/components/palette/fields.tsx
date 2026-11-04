@@ -99,22 +99,25 @@ export function SliderField({
           {unit ? <span className="w-3 text-xs text-muted-foreground">{unit}</span> : null}
         </div>
       </div>
-      {trackStyle ? (
-        <div
-          aria-hidden
-          className="h-2.5 w-full"
-          style={trackStyle}
+      {/* With a guide the gradient is the track itself: one bar with the thumb riding on it. */}
+      <div className={cn("relative", trackStyle && "flex h-5 items-center")}>
+        {trackStyle ? (
+          <div aria-hidden className="absolute inset-x-0 h-4 rounded-full shadow-(--shadow-default)" style={trackStyle} />
+        ) : null}
+        <Slider
+          aria-label={label}
+          value={[value]}
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
+          className={cn(
+            trackStyle &&
+              "relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-md [&_[data-slot=slider-track]]:bg-transparent",
+          )}
         />
-      ) : null}
-      <Slider
-        aria-label={label}
-        value={[value]}
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
-      />
+      </div>
       {startLabel || endLabel ? (
         <div className="flex justify-between text-[11px] text-muted-foreground">
           <span>{startLabel}</span>
