@@ -17,6 +17,7 @@ import { SPACES } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
 import { CollapsibleSection, PanelSection, SettingRow } from "./panel-section";
+import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
 import type { StepHeaderActions } from "./step-header";
@@ -74,10 +75,16 @@ export function StepPanel({
   const tuned = generated.shades.filter((s) => s.tweaked).length;
   const others = tuned - (here ? 1 : 0);
   const [confirming, setConfirming] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState<string | null>(null);
-  const nameResult = parseStepName(nameDraft ?? String(shade.grade), stepActions.grades, shade.grade);
+  const nameResult = parseStepName(
+    nameDraft ?? String(shade.grade),
+    stepActions.grades,
+    shade.grade,
+  );
   const commitName = () => {
-    if (nameResult.ok && nameResult.grade !== shade.grade) stepActions.onRenameStep(shade.grade, nameResult.grade);
+    if (nameResult.ok && nameResult.grade !== shade.grade)
+      stepActions.onRenameStep(shade.grade, nameResult.grade);
     if (nameResult.ok) setNameDraft(null);
   };
 
@@ -91,8 +98,14 @@ export function StepPanel({
   };
 
   const base = { h: shade.oklch.h - tweak.dh, c: shade.oklch.C };
-  const hueGuide = guide(shade.luminance, gamut, (t) => ({ h: base.h + (t * 120 - 60), c: base.c }));
-  const chromaGuide = guide(shade.luminance, gamut, (t) => ({ h: base.h + tweak.dh, c: Math.max(0, base.c * (1 + (t * 2 - 1))) }));
+  const hueGuide = guide(shade.luminance, gamut, (t) => ({
+    h: base.h + (t * 120 - 60),
+    c: base.c,
+  }));
+  const chromaGuide = guide(shade.luminance, gamut, (t) => ({
+    h: base.h + tweak.dh,
+    c: Math.max(0, base.c * (1 + (t * 2 - 1))),
+  }));
 
   const rows: { label: string; value: string; copy?: string }[] = [
     { label: "Hex", value: shade.hex, copy: shade.hex },
@@ -115,102 +128,113 @@ export function StepPanel({
 
   return (
     <>
-      <PanelSection className="space-y-4">
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="size-10 shrink-0 rounded-lg ring-1 ring-foreground/15"
-            style={{ backgroundColor: css }}
-          />
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold">
-              {name} {shade.grade}
-            </h2>
-            <p className="text-[11px] text-muted-foreground">
-              {shade.anchor
-                ? "White and black are fixed, so there's nothing to tune."
-                : shade.isSource
-                  ? "Your base color landed here."
-                  : "Nudge this step without moving its neighbors."}
-            </p>
+      <div>
+        <PanelSection className="space-y-4 pb-0">
+          <div className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className="size-10 shrink-0 rounded-lg ring-1 ring-foreground/15"
+              style={{ backgroundColor: css }}
+            />
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-semibold">
+                {name} {shade.grade}
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                {shade.anchor
+                  ? "White and black are fixed, so there's nothing to tune."
+                  : shade.isSource
+                    ? "Your base color landed here."
+                    : "Nudge this step without moving its neighbors."}
+              </p>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center">
+              <Hint label="Previous step">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Previous step"
+                  disabled={!onPrevious}
+                  onClick={() => onPrevious?.()}
+                >
+                  <ChevronLeft />
+                </Button>
+              </Hint>
+              <Hint label="Next step">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Next step"
+                  disabled={!onNext}
+                  onClick={() => onNext?.()}
+                >
+                  <ChevronRight />
+                </Button>
+              </Hint>
+            </div>
           </div>
-          <div className="ml-auto flex shrink-0 items-center">
-            <Hint label="Previous step">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Previous step"
-                disabled={!onPrevious}
-                onClick={() => onPrevious?.()}
-              >
-                <ChevronLeft />
-              </Button>
-            </Hint>
-            <Hint label="Next step">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Next step"
-                disabled={!onNext}
-                onClick={() => onNext?.()}
-              >
-                <ChevronRight />
-              </Button>
-            </Hint>
-          </div>
-        </div>
-      </PanelSection>
+        </PanelSection>
 
-      <CollapsibleSection id="details" title="Details">
-        <div className="space-y-3">
-          {!shade.anchor ? (
-            <SettingRow id="step-name" label="Step name">
-              <Input
-                id="step-name"
-                value={nameDraft ?? String(shade.grade)}
-                inputMode="numeric"
-                aria-invalid={nameResult.ok ? undefined : true}
-                onChange={(e) => setNameDraft(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                onBlur={commitName}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur();
-                  if (e.key === "Escape") {
-                    setNameDraft(null);
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="h-8 font-mono text-xs"
-              />
-            </SettingRow>
-          ) : null}
-          {!nameResult.ok ? <p className="text-[11px] text-destructive">{nameResult.error}</p> : null}
-          {rows.map((r) => (
-            <SettingRow key={r.label} label={r.label}>
-              <div className="flex h-8 w-full min-w-0 items-center gap-1 rounded-lg bg-white pr-1 pl-2.5 shadow-(--shadow-default) dark:bg-input/30">
-                <span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums">{r.value}</span>
-                {r.copy ? (
-                  <Hint label={`Copy ${r.label}`}>
-                    <button
-                      type="button"
-                      aria-label={`Copy ${r.label}`}
-                      onClick={() => copy(r.copy as string)}
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    >
-                      <Copy className="size-3" />
-                    </button>
-                  </Hint>
-                ) : null}
-              </div>
-            </SettingRow>
-          ))}
-        </div>
-      </CollapsibleSection>
+        <CollapsibleSection id="details" title="Details">
+          <div className="space-y-3">
+            {!shade.anchor ? (
+              <SettingRow id="step-name" label="Step name">
+                <Input
+                  id="step-name"
+                  value={nameDraft ?? String(shade.grade)}
+                  inputMode="numeric"
+                  aria-invalid={nameResult.ok ? undefined : true}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  onBlur={commitName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Escape") {
+                      setNameDraft(null);
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="h-8 font-mono text-xs"
+                />
+              </SettingRow>
+            ) : null}
+            {!nameResult.ok ? (
+              <p className="text-[11px] text-destructive">{nameResult.error}</p>
+            ) : null}
+            {rows.map((r) => (
+              <SettingRow key={r.label} label={r.label}>
+                <div className="flex h-8 w-full min-w-0 items-center gap-1 rounded-lg bg-white pr-1 pl-2.5 shadow-(--shadow-default) dark:bg-input/30">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs tabular-nums">
+                    {r.value}
+                  </span>
+                  {r.copy ? (
+                    <Hint label={`Copy ${r.label}`}>
+                      <button
+                        type="button"
+                        aria-label={`Copy ${r.label}`}
+                        onClick={() => copy(r.copy as string)}
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        <Copy className="size-3" />
+                      </button>
+                    </Hint>
+                  ) : null}
+                </div>
+              </SettingRow>
+            ))}
+          </div>
+        </CollapsibleSection>
+      </div>
 
       {!shade.anchor ? (
-        <CollapsibleSection id="adjustments" title="Adjustments" className="space-y-3">
+        <CollapsibleSection
+          id="adjustments"
+          title="Adjustments"
+          className="space-y-3"
+        >
           <p className="text-[11px] text-muted-foreground">
-            Nudge the hue and colorfulness of this step. Lightness doesn&apos;t change, so it keeps its contrast.
+            Nudge the hue and colorfulness of this step. Lightness doesn&apos;t
+            change, so it keeps its contrast.
           </p>
           <SliderField
             id={`tune-hue-${shade.grade}`}
@@ -265,25 +289,36 @@ export function StepPanel({
       ) : null}
 
       {!shade.anchor ? (
-        <CollapsibleSection id="danger" title="Danger zone" className="space-y-2">
-          <p className="text-[11px] text-muted-foreground">
-            Step {shade.grade} is shared by every color, so deleting it removes it from all of them.
-          </p>
+        <CollapsibleSection
+          id="danger"
+          title="Danger zone"
+          className="space-y-2"
+        >
           <Button
             variant="destructive"
             className="w-full"
             disabled={stepActions.stepLimit === "min"}
-            onClick={() => stepActions.onRemoveStep(shade.grade)}
+            onClick={() => setDeleting(true)}
           >
             <Trash2 />
             Delete step {shade.grade}
           </Button>
           {stepActions.stepLimit === "min" ? (
-            <p className="text-[11px] text-muted-foreground">A scale needs at least 3 steps.</p>
+            <p className="text-[11px] text-muted-foreground">
+              A scale needs at least 3 steps.
+            </p>
           ) : null}
         </CollapsibleSection>
       ) : null}
 
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete step ${shade.grade}?`}
+        description={`Step ${shade.grade} is shared by every color, so it is removed from all of them. You can undo it right after with ⌘Z.`}
+        confirm="Delete step"
+        onConfirm={() => stepActions.onRemoveStep(shade.grade)}
+      />
       <ResetTweaksDialog
         open={confirming}
         onOpenChange={setConfirming}

@@ -11,6 +11,7 @@ import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
 import { SliderField } from "./fields";
+import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
@@ -61,6 +62,7 @@ export function HuePanel({
   const lockedDark = generated.source?.grade === last?.grade && ramp.length > 1;
   const tuned = generated.shades.filter((s) => s.tweaked).length;
   const [confirming, setConfirming] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const lightGuide = React.useMemo(
     () =>
@@ -82,6 +84,16 @@ export function HuePanel({
       ),
     [space, gamut, last?.targetLuminance, hue.chromaDark, def.chroma.max],
   );
+
+  const chromaGuide = React.useMemo(() => {
+    const y = ramp[Math.floor(ramp.length / 2)]?.targetLuminance ?? 0.2;
+    const h = (hue.hueLight + hue.hueDark) / 2;
+    const stops = Array.from({ length: 13 }, (_, i) => {
+      const c = solveForLuminance(def, y, h, (i / 12) * def.chroma.max, gamut);
+      return `${cssColor(c.hex, c.linear, gamut)} ${((i / 12) * 100).toFixed(1)}%`;
+    });
+    return { background: `linear-gradient(to right, ${stops.join(", ")})` } as React.CSSProperties;
+  }, [ramp, hue.hueLight, hue.hueDark, def, gamut]);
 
   const setChroma = (value: number) => {
     const factor = hue.chromaMid > 1e-9 ? value / hue.chromaMid : 0;
@@ -229,19 +241,27 @@ export function HuePanel({
             max={def.chroma.max}
             step={def.chroma.step}
             decimals={def.chroma.decimals}
+            trackStyle={chromaGuide}
             onChange={setChroma}
           />
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection id="danger" title="Danger zone" className="space-y-2">
-        <p className="text-[11px] text-muted-foreground">Removes this color and its tuned steps from the palette.</p>
-        <Button variant="destructive" className="w-full" onClick={onRemove}>
+      <CollapsibleSection id="danger" title="Danger zone">
+        <Button variant="destructive" className="w-full" onClick={() => setDeleting(true)}>
           <Trash2 />
           Delete {hue.name || "this color"}
         </Button>
       </CollapsibleSection>
 
+      <ConfirmDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${hue.name || "this color"}?`}
+        description={`This removes ${hue.name || "this color"} and its ${tuned > 0 ? `${tuned} tuned ${tuned === 1 ? "step" : "steps"}` : "steps"} from the palette. You can undo it right after with ⌘Z.`}
+        confirm="Delete color"
+        onConfirm={onRemove}
+      />
       <ResetTweaksDialog
         open={confirming}
         onOpenChange={setConfirming}
