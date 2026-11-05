@@ -715,13 +715,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {/* On hover the logo gives off a soft glow of the palette on screen, so it changes with every palette. */}
+          {/* On hover the logo fills with a gradient of the palette on screen, so it changes with every palette. */}
           {(() => {
             const glow =
               ready && generated.length > 0 ? (
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-x-1 -bottom-0.5 -z-10 h-3 rounded-full opacity-0 blur-md transition-opacity duration-300 group-focus-visible:opacity-60 group-hover:opacity-60 motion-reduce:transition-none"
+                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] group-focus-visible:opacity-100 group-hover:opacity-100 motion-reduce:transition-none"
                   style={{ backgroundImage: `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` }}
                 />
               ) : null;
