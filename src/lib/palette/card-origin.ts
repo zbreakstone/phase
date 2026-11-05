@@ -61,14 +61,3 @@ export function flightKeyframes(from: DOMRect, to: DOMRect, radiusFrom: number, 
 export function peekLeavingId(): string | null {
   return leaving && Date.now() - leaving.at < FRESH_MS ? leaving.id : null;
 }
-
-/** Switching palettes from the editor's menu: the next editor eases in where this one eased out. */
-let switchedAt = 0;
-
-export function rememberSwitch() {
-  switchedAt = Date.now();
-}
-
-export function peekSwitch(): boolean {
-  return Date.now() - switchedAt < FRESH_MS;
-}

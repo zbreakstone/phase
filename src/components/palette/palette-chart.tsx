@@ -153,7 +153,7 @@ const lerpGeo = (a: Geo, b: Geo, k: number): Geo => ({
 });
 
 /** Glides the lines to their new positions when a view changes but keeps the same shape. A different shape just swaps. */
-function useMorph(target: Geo | null): Geo | null {
+function useMorph(target: Geo | null, calm: boolean): Geo | null {
   const [shown, setShown] = React.useState(target);
   const latest = React.useRef(target);
   React.useEffect(() => {
@@ -162,7 +162,7 @@ function useMorph(target: Geo | null): Geo | null {
       setShown(g);
     };
     const from = latest.current;
-    if (!target || !from || !sameShape(from, target) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (calm || !target || !from || !sameShape(from, target) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       apply(target);
       return;
     }
@@ -175,7 +175,7 @@ function useMorph(target: Geo | null): Geo | null {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
+  }, [target, calm]);
   return shown;
 }
 
@@ -247,12 +247,15 @@ export function PaletteChart({
   focusGrade,
   space,
   gamut,
+  calm = false,
 }: {
   generated: GeneratedHue[];
+  /** The data is already gliding on its own (switching palettes), so don't ease between its frames too. */
   focusId: string | null;
   focusGrade: number | null;
   space: SpaceId;
   gamut: Gamut;
+  calm?: boolean;
 }) {
   const [metric, setMetric] = React.useState<Metric>("chroma");
   const [grade, setGrade] = React.useState<number | "all">(500);
@@ -319,7 +322,7 @@ export function PaletteChart({
   const { tLo, tHi, xOf, yOf } = scales;
 
   const geo = React.useMemo((): Geo | null => (points.length ? { lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))) } : null), [points, series, showAll, xOf, yOf]);
-  const morphed = useMorph(geo);
+  const morphed = useMorph(geo, calm);
 
   const showLimit = metric === "chroma" && !showAll;
   const hatchLayer = React.useMemo(() => {
