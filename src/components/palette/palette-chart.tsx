@@ -319,7 +319,7 @@ function Dot({ x, y, hex, big = false, opacity = 1 }: { x: number; y: number; he
   return (
     <span
       aria-hidden
-      className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)", big ? "size-3.5" : "size-2.5")}
+      className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-default)", big ? "size-3.5" : "size-2.5")}
       style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`, backgroundColor: hex, opacity }}
     />
   );

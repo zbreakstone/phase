@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Hint } from "./hint";
+import { useKeyShortcut } from "./use-key-shortcut";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
   type Accent,
@@ -94,6 +95,10 @@ function ColorPad({
     return best;
   };
 
+  // With no theme color yet there are no dots, so the pad itself takes the arrow keys and the first one
+  // creates the color, starting from the middle of the field.
+  const seed: Handle = { id: "bg", label: "Background color", point: { x: 0.5, y: STEP * 3 }, color: "" };
+  const empty = handles.length === 0;
   const onKey = (h: Handle) => (e: React.KeyboardEvent) => {
     const big = e.shiftKey ? 3 : 1;
     const d: Record<string, Point> = {
@@ -112,6 +117,17 @@ function ColorPad({
   return (
     <div
       ref={ref}
+      data-color-pad=""
+      {...(empty && {
+        tabIndex: 0,
+        role: "group",
+        "aria-label": "Theme color. Arrow keys pick a hue and vividness.",
+        onKeyDown: (e: React.KeyboardEvent) => {
+          onKey(seed)(e);
+          // The pad lost its job to the new dot, so hand focus over instead of dropping it.
+          if (e.defaultPrevented) requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>("[role=slider]")?.focus());
+        },
+      })}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         const p = point(e);
@@ -125,7 +141,7 @@ function ColorPad({
         if (active.current) onCommit();
         active.current = null;
       }}
-      className="relative h-32 cursor-crosshair touch-none rounded-xl bg-muted p-3 select-none"
+      className="relative h-32 cursor-crosshair touch-none rounded-xl bg-muted p-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="grid h-full w-full place-items-center"
@@ -165,7 +181,7 @@ function ColorPad({
           aria-valuenow={Math.round(h.point.x * 360)}
           onKeyDown={onKey(h)}
           className={
-            "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-(--shadow-large) outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+            "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-(--shadow-default) outline-none focus-visible:ring-2 focus-visible:ring-ring " +
             (h.id === "bg" ? "size-6" : "size-4")
           }
           style={{
@@ -201,6 +217,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const accent = useAccent();
+  useKeyShortcut("KeyA", () => setOpen(true), { enabled: enabled && !!session });
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -253,7 +270,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Hint label={email}>
+      <Hint label={email} shortcut={["A"]}>
         <PopoverTrigger
           aria-label="Account"
           className={toggleVariants({ variant: "outline", size: "sm", className: "size-7 min-w-0 rounded-full! p-0" })}
@@ -271,7 +288,16 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
           </span>
         </PopoverTrigger>
       </Hint>
-      <PopoverContent align="end" className="w-72 gap-2 p-3">
+      {/* Start on the color dots (or the pad), not the first enabled button, so Enter right after opening can't sign you out. */}
+      <PopoverContent
+        align="end"
+        className="w-72 gap-2 p-3"
+        initialFocus={() =>
+          document.querySelector<HTMLElement>("[data-slot=popover-content] [role=slider]") ??
+          document.querySelector<HTMLElement>("[data-slot=popover-content] [data-color-pad]") ??
+          document.querySelector<HTMLElement>("[data-slot=popover-content]")
+        }
+      >
         <p className="text-xs text-muted-foreground">Signed in as</p>
         <p className="truncate text-sm font-medium">{email}</p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -329,9 +355,11 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
             onClick={() => {
               setAccent(null);
               void saveAccent(null);
+              // This button disables itself, so move focus to the pad rather than dropping it.
+              requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-color-pad]")?.focus());
             }}
           >
-            Use default
+            Reset theme
           </Button>
         </div>
         <Button variant="outline" size="sm" onClick={signOut} disabled={busy}>

@@ -80,7 +80,7 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
-  // / turns the preview on and off, P opens the lens menu, T the theme menu, G toggles grain, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  // / turns the preview on and off, M opens the lens menu, T the theme menu, G toggles grain, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -95,7 +95,7 @@ export function ViewToolbar({
         e.key !== "/" &&
         e.key !== "[" &&
         e.key !== "]" &&
-        e.key.toLowerCase() !== "p" &&
+        e.key.toLowerCase() !== "m" &&
         e.key.toLowerCase() !== "t" &&
         e.key.toLowerCase() !== "g"
       )
@@ -109,7 +109,7 @@ export function ViewToolbar({
         return;
       e.preventDefault();
       if (e.key === "/") apply(active ? null : lens);
-      else if (e.key.toLowerCase() === "p") setLensOpen(true);
+      else if (e.key.toLowerCase() === "m") setLensOpen(true);
       else if (e.key.toLowerCase() === "t") setThemeOpen(true);
       else if (e.key.toLowerCase() === "g") {
         if (mode === "smooth") onGrain(!grain);
@@ -136,7 +136,7 @@ export function ViewToolbar({
             apply(v as Lens);
           }}
         >
-          <Hint label="Change preview mode" shortcut={["P"]}>
+          <Hint label="Change preview mode" shortcut={["M"]}>
             <SelectTrigger
               size="sm"
               className="w-40"
