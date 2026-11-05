@@ -85,11 +85,12 @@ const LOGO_MASK = "[mask-image:url(/phase-lockup-white.png)] [mask-position:cent
  * colors, hovering lights it up with them drifting through the letters and a soft glow of the same colors behind.
  */
 function Logo({ colors }: { colors?: string[] }) {
-  // A soft round blob of each color, spread across a tile twice the logo's width; the first repeats at the end so the drift loops seamlessly.
+  // A soft round blob of each color, spread across a tile twice the logo's width. Each blob is also drawn a tile to
+  // either side, so the parts that spill over an edge carry on into the next tile and the drift loops without a seam.
   const fill = colors?.length
     ? {
-        backgroundImage: [...colors, colors[0]]
-          .map((c, i) => `radial-gradient(ellipse 28% 120% at ${(i / colors.length) * 100}% ${i % 2 ? 80 : 20}%, ${c}, ${c}00)`)
+        backgroundImage: colors
+          .flatMap((c, i) => [-100, 0, 100].map((shift) => `radial-gradient(ellipse 28% 120% at ${(i / colors.length) * 100 + shift}% ${i % 2 ? 80 : 20}%, ${c}, ${c}00)`))
           .concat(`linear-gradient(${colors[0]}, ${colors[0]})`)
           .join(", "),
       }
