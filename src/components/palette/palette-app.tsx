@@ -81,6 +81,43 @@ interface PaletteAppProps {
 const LOGO_MASK = "[mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]";
 
 /**
+ * `--shadow-default` turned inward and traced around the letters rather than a box: the same hairline ring and the
+ * same two soft drops, each cut from the logo's own outline. CSS shadows can't follow a mask, so it's an SVG filter.
+ */
+function LogoInsetFilter({ id }: { id: string }) {
+  const drop = (dy: number, blur: number, color: string, dark: string, n: number) => (
+    <>
+      <feOffset in="outside" dy={dy} result={`o${n}`} />
+      <feGaussianBlur in={`o${n}`} stdDeviation={blur} result={`b${n}`} />
+      <feFlood className={cn(color, dark)} />
+      <feComposite operator="in" in2={`b${n}`} />
+      <feComposite operator="in" in2="SourceAlpha" result={`s${n}`} />
+    </>
+  );
+  return (
+    <svg aria-hidden width={0} height={0} className="absolute">
+      <filter id={id} x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+        <feComponentTransfer in="SourceAlpha" result="outside">
+          <feFuncA type="table" tableValues="1 0" />
+        </feComponentTransfer>
+        <feMorphology in="SourceAlpha" operator="erode" radius={0.5} result="eroded" />
+        <feComposite in="SourceAlpha" in2="eroded" operator="out" result="edge" />
+        <feFlood className="[flood-color:#0000000f] dark:[flood-color:#ffffff12]" />
+        <feComposite operator="in" in2="edge" result="s0" />
+        {drop(1, 0.5, "[flood-color:#0000001a]", "dark:[flood-color:#0000]", 1)}
+        {drop(1, 1, "[flood-color:#0000000d]", "dark:[flood-color:#0000]", 2)}
+        <feMerge>
+          <feMergeNode in="SourceGraphic" />
+          <feMergeNode in="s0" />
+          <feMergeNode in="s1" />
+          <feMergeNode in="s2" />
+        </feMerge>
+      </filter>
+    </svg>
+  );
+}
+
+/**
  * The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. Given the palette's
  * colors, hovering lights it up with them swirling through the letters and a soft glow of the same colors behind.
  */
@@ -105,19 +142,23 @@ function Logo({ colors }: { colors?: string[] }) {
       style={fill ?? undefined}
     />
   );
+  const inset = "phase-logo-inset";
   return (
     <span className="relative block">
-      <span role="img" aria-label="Phase" className={cn("block aspect-[276/90] h-7 bg-stone-300 dark:bg-stone-700", LOGO_MASK)} />
+      <LogoInsetFilter id={inset} />
       {fill ? (
-        <>
-          <span aria-hidden className={cn("pointer-events-none absolute inset-0 blur-md saturate-150", lit, "group-hover:opacity-90 group-focus-visible:opacity-90")}>
-            <span className={cn("absolute inset-0 overflow-hidden", LOGO_MASK)}>{swirl}</span>
-          </span>
-          <span aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden", LOGO_MASK, lit)}>
+        <span aria-hidden className={cn("pointer-events-none absolute inset-0 blur-md mix-blend-multiply dark:mix-blend-screen", lit, "group-hover:opacity-35 group-focus-visible:opacity-35")}>
+          <span className={cn("absolute inset-0 overflow-hidden", LOGO_MASK)}>{swirl}</span>
+        </span>
+      ) : null}
+      <span className="relative block" style={{ filter: `url(#${inset})` }}>
+        <span role="img" aria-label="Phase" className={cn("block aspect-[276/90] h-7 bg-stone-300 dark:bg-stone-700", LOGO_MASK)} />
+        {fill ? (
+          <span aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden mix-blend-multiply dark:mix-blend-screen", LOGO_MASK, lit, "group-hover:opacity-55 group-focus-visible:opacity-55")}>
             {swirl}
           </span>
-        </>
-      ) : null}
+        ) : null}
+      </span>
     </span>
   );
 }
