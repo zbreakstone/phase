@@ -91,15 +91,18 @@ describe("rules", () => {
     expect(requiredRatio(600, rules)).toBe(4.5);
     expect(requiredRatio(900, rules)).toBe(7);
   });
-  it("detects violations in hand-edited targets", () => {
+  it("moves hand-edited targets that break a rule until every rule holds", () => {
     const scale = {
       ...defaultScale(),
       luminanceMode: "custom" as const,
       customLuminance: { "500": uniformLuminance(500), "100": uniformLuminance(500) + 0.02 },
     };
-    const v = checkTargets(scale);
-    expect(v.length).toBeGreaterThan(0);
-    expect(v.every((x) => x.actual < x.required)).toBe(true);
+    // The edit asks for steps 100 and 500 to sit almost together, which no contrast rule allows.
+    const asked = contrastFromLuminance(scale.customLuminance["100"], scale.customLuminance["500"]);
+    expect(asked).toBeLessThan(requiredRatio(400, scale.rules) ?? 0);
+    // The targets are corrected rather than reported, so nothing violates and the gap is restored.
+    expect(checkTargets(scale)).toEqual([]);
+    expect(contrastFromLuminance(targetLuminance(scale, 100), targetLuminance(scale, 500))).toBeGreaterThanOrEqual(requiredRatio(400, scale.rules) ?? 0);
   });
   it("flags rules no white-to-black scale can satisfy", () => {
     const res = ruleFeasibility([{ id: "x", minDiff: 200, ratio: 7 }]);
