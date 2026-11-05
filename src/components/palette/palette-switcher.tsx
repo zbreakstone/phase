@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Hint } from "./hint";
 import { useKeyShortcut } from "./use-key-shortcut";
@@ -47,52 +47,31 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Pro
   }, [open]);
 
   const choose = (id: string) => {
-    setOpen(false);
     if (id !== currentId) onSwitch(id);
   };
 
   const label = currentName.trim() || "Untitled palette";
 
-  const rows = (
-    <ul className="max-h-80 overflow-y-auto">
-      {palettes?.map((p) => (
-        <li key={p.id}>
-          <button
-            type="button"
-            onClick={() => choose(p.id)}
-            aria-current={p.id === currentId ? "true" : undefined}
-            className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{p.name}</span>
-              <span className="block text-xs text-muted-foreground">Edited {when(p.updatedAt)}</span>
-            </span>
-            {p.id === currentId ? <Check aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /> : null}
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-
+  // A menu rather than a popover, so the arrow keys, Home and End, and typing a name all move through the palettes.
   return (
-    <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <Hint label="Switch palette" shortcut={["P"]}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Switch palette"
-                className="min-w-0 border-0 bg-white pr-1.5 pl-2.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) aria-expanded:bg-white aria-expanded:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30 dark:aria-expanded:bg-input/30"
-              />
-            }
-          >
-            <span className="truncate font-medium">{label}</span>
-            <ChevronDown className="shrink-0" />
-          </PopoverTrigger>
-        </Hint>
-        <PopoverContent align="start" className="w-72 gap-0 p-1">
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <Hint label="Switch palette" shortcut={["P"]}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Switch palette"
+              className="min-w-0 border-0 bg-white pr-1.5 pl-2.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) aria-expanded:bg-white aria-expanded:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30 dark:aria-expanded:bg-input/30"
+            />
+          }
+        >
+          <span className="truncate font-medium">{label}</span>
+          <ChevronDown className="shrink-0" />
+        </DropdownMenuTrigger>
+      </Hint>
+      <DropdownMenuContent align="start" className="w-72 gap-0 p-1">
+        <div className="max-h-80 overflow-y-auto">
           {palettes === null ? (
             <div aria-busy="true" aria-label="Loading your palettes" className="space-y-1 p-1">
               {[0, 1, 2].map((i) => (
@@ -102,23 +81,23 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Pro
           ) : palettes.length === 0 ? (
             <p className="p-3 text-center text-xs text-muted-foreground">No saved palettes yet.</p>
           ) : (
-            rows
+            palettes.map((p) => (
+              <DropdownMenuItem key={p.id} label={p.name} onClick={() => choose(p.id)} aria-current={p.id === currentId ? "true" : undefined} className="gap-2 py-1.5 pr-2 pl-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{p.name}</span>
+                  <span className="block text-xs font-normal text-muted-foreground">Edited {when(p.updatedAt)}</span>
+                </span>
+                {p.id === currentId ? <Check aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+              </DropdownMenuItem>
+            ))
           )}
-          <div className={palettes?.length ? "mt-1 border-t border-border pt-1" : ""}>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onNew();
-              }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <Plus aria-hidden className="size-4 text-muted-foreground" />
-              New palette
-            </button>
-          </div>
-        </PopoverContent>
-      </Popover>
-    </>
+        </div>
+        {palettes?.length ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuItem onClick={onNew} className="gap-2 py-1.5 pl-2 font-medium">
+          <Plus aria-hidden className="size-4 text-muted-foreground" />
+          New palette
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
