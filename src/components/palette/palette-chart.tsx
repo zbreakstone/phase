@@ -141,37 +141,85 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
 }
 
 const MORPH_MS = 380;
+const CROSS_MS = 520;
 
 interface Geo {
   lines: { x: number; y: number }[][];
+  /** The dot on each step or color, for the views that show them all at once. */
+  dots: { x: number; y: number; hex: string }[];
+}
+
+const RESAMPLE = 40;
+
+/** The line's height at `x`, bending the way the drawn curve does. */
+function lineY(line: { x: number; y: number }[], x: number): number {
+  if (line.length === 0) return 0;
+  if (line.length === 1 || x <= line[0].x) return line[0].y;
+  let k = 0;
+  while (k < line.length - 2 && x > line[k + 1].x) k++;
+  const a = line[k];
+  const b = line[k + 1];
+  const f = b.x === a.x ? 0 : Math.min(1, Math.max(0, (x - a.x) / (b.x - a.x)));
+  return spline((line[k - 1] ?? a).y, a.y, b.y, (line[k + 2] ?? b).y, f);
+}
+
+/** The same curve as a fixed number of points, so lines with different numbers of stops can be blended. */
+function resample(line: { x: number; y: number }[]): { x: number; y: number }[] {
+  const x0 = line[0]?.x ?? 0;
+  const x1 = line[line.length - 1]?.x ?? 0;
+  return Array.from({ length: RESAMPLE }, (_, i) => {
+    const x = x0 + ((x1 - x0) * i) / (RESAMPLE - 1);
+    return { x, y: lineY(line, x) };
+  });
 }
 
 const sameShape = (a: Geo, b: Geo) => a.lines.length === b.lines.length && a.lines.every((l, i) => l.length === b.lines[i].length);
 
 const lerpGeo = (a: Geo, b: Geo, k: number): Geo => ({
   lines: b.lines.map((l, i) => l.map((p, j) => ({ x: a.lines[i][j].x + (p.x - a.lines[i][j].x) * k, y: a.lines[i][j].y + (p.y - a.lines[i][j].y) * k }))),
+  dots: b.dots,
 });
 
-/** Glides the lines to their new positions when a view changes but keeps the same shape. A different shape just swaps. */
-function useMorph(target: Geo | null, calm: boolean): Geo | null {
-  const [shown, setShown] = React.useState(target);
+/** Lines that differ in how many stops they have, blended through resampled copies. Line `i` of `b` starts from the nearest line of `a`. */
+const lerpAcross = (a: Geo, b: Geo, k: number): Geo => ({
+  lines: b.lines.map((l, i) => {
+    const from = resample(a.lines[Math.min(i, a.lines.length - 1)] ?? l);
+    const to = resample(l);
+    return from.map((p, j) => ({ x: p.x + (to[j].x - p.x) * k, y: p.y + (to[j].y - p.y) * k }));
+  }),
+  dots: b.dots,
+});
+
+interface Shown {
+  geo: Geo;
+  /** While lines of a different shape are blending: how far along, and where they started (for the dots that are leaving). */
+  across: { k: number; from: Geo } | null;
+}
+
+/** Glides the lines to their new positions when the view changes. Lines of a different shape (a color's steps vs. every color) blend through resampled copies. */
+function useMorph(target: Geo | null, calm: boolean): Shown | null {
+  const [shown, setShown] = React.useState<Shown | null>(target ? { geo: target, across: null } : null);
   const latest = React.useRef(target);
   React.useEffect(() => {
-    const apply = (g: Geo | null) => {
+    const apply = (s: Shown | null, g: Geo | null = s?.geo ?? null) => {
       latest.current = g;
-      setShown(g);
+      setShown(s);
     };
     const from = latest.current;
-    if (calm || !target || !from || !sameShape(from, target) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      apply(target);
+    if (calm || !target || !from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      apply(target ? { geo: target, across: null } : null);
       return;
     }
+    const same = sameShape(from, target);
     const start = performance.now();
     let raf = 0;
     const step = (now: number) => {
-      const k = Math.min(1, (now - start) / MORPH_MS);
-      apply(lerpGeo(from, target, 1 - Math.pow(1 - k, 3)));
-      if (k < 1) raf = requestAnimationFrame(step);
+      const t = Math.min(1, (now - start) / (same ? MORPH_MS : CROSS_MS));
+      const k = 1 - Math.pow(1 - t, 3);
+      if (t >= 1) apply({ geo: target, across: null });
+      else if (same) apply({ geo: lerpGeo(from, target, k), across: null });
+      else apply({ geo: lerpAcross(from, target, k), across: { k, from } });
+      if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
@@ -231,6 +279,17 @@ function format(metric: Metric, v: number): string {
 }
 
 /** A smooth path through the points (Catmull-Rom turned into Béziers), so a curve reads as a curve. */
+/** One dot on the line, placed in chart coordinates. */
+function Dot({ x, y, hex, big = false, opacity = 1 }: { x: number; y: number; hex: string; big?: boolean; opacity?: number }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)", big ? "size-3.5" : "size-2.5")}
+      style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`, backgroundColor: hex, opacity }}
+    />
+  );
+}
+
 function smooth(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return "";
   if (pts.length === 1) return `M${pts[0].x} ${pts[0].y}`;
@@ -332,7 +391,16 @@ export function PaletteChart({
   }, [points, domain]);
   const { tLo, tHi, xOf, yOf } = scales;
 
-  const geo = React.useMemo((): Geo | null => (points.length ? { lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))) } : null), [points, series, showAll, xOf, yOf]);
+  const geo = React.useMemo(
+    (): Geo | null =>
+      points.length
+        ? {
+            lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))),
+            dots: showAll ? [] : points.map((p) => ({ x: xOf(p.t), y: yOf(p.value), hex: p.hex })),
+          }
+        : null,
+    [points, series, showAll, xOf, yOf],
+  );
   const morphed = useMorph(geo, calm);
 
   const showLimit = metric === "chroma" && !showAll;
@@ -354,7 +422,10 @@ export function PaletteChart({
   const fade = useCrossfade(settled.value, viewKey);
 
   if (points.length === 0 || !geo) return null;
-  const drawn = morphed && sameShape(morphed, geo) ? morphed : geo;
+  // Until the glide effect has caught up with a new view, hold its first frame instead of jumping to the end.
+  const lagging = !!morphed && !morphed.across && !sameShape(morphed.geo, geo) && morphed.geo !== geo;
+  const across = lagging ? { k: 0, from: morphed.geo } : (morphed?.across ?? null);
+  const drawn = lagging ? lerpAcross(morphed.geo, geo, 0) : morphed && (morphed.across || sameShape(morphed.geo, geo)) ? morphed.geo : geo;
 
   const paths = drawn.lines.map((l) => smooth(l));
   const tones = showAll ? series.map((ss) => (ss.find((p) => p.grade === level) ?? ss[Math.floor(ss.length / 2)]).hex) : [];
@@ -422,7 +493,7 @@ export function PaletteChart({
           )}
         </div>
       </div>
-      <div key={`${showAll}|${focused?.hue.id ?? ""}`} className="animate-in fade-in relative duration-300">
+      <div className="animate-in fade-in relative duration-300">
       <svg
         role="img"
         aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
@@ -457,17 +528,20 @@ export function PaletteChart({
           <path d={paths[0]} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         )}
       </svg>
-      {(showAll ? (activeIndex >= 0 ? series.map((ss, n) => ({ p: ss[activeIndex], at: drawn.lines[n][activeIndex] })) : []) : points.map((p, i) => ({ p, at: drawn.lines[0][i] }))).map(({ p, at }, n) => (
-        <span
-          key={`${n}-${p.key}`}
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
-            !showAll && active?.key === p.key ? "size-3.5" : "size-2.5",
-          )}
-          style={{ left: `${(at.x / W) * 100}%`, top: `${(at.y / H) * 100}%`, backgroundColor: p.hex }}
-        />
-      ))}
+      {across ? (
+        <>
+          {across.from.dots.map((d, n) => (
+            <Dot key={`from-${n}`} x={d.x} y={lineY(drawn.lines[0], d.x)} hex={d.hex} opacity={1 - across.k} />
+          ))}
+          {geo.dots.map((d, n) => (
+            <Dot key={`to-${n}`} x={d.x} y={lineY(drawn.lines[0], d.x)} hex={d.hex} opacity={across.k} />
+          ))}
+        </>
+      ) : (
+        (showAll ? (activeIndex >= 0 ? series.map((ss, n) => ({ p: ss[activeIndex], at: drawn.lines[n][activeIndex] })) : []) : points.map((p, i) => ({ p, at: drawn.lines[0][i] }))).map(({ p, at }, n) => (
+          <Dot key={`${n}-${p.key}`} x={at.x} y={at.y} hex={p.hex} big={!showAll && active?.key === p.key} />
+        ))
+      )}
       {!focused && active ? (
         <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
           {active.label}

@@ -32,7 +32,7 @@ import { ColorsList } from "./colors-list";
 import { PaletteChart } from "./palette-chart";
 import { HuePanel } from "./hue-panel";
 import { ContrastRulesSection, PaletteSettings } from "./palette-settings";
-import { PaletteSquare, type SquareMode } from "./palette-square";
+import { PalettePreview, PaletteSquare, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
@@ -715,13 +715,29 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {session ? (
-            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Logo />
-            </button>
-          ) : (
-            <Logo />
-          )}
+          {/* On hover the logo gives off a soft glow of the palette on screen, so it changes with every palette. */}
+          {(() => {
+            const glow =
+              ready && generated.length > 0 ? (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-x-6 top-1 -bottom-4 -z-10 overflow-hidden rounded-full opacity-0 blur-xl transition-opacity duration-300 group-focus-visible:opacity-80 group-hover:opacity-80 motion-reduce:transition-none"
+                >
+                  <PalettePreview generated={generated} gamut={state.gamut} />
+                </span>
+              ) : null;
+            return session ? (
+              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {glow}
+                <Logo />
+              </button>
+            ) : (
+              <span className="group pointer-events-auto relative isolate rounded-md">
+                {glow}
+                <Logo />
+              </span>
+            );
+          })()}
         </footer>
       </main>
     </div>
