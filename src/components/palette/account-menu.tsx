@@ -273,7 +273,15 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
           </span>
         </PopoverTrigger>
       </Hint>
-      <PopoverContent align="end" className="w-72 gap-2 p-3">
+      {/* Start on the color dots (or the panel itself), not the first enabled button, so Enter right after opening can't sign you out. */}
+      <PopoverContent
+        align="end"
+        className="w-72 gap-2 p-3"
+        initialFocus={() =>
+          document.querySelector<HTMLElement>("[data-slot=popover-content] [role=slider]") ??
+          document.querySelector<HTMLElement>("[data-slot=popover-content]")
+        }
+      >
         <p className="text-xs text-muted-foreground">Signed in as</p>
         <p className="truncate text-sm font-medium">{email}</p>
         <p className="mt-1 text-xs text-muted-foreground">
