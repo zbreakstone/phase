@@ -187,3 +187,8 @@ html.dark[data-accent] {
     cursor: grabbing !important;
   }
 }
+@keyframes logo-drift {
+  to {
+    background-position: 200% 0;
+  }
+}

@@ -2,6 +2,7 @@
 
 import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -77,14 +78,36 @@ interface PaletteAppProps {
   fresh?: boolean;
 }
 
-/** The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. */
-function Logo() {
+const LOGO_MASK = "[mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]";
+
+/**
+ * The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. Given the palette's
+ * colors, hovering lights it up with them drifting through the letters and a soft glow of the same colors behind.
+ */
+function Logo({ colors }: { colors?: string[] }) {
+  // A soft round blob of each color, spread across a tile twice the logo's width; the first repeats at the end so the drift loops seamlessly.
+  const fill = colors?.length
+    ? {
+        backgroundImage: [...colors, colors[0]]
+          .map((c, i) => `radial-gradient(ellipse 28% 120% at ${(i / colors.length) * 100}% ${i % 2 ? 80 : 20}%, ${c}, ${c}00)`)
+          .concat(`linear-gradient(${colors[0]}, ${colors[0]})`)
+          .join(", "),
+      }
+    : null;
+  const lit = "opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none";
+  const drift = "bg-[length:200%_100%] bg-repeat-x animate-[logo-drift_6s_linear_infinite] motion-reduce:animate-none";
   return (
-    <span
-      role="img"
-      aria-label="Phase"
-      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] group-focus-visible:[background-image:var(--logo-fill)] group-hover:[background-image:var(--logo-fill)] dark:bg-stone-700"
-    />
+    <span className="relative block">
+      <span role="img" aria-label="Phase" className={cn("block aspect-[276/90] h-7 bg-stone-300 dark:bg-stone-700", LOGO_MASK)} />
+      {fill ? (
+        <>
+          <span aria-hidden className={cn("pointer-events-none absolute inset-0 blur-md saturate-150", lit, "group-hover:opacity-90 group-focus-visible:opacity-90")}>
+            <span className={cn("block size-full", LOGO_MASK, drift)} style={fill} />
+          </span>
+          <span aria-hidden className={cn("pointer-events-none absolute inset-0", LOGO_MASK, drift, lit)} style={fill} />
+        </>
+      ) : null}
+    </span>
   );
 }
 
@@ -715,17 +738,19 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {/* On hover the logo's fill becomes a gradient of the palette on screen, so it changes with every palette. */}
+          {/* On hover the logo lights up with the palette on screen, so it changes with every palette. */}
           {(() => {
-            const fill = ready && generated.length > 0 ? `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` : undefined;
-            const vars = { "--logo-fill": fill } as React.CSSProperties;
+            // Grays would only dull the gradient, so they're left out unless the palette has nothing else.
+            const tones = generated.map(representativeShade);
+            const vivid = tones.filter((t) => t.chroma >= 0.04);
+            const colors = ready ? (vivid.length ? vivid : tones).map((t) => t.hex) : undefined;
             return session ? (
-              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" style={vars}>
-                <Logo />
+              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Logo colors={colors} />
               </button>
             ) : (
-              <span className="group pointer-events-auto relative isolate rounded-md" style={vars}>
-                <Logo />
+              <span className="group pointer-events-auto relative isolate rounded-md">
+                <Logo colors={colors} />
               </span>
             );
           })()}
