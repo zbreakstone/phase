@@ -81,7 +81,7 @@ function Logo() {
     <span
       role="img"
       aria-label="Phase"
-      className="block aspect-[276/90] h-5 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
+      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
     />
   );
 }
@@ -615,6 +615,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               </span>
             </Hint>
           </div>
+          </div>
+          <div className="flex items-center gap-2">
           <SavesDialog
             open={historyOpen}
             onOpenChange={setHistoryOpen}
@@ -630,8 +632,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               setFocus({ hueId: null, grade: null });
             }}
           />
-          </div>
-          <div className="flex items-center gap-2">
           <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
           <AccountMenu onSignedOut={() => updateCurrent(null)} />
           </div>

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { KbdGroup } from "@/components/ui/kbd";
 import { Hint } from "./hint";
+import { isPopupOpen, isTextEntry } from "./text-entry";
 import { AddVersionDialog } from "./add-version-dialog";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
@@ -126,6 +127,21 @@ export function SavesDialog({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [session]);
+
+  // V shows or hides the version history, unless you're typing or a dialog or menu is open.
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.key.toLowerCase() !== "v") return;
+      if (isTextEntry(e.target)) return;
+      if (isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (!buttonRef.current) return;
+      e.preventDefault();
+      buttonRef.current.click();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const refresh = React.useCallback(async (paletteId: string | null) => {
     const cloud = getCloud();
@@ -483,8 +499,9 @@ export function SavesDialog({
 
   return (
     <>
-      <Hint label={`Version history: ${status?.label ?? label}`}>
+      <Hint label={`Show version history: ${status?.label ?? label}`} shortcut={["V"]}>
         <button
+          ref={buttonRef}
           type="button"
           aria-label="Version history"
           aria-expanded={open}
