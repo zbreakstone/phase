@@ -38,7 +38,7 @@ import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
 import { DisplaySettings, type Panel } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
-import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
+import { displayShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import { AccountMenu } from "./account-menu";
 import { useApplyAccent } from "@/lib/accent";
@@ -83,7 +83,7 @@ function Logo() {
     <span
       role="img"
       aria-label="Phase"
-      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] group-focus-visible:[background-image:var(--logo-fill)] group-hover:[background-image:var(--logo-fill)] dark:bg-stone-700"
+      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
     />
   );
 }
@@ -715,20 +715,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {/* On hover the logo's fill becomes a gradient of the palette on screen, so it changes with every palette. */}
-          {(() => {
-            const fill = ready && generated.length > 0 ? `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` : undefined;
-            const vars = { "--logo-fill": fill } as React.CSSProperties;
-            return session ? (
-              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" style={vars}>
-                <Logo />
-              </button>
-            ) : (
-              <span className="group pointer-events-auto relative isolate rounded-md" style={vars}>
-                <Logo />
-              </span>
-            );
-          })()}
+          {session ? (
+            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Logo />
+            </button>
+          ) : (
+            <Logo />
+          )}
         </footer>
       </main>
     </div>
