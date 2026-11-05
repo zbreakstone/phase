@@ -84,7 +84,7 @@ export function SavesDialog({
   const [, setAuthReady] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   /** The last save, open or load failed. Cleared by the next one that works. */
-  const [, setFailed] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
@@ -359,6 +359,15 @@ export function SavesDialog({
       }
     });
 
+  /** The dot on the history button: how the last save went. Nothing until there is a saved palette to report on. */
+  const status = failed
+    ? { label: "The last save failed", color: "bg-red-500" }
+    : dirty
+      ? { label: "Unsaved changes", color: "bg-amber-400" }
+      : current
+        ? { label: "All changes saved", color: "bg-green-500" }
+        : null;
+
   const panel = (
     <div className="flex h-full min-h-0 flex-col divide-y divide-border">
       <section className="flex items-center justify-between gap-2 px-5 py-4">
@@ -487,9 +496,15 @@ export function SavesDialog({
           aria-label="Version history"
           aria-expanded={open}
           onClick={toggle}
-          className={toggleVariants({ variant: "outline", size: "sm", className: open ? "bg-muted hover:bg-muted" : undefined })}
+          className={toggleVariants({ variant: "outline", size: "sm", className: open ? "relative bg-muted hover:bg-muted" : "relative" })}
         >
           <RotateCcwClock />
+          {status ? (
+            <>
+              <span aria-hidden className={`absolute -top-0.5 -right-0.5 size-2 rounded-full ring-2 ring-background ${status.color}`} />
+              <span className="sr-only">{status.label}</span>
+            </>
+          ) : null}
         </button>
       </Hint>
       {open && slot ? createPortal(panel, slot) : null}
