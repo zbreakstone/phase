@@ -577,7 +577,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               </div>
             ) : (
               <>
-                {/* The square is 16px taller than the sidebar, and the toolbar hangs above it so it never moves the square off center. */}
+                {/* The square and the sidebar are the same height, and the toolbar hangs above the square so it never moves the square off center. */}
                 <div className="relative mr-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-9rem)]">
                   <PaletteSquare
                     generated={generated}
@@ -620,7 +620,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           </div>
         </section>
 
-        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[calc(min(100cqw-25.5rem,100cqh-9rem)-1rem)] lg:pb-0">
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
           {!ready ? null : (
             <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
             {historyOpen || generated.length === 0 ? null : (
