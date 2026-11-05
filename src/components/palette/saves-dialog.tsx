@@ -81,10 +81,10 @@ export function SavesDialog({
 }: Props) {
   const enabled = cloudEnabled();
   const [session, setSession] = React.useState<Session | null>(null);
-  const [authReady, setAuthReady] = React.useState(false);
+  const [, setAuthReady] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   /** The last save, open or load failed. Cleared by the next one that works. */
-  const [failed, setFailed] = React.useState(false);
+  const [, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
@@ -359,25 +359,6 @@ export function SavesDialog({
       }
     });
 
-  const status = failed
-    ? { label: "The last save failed", color: "bg-red-500" }
-    : dirty
-      ? { label: "Unsaved changes", color: "bg-amber-400" }
-      : current
-        ? { label: "All changes saved", color: "bg-green-500" }
-        : null;
-  const label = !authReady
-    ? "Save"
-    : !signedIn
-      ? "Sign in"
-      : failed
-        ? "Save failed"
-        : dirty
-          ? "Unsaved"
-          : current
-            ? "Saved"
-            : "Not saved";
-
   const panel = (
     <div className="flex h-full min-h-0 flex-col divide-y divide-border">
       <section className="flex items-center justify-between gap-2 px-5 py-4">
@@ -499,7 +480,7 @@ export function SavesDialog({
 
   return (
     <>
-      <Hint label={`Show version history: ${status?.label ?? label}`} shortcut={["V"]}>
+      <Hint label="Show version history" shortcut={["V"]}>
         <button
           ref={buttonRef}
           type="button"

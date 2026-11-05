@@ -24,7 +24,7 @@ export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolea
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
+      <PopoverTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="bg-clip-border shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
         <Share2 />
         Share
       </PopoverTrigger>
