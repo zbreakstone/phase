@@ -2,6 +2,7 @@
 
 import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
+import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,7 +39,7 @@ import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
 import { DisplaySettings, type Panel } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
-import { displayShade, type Overlay } from "@/lib/palette/overlay";
+import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import { AccountMenu } from "./account-menu";
 import { useApplyAccent } from "@/lib/accent";
@@ -77,14 +78,88 @@ interface PaletteAppProps {
   fresh?: boolean;
 }
 
-/** The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. */
-function Logo() {
+const LOGO_MASK = "[mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]";
+
+/**
+ * `--shadow-default` turned inward and traced around the letters rather than a box: the same hairline ring and the
+ * same two soft drops, each cut from the logo's own outline. CSS shadows can't follow a mask, so it's an SVG filter.
+ */
+function LogoInsetFilter({ id }: { id: string }) {
+  const drop = (dy: number, blur: number, color: string, dark: string, n: number) => (
+    <>
+      <feOffset in="outside" dy={dy} result={`o${n}`} />
+      <feGaussianBlur in={`o${n}`} stdDeviation={blur} result={`b${n}`} />
+      <feFlood className={cn(color, dark)} />
+      <feComposite operator="in" in2={`b${n}`} />
+      <feComposite operator="in" in2="SourceAlpha" result={`s${n}`} />
+    </>
+  );
   return (
+    <svg aria-hidden width={0} height={0} className="absolute">
+      <filter id={id} x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
+        <feComponentTransfer in="SourceAlpha" result="outside">
+          <feFuncA type="table" tableValues="1 0" />
+        </feComponentTransfer>
+        <feMorphology in="SourceAlpha" operator="erode" radius={0.5} result="eroded" />
+        <feComposite in="SourceAlpha" in2="eroded" operator="out" result="edge" />
+        <feFlood className="[flood-color:#0000000f] dark:[flood-color:#ffffff12]" />
+        <feComposite operator="in" in2="edge" result="s0" />
+        {drop(1, 0.5, "[flood-color:#0000001a]", "dark:[flood-color:#0000]", 1)}
+        {drop(1, 1, "[flood-color:#0000000d]", "dark:[flood-color:#0000]", 2)}
+        <feMerge>
+          <feMergeNode in="SourceGraphic" />
+          <feMergeNode in="s0" />
+          <feMergeNode in="s1" />
+          <feMergeNode in="s2" />
+        </feMerge>
+      </filter>
+    </svg>
+  );
+}
+
+/**
+ * The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. Given the palette's
+ * colors, hovering lights it up with them swirling through the letters and a soft glow of the same colors behind.
+ */
+function Logo({ colors }: { colors?: string[] }) {
+  // A soft round blob of each color, set around a ring on a square larger than the logo. The square turns, so the
+  // colors orbit through the letters instead of sliding past.
+  const fill = colors?.length
+    ? {
+        backgroundImage: colors
+          .map((c, i) => {
+            const a = (i / colors.length) * Math.PI * 2;
+            return `radial-gradient(circle at ${(50 + Math.cos(a) * 28).toFixed(1)}% ${(50 + Math.sin(a) * 28).toFixed(1)}%, ${c}, ${c}00 38%)`;
+          })
+          .concat(`linear-gradient(${colors[0]}, ${colors[0]})`)
+          .join(", "),
+      }
+    : null;
+  const lit = "opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none";
+  const swirl = (
     <span
-      role="img"
-      aria-label="Phase"
-      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
+      className="absolute top-1/2 left-1/2 aspect-square w-[130%] -translate-x-1/2 -translate-y-1/2 animate-[logo-swirl_8s_linear_infinite] motion-reduce:animate-none"
+      style={fill ?? undefined}
     />
+  );
+  const inset = "phase-logo-inset";
+  return (
+    <span className="relative block">
+      <LogoInsetFilter id={inset} />
+      {fill ? (
+        <span aria-hidden className={cn("pointer-events-none absolute inset-0 blur-md mix-blend-multiply dark:mix-blend-screen", lit, "group-hover:opacity-35 group-focus-visible:opacity-35")}>
+          <span className={cn("absolute inset-0 overflow-hidden", LOGO_MASK)}>{swirl}</span>
+        </span>
+      ) : null}
+      <span className="relative block" style={{ filter: `url(#${inset})` }}>
+        <span role="img" aria-label="Phase" className={cn("block aspect-[276/90] h-7 bg-stone-300 dark:bg-stone-700", LOGO_MASK)} />
+        {fill ? (
+          <span aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden mix-blend-multiply dark:mix-blend-screen", LOGO_MASK, lit, "group-hover:opacity-55 group-focus-visible:opacity-55")}>
+            {swirl}
+          </span>
+        ) : null}
+      </span>
+    </span>
   );
 }
 
@@ -715,13 +790,22 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {session ? (
-            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Logo />
-            </button>
-          ) : (
-            <Logo />
-          )}
+          {/* On hover the logo lights up with the palette on screen, so it changes with every palette. */}
+          {(() => {
+            // Grays would only dull the gradient, so they're left out unless the palette has nothing else.
+            const tones = generated.map(representativeShade);
+            const vivid = tones.filter((t) => t.chroma >= 0.04);
+            const colors = ready ? (vivid.length ? vivid : tones).map((t) => t.hex) : undefined;
+            return session ? (
+              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Logo colors={colors} />
+              </button>
+            ) : (
+              <span className="group pointer-events-auto relative isolate rounded-md">
+                <Logo colors={colors} />
+              </span>
+            );
+          })()}
         </footer>
       </main>
     </div>
