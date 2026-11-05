@@ -117,7 +117,7 @@ export const ColorPickerSlider = (props: React.ComponentProps<typeof ArkColorPic
       <ArkColorPicker.ChannelSliderThumb
         className={cn(
           "relative size-4 shrink-0 -translate-1/2 rounded-full",
-          "border-2 border-white bg-white shadow-md ring-1 ring-black/10",
+          "border-2 border-white bg-white shadow-(--shadow-default)",
           "outline-none focus-visible:ring-2 focus-visible:ring-ring",
         )}
         data-slot="color-picker-channel-slider-thumb"
@@ -144,7 +144,7 @@ export const ColorPickerAreaThumb = (props: React.ComponentProps<typeof ArkColor
   const { className, ...rest } = props;
   return (
     <ArkColorPicker.AreaThumb
-      className={cn("size-4 rounded-full border-2 border-white shadow-md ring-1 ring-black/10 outline-none", className)}
+      className={cn("size-4 rounded-full border-2 border-white shadow-(--shadow-default) outline-none", className)}
       data-slot="color-picker-area-thumb"
       {...rest}
     />

@@ -122,7 +122,7 @@ export function AddColorSlot({
             type="button"
             aria-label={label}
             title="Add a color here"
-            className="flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-sm transition-opacity group-hover/addc:opacity-100 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:opacity-100"
+            className="flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-(--shadow-default) transition-opacity group-hover/addc:opacity-100 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:opacity-100"
           />
         }
       >

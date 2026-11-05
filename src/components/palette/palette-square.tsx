@@ -338,7 +338,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           const at = locate(e);
           if (at) open(at.row, at.col);
         }}
-        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-extra-large)", level !== "step" && "cursor-pointer")}
+        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-default)", level !== "step" && "cursor-pointer")}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
           {/* A picture that stays opaque while the new one fades in sits beneath it; one that fades out sits on top. */}
@@ -440,7 +440,7 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_4px_6px_-1px_#0000001a,0_2px_4px_-2px_#0000001a]", shown, on)} style={{ backgroundColor: color }} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", shown, on)} style={{ backgroundColor: color }} />
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", shown, on)} />
           </button>
         }

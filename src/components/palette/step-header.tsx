@@ -45,7 +45,7 @@ export function StepHeader({
             onClick={() => actions.onAddStep(previous, grade)}
             aria-label={`Add step ${mid}, between ${previous} and ${grade}`}
             title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : `Add step ${mid}`}
-            className="flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-sm transition-opacity group-hover/add:opacity-100 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:bg-muted disabled:text-muted-foreground disabled:hover:scale-100"
+            className="flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-(--shadow-default) transition-opacity group-hover/add:opacity-100 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:bg-muted disabled:text-muted-foreground disabled:hover:scale-100"
           >
             <Plus className="size-3" />
           </button>

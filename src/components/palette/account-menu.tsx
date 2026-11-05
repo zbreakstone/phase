@@ -181,7 +181,7 @@ function ColorPad({
           aria-valuenow={Math.round(h.point.x * 360)}
           onKeyDown={onKey(h)}
           className={
-            "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-(--shadow-large) outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+            "absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-(--shadow-default) outline-none focus-visible:ring-2 focus-visible:ring-ring " +
             (h.id === "bg" ? "size-6" : "size-4")
           }
           style={{
