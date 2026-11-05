@@ -1,6 +1,6 @@
 "use client";
 
-import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
+import { peekCardOrigin, peekSwitch, rememberLeavingSquare, rememberSwitch } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
@@ -96,6 +96,10 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
+  /** Leaving for another saved palette: this one eases out, then the next one eases in (see `swapped`). */
+  const [leaving, setLeaving] = React.useState(false);
+  /** Arrived from another palette's switcher: the square and sidebar ease in. Opening from a card keeps its own zoom instead. */
+  const [swapped] = React.useState(() => peekSwitch());
   const [resetOpen, setResetOpen] = React.useState(false);
   /** The version history takes over the sidebar, drawn into this element by the history menu. */
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -117,6 +121,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       if (paletteId || fresh) {
         // Coming back to a palette starts from its latest version with the history closed, not wherever it was left.
         setHistoryOpen(false);
+        setLeaving(false);
         try {
           if (paletteId) {
             const cloud = getCloud();
@@ -488,7 +493,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               currentId={current?.id ?? null}
               currentName={name}
               onSwitch={(id) => {
-                if (confirmLeave()) router.push(`/p/${id}`);
+                if (!confirmLeave()) return;
+                rememberSwitch();
+                if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) router.push(`/p/${id}`);
+                else {
+                  setLeaving(true);
+                  window.setTimeout(() => router.push(`/p/${id}`), 180);
+                }
               }}
               onNew={() => {
                 if (confirmLeave()) router.push("/p/new");
@@ -541,7 +552,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="my-auto space-y-6">
             {!ready ? (
               <div aria-busy="true" aria-label="Loading your palette" className="mr-auto">
-                <Skeleton className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard ? "invisible" : ""}`} />
+                <Skeleton className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard || swapped ? "invisible" : ""}`} />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
@@ -553,6 +564,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               <>
                 {/* The square and the sidebar are the same height, and the toolbar hangs above the square so it never moves the square off center. */}
                 <div className="relative mr-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-9rem)]">
+                  <div className={`transition-[opacity,scale,filter] duration-200 ease-out motion-reduce:transition-none ${leaving ? "scale-[0.97] opacity-0 blur-sm" : ""} ${swapped ? "animate-in fade-in zoom-in-95 duration-300 motion-reduce:animate-none" : ""}`}>
                   <PaletteSquare
                     generated={generated}
                     focusHueId={focused?.hue.id ?? null}
@@ -567,6 +579,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
                   />
+                  </div>
                   <div className="animate-in fade-in absolute inset-x-0 bottom-full mb-4 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none">
                     <ViewToolbar
                       overlay={overlay}
@@ -639,7 +652,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
         </div>
           {!ready ? null : (
-            <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
+            <div className={`animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) transition-[opacity,translate] duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none motion-reduce:transition-none lg:h-full dark:bg-black ${leaving ? "translate-y-1 opacity-0 duration-200" : ""}`}>
             {historyOpen || generated.length === 0 ? null : (
               <div className="shrink-0 border-b border-border">
                 <PaletteChart generated={generated} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
