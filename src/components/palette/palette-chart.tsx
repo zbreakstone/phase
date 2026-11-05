@@ -179,6 +179,17 @@ function useMorph(target: Geo | null, calm: boolean): Geo | null {
   return shown;
 }
 
+/**
+ * Follows `value`, except while `hold` is set, when it stays as it was. Once the hold ends it moves to the latest value
+ * and bumps `epoch`, so a crossfade keyed on it can fade between the two instead of tracking every frame in between.
+ */
+function useSettled<T>(value: T, hold: boolean): { value: T; epoch: number } {
+  const [st, setSt] = React.useState({ value, epoch: 0, held: hold });
+  if (hold && !st.held) setSt({ ...st, held: true });
+  else if (!hold && (st.held || st.value !== value)) setSt({ value, epoch: st.held ? st.epoch + 1 : st.epoch, held: false });
+  return { value: st.value, epoch: st.epoch };
+}
+
 /** Keeps the previous layer around for a moment so it can fade out while the new one fades in. */
 function useCrossfade<T>(value: T, key: string): { current: T; previous: { key: string; value: T } | null } {
   const [state, setState] = React.useState<{ key: string; value: T; previous: { key: string; value: T } | null }>({ key, value, previous: null });
@@ -334,8 +345,11 @@ export function PaletteChart({
     }
     return { cells: hatchCells, limit };
   }, [showLimit, points, xOf, yOf, domain, hatchCells]);
-  const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}`;
-  const fade = useCrossfade(hatchLayer, viewKey);
+  // While the palette is gliding to another, the hatching holds still, then fades to the new one: the gamut edge it
+  // draws is far too jumpy to follow through in-between colors.
+  const settled = useSettled(hatchLayer, calm);
+  const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}|${settled.epoch}`;
+  const fade = useCrossfade(settled.value, viewKey);
 
   if (points.length === 0 || !geo) return null;
   const drawn = morphed && sameShape(morphed, geo) ? morphed : geo;

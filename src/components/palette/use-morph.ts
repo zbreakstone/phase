@@ -8,38 +8,44 @@ const DURATION = 700;
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+interface View {
+  from: GeneratedHue[];
+  to: GeneratedHue[];
+  t: number;
+}
+
 /**
  * Follows `generated`, but when `arm()` was called just before it changes, glides from the old colors to the new ones
- * instead of jumping. Anything else (an edit, a slider) shows through immediately.
+ * instead of jumping. Anything else (an edit, a slider) shows through immediately. Also says whether a glide is under way.
  */
 export function useMorph(generated: GeneratedHue[]) {
-  const armed = React.useRef(false);
-  const [view, setView] = React.useState<{ from: GeneratedHue[]; to: GeneratedHue[]; t: number } | null>(null);
-  const latest = React.useRef(generated);
+  const [armed, setArmed] = React.useState(false);
+  const [prev, setPrev] = React.useState(generated);
+  const [view, setView] = React.useState<View | null>(null);
 
-  React.useLayoutEffect(() => {
-    const from = latest.current;
-    latest.current = generated;
-    if (!armed.current || from === generated || from.length === 0 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      armed.current = false;
-      return;
-    }
-    armed.current = false;
-    setView({ from, to: generated, t: 0 });
-    let raf = 0;
+  // Decided while rendering, so the very first frame of the new palette is already the start of the glide.
+  if (prev !== generated) {
+    setPrev(generated);
+    setArmed(false);
+    if (armed && prev.length > 0 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) setView({ from: prev, to: generated, t: 0 });
+  }
+
+  const to = view?.to;
+  React.useEffect(() => {
+    if (!to) return;
     const start = performance.now();
+    let raf = 0;
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / DURATION);
-      setView(p >= 1 ? null : { from, to: generated, t: easeInOut(p) });
+      setView((v) => (v && v.to === to ? (p >= 1 ? null : { ...v, t: easeInOut(p) }) : v));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [generated]);
+  }, [to]);
 
-  const arm = React.useCallback(() => {
-    armed.current = true;
-  }, []);
-  const shown = React.useMemo(() => (view && view.to === generated ? morphGenerated(view.from, view.to, view.t) : generated), [view, generated]);
-  return [shown, arm, view !== null && view.to === generated] as const;
+  const arm = React.useCallback(() => setArmed(true), []);
+  const gliding = view !== null && view.to === generated;
+  const shown = React.useMemo(() => (gliding && view ? morphGenerated(view.from, view.to, view.t) : generated), [gliding, view, generated]);
+  return [shown, arm, gliding] as const;
 }
