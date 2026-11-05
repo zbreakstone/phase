@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import {
   Popover,
   PopoverContent,
@@ -255,15 +256,19 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
       <Hint label={email}>
         <PopoverTrigger
           aria-label="Account"
-          style={{
-            backgroundColor: accent
-              ? accentColor(accent)
-              : colorFor(session.user.id),
-            color: accent ? accentOn(accent) : undefined,
-          }}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white shadow-(--shadow-default) transition-[color,box-shadow] outline-none hover:shadow-(--shadow-large) focus-visible:ring-2 focus-visible:ring-ring"
+          className={toggleVariants({ variant: "outline", size: "sm", className: "size-7 min-w-0 rounded-full! p-0" })}
         >
-          {initial}
+          <span
+            style={{
+              backgroundColor: accent
+                ? accentColor(accent)
+                : colorFor(session.user.id),
+              color: accent ? accentOn(accent) : undefined,
+            }}
+            className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+          >
+            {initial}
+          </span>
         </PopoverTrigger>
       </Hint>
       <PopoverContent align="end" className="w-72 gap-2 p-3">

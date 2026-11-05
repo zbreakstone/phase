@@ -71,7 +71,7 @@ function overshoot(rgb: [number, number, number], gamut: Gamut): number {
 }
 
 /** Where the screen can't show the color: lightness or hue values that clip, given the other two. `fill` is the hatched area, `edge` its traced outline. */
-function unreachable(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): { fill: string; edge: string } {
+function unreachableGrid(metric: "lightness" | "hue", points: Point[], domain: [number, number], gamut: Gamut): number[][] {
   const [yMin, yMax] = domain;
   const ts = points.map((p) => p.t);
   const lo = Math.min(...ts);
@@ -109,7 +109,14 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
     }
     grid.push(col);
   }
+  return grid;
+}
 
+/** The hatched area and its traced outline for a grid of overshoot values. */
+function traceCells(grid: number[][]): { fill: string; edge: string } {
+  const cw = W / NX;
+  const ch = H / NY;
+  const f1 = (n: number) => n.toFixed(1);
   let fill = "";
   let edge = "";
   for (let i = 0; i < NX; i++) {
@@ -141,42 +148,129 @@ function unreachable(metric: "lightness" | "hue", points: Point[], domain: [numb
 }
 
 const MORPH_MS = 380;
+const CROSS_MS = 520;
 
 interface Geo {
   lines: { x: number; y: number }[][];
+  /** The dot on each step or color, for the views that show them all at once. */
+  dots: { x: number; y: number; hex: string }[];
+  /** What the hatching is drawn from, so it can glide along with the line. */
+  hatch: { grid: number[][] | null; limit: { x: number; y: number }[] | null };
 }
 
+/** The line's height at `x`, bending the way the drawn curve does. */
+function lineY(line: { x: number; y: number }[], x: number): number {
+  if (line.length === 0) return 0;
+  if (line.length === 1 || x <= line[0].x) return line[0].y;
+  let k = 0;
+  while (k < line.length - 2 && x > line[k + 1].x) k++;
+  const a = line[k];
+  const b = line[k + 1];
+  const f = b.x === a.x ? 0 : Math.min(1, Math.max(0, (x - a.x) / (b.x - a.x)));
+  return spline((line[k - 1] ?? a).y, a.y, b.y, (line[k + 2] ?? b).y, f);
+}
+
+/** x positions along a line: its own, plus a few between each pair, so a blend ends on the exact curve. */
+function densify(line: { x: number }[]): number[] {
+  const xs: number[] = [];
+  for (let i = 0; i < line.length - 1; i++) for (let n = 0; n < 4; n++) xs.push(line[i].x + ((line[i + 1].x - line[i].x) * n) / 4);
+  if (line.length) xs.push(line[line.length - 1].x);
+  return xs;
+}
+
+/** Blends two curves that have different numbers of points, sampling both along `b`'s x positions. */
+function blendLines(a: { x: number; y: number }[], b: { x: number; y: number }[], k: number): { x: number; y: number }[] {
+  return densify(b).map((x) => {
+    const ya = lineY(a, x);
+    return { x, y: ya + (lineY(b, x) - ya) * k };
+  });
+}
+
+/** Lines that differ in how many stops they have, blended through resampled copies. Line `i` of `b` starts from the nearest line of `a`. */
 const sameShape = (a: Geo, b: Geo) => a.lines.length === b.lines.length && a.lines.every((l, i) => l.length === b.lines[i].length);
 
 const lerpGeo = (a: Geo, b: Geo, k: number): Geo => ({
   lines: b.lines.map((l, i) => l.map((p, j) => ({ x: a.lines[i][j].x + (p.x - a.lines[i][j].x) * k, y: a.lines[i][j].y + (p.y - a.lines[i][j].y) * k }))),
+  dots: b.dots,
+  hatch: b.hatch,
 });
 
-/** Glides the lines to their new positions when a view changes but keeps the same shape. A different shape just swaps. */
-function useMorph(target: Geo | null): Geo | null {
-  const [shown, setShown] = React.useState(target);
+const lerpAcross = (a: Geo, b: Geo, k: number): Geo => ({
+  lines: b.lines.map((l, i) => blendLines(a.lines[Math.min(i, a.lines.length - 1)] ?? l, l, k)),
+  dots: b.dots,
+  hatch: b.hatch,
+});
+
+const parseHex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+/** The line's color at `x`, blending between the dots either side. */
+function toneAt(dots: { x: number; hex: string }[], x: number): number[] {
+  let k = 0;
+  while (k < dots.length - 2 && x > dots[k + 1].x) k++;
+  const a = dots[k];
+  const b = dots[Math.min(k + 1, dots.length - 1)];
+  const f = b.x === a.x ? 0 : Math.min(1, Math.max(0, (x - a.x) / (b.x - a.x)));
+  const ca = parseHex(a.hex);
+  const cb = parseHex(b.hex);
+  return ca.map((v, i) => v + (cb[i] - v) * f);
+}
+
+/** The hatching partway between two views. Each part glides only when both views have it. */
+function blendHatch(a: Geo["hatch"], b: Geo["hatch"], k: number) {
+  const cells = a.grid && b.grid ? traceCells(a.grid.map((col, i) => col.map((v, j) => v + (b.grid![i][j] - v) * k))) : null;
+  let limit: { line: string; area: string } | null = null;
+  if (a.limit && b.limit) {
+    const line = smooth(blendLines(a.limit, b.limit, k));
+    limit = { line, area: `${line} L${W} 0 L0 0 Z` };
+  }
+  return { cells, limit };
+}
+
+interface Shown {
+  geo: Geo;
+  /** While lines of a different shape are blending: how far along, and where they started (for the dots that are leaving). */
+  across: { k: number; from: Geo } | null;
+}
+
+/** Glides the lines to their new positions when the view changes. Lines of a different shape (a color's steps vs. every color) blend through resampled copies. */
+function useMorph(target: Geo | null, calm: boolean): Shown | null {
+  const [shown, setShown] = React.useState<Shown | null>(target ? { geo: target, across: null } : null);
   const latest = React.useRef(target);
   React.useEffect(() => {
-    const apply = (g: Geo | null) => {
+    const apply = (s: Shown | null, g: Geo | null = s?.geo ?? null) => {
       latest.current = g;
-      setShown(g);
+      setShown(s);
     };
     const from = latest.current;
-    if (!target || !from || !sameShape(from, target) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      apply(target);
+    if (calm || !target || !from || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      apply(target ? { geo: target, across: null } : null);
       return;
     }
+    const same = sameShape(from, target);
     const start = performance.now();
     let raf = 0;
     const step = (now: number) => {
-      const k = Math.min(1, (now - start) / MORPH_MS);
-      apply(lerpGeo(from, target, 1 - Math.pow(1 - k, 3)));
-      if (k < 1) raf = requestAnimationFrame(step);
+      const t = Math.min(1, (now - start) / (same ? MORPH_MS : CROSS_MS));
+      const k = 1 - Math.pow(1 - t, 3);
+      if (t >= 1) apply({ geo: target, across: null });
+      else if (same) apply({ geo: lerpGeo(from, target, k), across: null });
+      else apply({ geo: lerpAcross(from, target, k), across: { k, from } });
+      if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
+  }, [target, calm]);
   return shown;
+}
+
+/**
+ * Follows `value`, except while `hold` is set, when it stays as it was. Once the hold ends it moves to the latest value
+ * and bumps `epoch`, so a crossfade keyed on it can fade between the two instead of tracking every frame in between.
+ */
+function useSettled<T>(value: T, hold: boolean): { value: T; epoch: number } {
+  const [st, setSt] = React.useState({ value, epoch: 0, held: hold });
+  if (hold && !st.held) setSt({ ...st, held: true });
+  else if (!hold && (st.held || st.value !== value)) setSt({ value, epoch: st.held ? st.epoch + 1 : st.epoch, held: false });
+  return { value: st.value, epoch: st.epoch };
 }
 
 /** Keeps the previous layer around for a moment so it can fade out while the new one fades in. */
@@ -220,6 +314,17 @@ function format(metric: Metric, v: number): string {
 }
 
 /** A smooth path through the points (Catmull-Rom turned into Béziers), so a curve reads as a curve. */
+/** One dot on the line, placed in chart coordinates. */
+function Dot({ x, y, hex, big = false, opacity = 1 }: { x: number; y: number; hex: string; big?: boolean; opacity?: number }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)", big ? "size-3.5" : "size-2.5")}
+      style={{ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`, backgroundColor: hex, opacity }}
+    />
+  );
+}
+
 function smooth(pts: { x: number; y: number }[]): string {
   if (pts.length === 0) return "";
   if (pts.length === 1) return `M${pts[0].x} ${pts[0].y}`;
@@ -247,12 +352,15 @@ export function PaletteChart({
   focusGrade,
   space,
   gamut,
+  calm = false,
 }: {
   generated: GeneratedHue[];
+  /** The data is already gliding on its own (switching palettes), so don't ease between its frames too. */
   focusId: string | null;
   focusGrade: number | null;
   space: SpaceId;
   gamut: Gamut;
+  calm?: boolean;
 }) {
   const [metric, setMetric] = React.useState<Metric>("chroma");
   const [grade, setGrade] = React.useState<number | "all">(500);
@@ -274,7 +382,7 @@ export function PaletteChart({
       hex: s.hex,
       grade: s.grade,
       value: metric === "lightness" ? s.oklch.L : metric === "chroma" ? s.chroma : s.hue,
-      limit: metric === "chroma" ? maxChromaAt(def, s.targetLuminance, s.hue, gamut) : undefined,
+      limit: metric === "chroma" ? (s.limit ?? maxChromaAt(def, s.targetLuminance, s.hue, gamut)) : undefined,
       asked: metric === "chroma" ? s.requestedChroma : undefined,
       L: s.oklch.L,
       C: s.oklch.C,
@@ -298,10 +406,11 @@ export function PaletteChart({
   }, [focused, showAll, generated, level, metric, def, gamut]);
 
   const domain = React.useMemo(() => (points.length ? domainFor(metric, showAll ? series.flat() : points, !showAll) : ([0, 1] as [number, number])), [metric, points, series, showAll]);
-  const hatchCells = React.useMemo(
-    () => (points.length && metric !== "chroma" && !showAll ? unreachable(metric, points, domain, gamut) : null),
+  const hatchGrid = React.useMemo(
+    () => (points.length && metric !== "chroma" && !showAll ? unreachableGrid(metric, points, domain, gamut) : null),
     [metric, points, domain, gamut, showAll],
   );
+  const hatchCells = React.useMemo(() => (hatchGrid ? traceCells(hatchGrid) : null), [hatchGrid]);
 
   // Steps and colors both spread evenly across the width, inside the padding.
   const scales = React.useMemo(() => {
@@ -318,26 +427,61 @@ export function PaletteChart({
   }, [points, domain]);
   const { tLo, tHi, xOf, yOf } = scales;
 
-  const geo = React.useMemo((): Geo | null => (points.length ? { lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))) } : null), [points, series, showAll, xOf, yOf]);
-  const morphed = useMorph(geo);
-
   const showLimit = metric === "chroma" && !showAll;
+  const limitPts = React.useMemo(() => {
+    if (!showLimit || !points.length) return null;
+    const inner = points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? domain[1]) }));
+    return [{ x: 0, y: inner[0].y }, ...inner, { x: W, y: inner[inner.length - 1].y }];
+  }, [showLimit, points, xOf, yOf, domain]);
+
+  const geo = React.useMemo(
+    (): Geo | null =>
+      points.length
+        ? {
+            lines: (showAll ? series : [points]).map((ss) => ss.map((p) => ({ x: xOf(p.t), y: yOf(p.value) }))),
+            dots: showAll ? [] : points.map((p) => ({ x: xOf(p.t), y: yOf(p.value), hex: p.hex })),
+            hatch: { grid: hatchGrid, limit: limitPts },
+          }
+        : null,
+    [points, series, showAll, xOf, yOf, hatchGrid, limitPts],
+  );
+  const morphed = useMorph(geo, calm);
+
   const hatchLayer = React.useMemo(() => {
     let limit: { line: string; area: string } | null = null;
-    if (showLimit && points.length) {
-      const inner = points.map((p) => ({ x: xOf(p.t), y: yOf(p.limit ?? domain[1]) }));
-      const line = smooth([{ x: 0, y: inner[0].y }, ...inner, { x: W, y: inner[inner.length - 1].y }]);
+    if (limitPts) {
+      const line = smooth(limitPts);
       limit = { line, area: `${line} L${W} 0 L0 0 Z` };
     }
     return { cells: hatchCells, limit };
-  }, [showLimit, points, xOf, yOf, domain, hatchCells]);
-  const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}`;
-  const fade = useCrossfade(hatchLayer, viewKey);
+  }, [limitPts, hatchCells]);
+  // The chroma limit glides with the lines. The hatched cells of the other views can't be blended, so they hold still
+  // while the palette glides, then fade to the new ones.
+  const settledCells = useSettled(hatchLayer.cells, calm);
+  // Only the cells need a crossfade afterwards; the limit has already glided, and fading from its old self would bring the old edge back.
+  const settled = { value: { ...hatchLayer, cells: settledCells.value }, epoch: hatchLayer.cells ? settledCells.epoch : 0 };
+  const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}|${settled.epoch}`;
+  const fade = useCrossfade(settled.value, viewKey);
 
   if (points.length === 0 || !geo) return null;
-  const drawn = morphed && sameShape(morphed, geo) ? morphed : geo;
+  // Until the glide effect has caught up with a new view, hold its first frame instead of jumping to the end.
+  const lagging = !!morphed && !morphed.across && !sameShape(morphed.geo, geo) && morphed.geo !== geo;
+  const across = lagging ? { k: 0, from: morphed.geo } : (morphed?.across ?? null);
+  const drawn = lagging ? lerpAcross(morphed.geo, geo, 0) : morphed && (morphed.across || sameShape(morphed.geo, geo)) ? morphed.geo : geo;
 
   const paths = drawn.lines.map((l) => smooth(l));
+  // While the view changes shape, hatching that exists in both views glides; the rest crossfades as before.
+  const blended = across && across.from.hatch && geo.hatch ? blendHatch(across.from.hatch, geo.hatch, across.k) : null;
+  const strip = (l: typeof fade.current) => ({ cells: blended?.cells ? null : l.cells, limit: blended?.limit ? null : l.limit });
+  const blendedTones =
+    across && across.from.dots.length && geo.dots.length
+      ? Array.from({ length: 17 }, (_, i) => {
+          const x = xOf(tLo) + ((xOf(tHi) - xOf(tLo)) * i) / 16;
+          const a = toneAt(across.from.dots, x);
+          const b = toneAt(geo.dots, x);
+          return { offset: i / 16, color: `rgb(${a.map((v, n) => Math.round(v + (b[n] - v) * across.k)).join(",")})` };
+        })
+      : null;
   const tones = showAll ? series.map((ss) => (ss.find((p) => p.grade === level) ?? ss[Math.floor(ss.length / 2)]).hex) : [];
   const gradientId = `${patternId}-line`;
 
@@ -403,7 +547,7 @@ export function PaletteChart({
           )}
         </div>
       </div>
-      <div key={`${showAll}|${focused?.hue.id ?? ""}`} className="animate-in fade-in relative duration-300">
+      <div className="animate-in fade-in relative duration-300">
       <svg
         role="img"
         aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
@@ -417,20 +561,21 @@ export function PaletteChart({
             <line x1={0} y1={0} x2={0} y2={4} className="stroke-foreground/15" strokeWidth={1} />
           </pattern>
           <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={xOf(tLo)} x2={xOf(tHi)} y1={0} y2={0}>
-            {points.map((p) => (
-              <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />
-            ))}
+            {blendedTones
+              ? blendedTones.map((t) => <stop key={t.offset} offset={t.offset} stopColor={t.color} />)
+              : points.map((p) => <stop key={p.key} offset={tHi === tLo ? 0.5 : (p.t - tLo) / (tHi - tLo)} stopColor={p.hex} />)}
           </linearGradient>
         </defs>
         <rect x={0} y={0} width={W} height={H} className="fill-muted/40" />
         {fade.previous ? (
           <g key={`prev-${fade.previous.key}`} className="animate-out fade-out-0 fill-mode-forwards duration-300">
-            {hatchMarks(fade.previous.value, patternId)}
+            {hatchMarks(strip(fade.previous.value), patternId)}
           </g>
         ) : null}
         <g key={viewKey} className="animate-in fade-in fill-mode-backwards duration-300">
-          {hatchMarks(fade.current, patternId)}
+          {hatchMarks(strip(fade.current), patternId)}
         </g>
+        {blended ? hatchMarks(blended, patternId) : null}
         {active ? <line x1={xOf(active.t)} x2={xOf(active.t)} y1={0} y2={H} className="stroke-foreground/25" strokeWidth={1} /> : null}
         {showAll ? (
           series.map((ss, n) => <path key={generated[n]?.hue.id ?? n} d={paths[n]} fill="none" stroke={tones[n]} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />)
@@ -438,17 +583,20 @@ export function PaletteChart({
           <path d={paths[0]} fill="none" stroke={`url(#${gradientId})`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         )}
       </svg>
-      {(showAll ? (activeIndex >= 0 ? series.map((ss, n) => ({ p: ss[activeIndex], at: drawn.lines[n][activeIndex] })) : []) : points.map((p, i) => ({ p, at: drawn.lines[0][i] }))).map(({ p, at }, n) => (
-        <span
-          key={`${n}-${p.key}`}
-          aria-hidden
-          className={cn(
-            "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white shadow-(--shadow-border)",
-            !showAll && active?.key === p.key ? "size-3.5" : "size-2.5",
-          )}
-          style={{ left: `${(at.x / W) * 100}%`, top: `${(at.y / H) * 100}%`, backgroundColor: p.hex }}
-        />
-      ))}
+      {across ? (
+        <>
+          {across.from.dots.map((d, n) => (
+            <Dot key={`from-${n}`} x={d.x} y={lineY(drawn.lines[0], d.x)} hex={d.hex} opacity={1 - across.k} />
+          ))}
+          {geo.dots.map((d, n) => (
+            <Dot key={`to-${n}`} x={d.x} y={lineY(drawn.lines[0], d.x)} hex={d.hex} opacity={across.k} />
+          ))}
+        </>
+      ) : (
+        (showAll ? (activeIndex >= 0 ? series.map((ss, n) => ({ p: ss[activeIndex], at: drawn.lines[n][activeIndex] })) : []) : points.map((p, i) => ({ p, at: drawn.lines[0][i] }))).map(({ p, at }, n) => (
+          <Dot key={`${n}-${p.key}`} x={at.x} y={at.y} hex={p.hex} big={!showAll && active?.key === p.key} />
+        ))
+      )}
       {!focused && active ? (
         <p className="pointer-events-none absolute top-1.5 left-2 max-w-[60%] truncate rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground tabular-nums dark:bg-black/60">
           {active.label}

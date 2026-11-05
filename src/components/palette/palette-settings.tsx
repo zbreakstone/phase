@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,11 @@ interface Props {
   onDelete?: () => void;
   /** The palette's name, for the delete confirmation. */
   name?: string;
+  /** The name being edited, which a saved palette takes on its next save. */
+  paletteName: string;
+  onPaletteName: (name: string) => void;
+  /** Saves a copy of the palette. Omitted when there is nothing saved to copy. */
+  onDuplicate?: () => void;
 }
 
 /** A select whose options each explain themselves, so the sidebar doesn't need paragraphs under it. */
@@ -79,12 +85,27 @@ export function PaletteSettings({
   display,
   onDelete,
   name,
+  paletteName,
+  onPaletteName,
+  onDuplicate,
 }: Props) {
   const [deleting, setDeleting] = React.useState(false);
   const label = name?.trim() || "this palette";
   return (
     <>
       <CollapsibleSection id="display" title="Settings" className="space-y-3">
+        <SettingRow id="settings-name" label="Name">
+          <Input
+            id="settings-name"
+            value={paletteName}
+            maxLength={80}
+            placeholder="Untitled palette"
+            onChange={(e) => onPaletteName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
+            }}
+          />
+        </SettingRow>
         <SettingRow id="settings-space" label="Color space">
           <DescribedSelect
             id="settings-space"
@@ -110,8 +131,14 @@ export function PaletteSettings({
           />
         </SettingRow>
         {display}
+        {onDuplicate ? (
+          <Button variant="outline" className="mt-3 w-full" onClick={onDuplicate}>
+            <Copy />
+            Duplicate {label}
+          </Button>
+        ) : null}
         {onDelete ? (
-          <Button variant="destructive" className="mt-3 w-full" onClick={() => setDeleting(true)}>
+          <Button variant="destructive" className={onDuplicate ? "w-full" : "mt-3 w-full"} onClick={() => setDeleting(true)}>
             <Trash2 />
             Delete {label}
           </Button>

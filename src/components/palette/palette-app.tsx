@@ -2,18 +2,18 @@
 
 import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
-import { type SpaceId } from "@/lib/color/spaces";
+import { SPACES, type SpaceId } from "@/lib/color/spaces";
+import { maxChromaAt } from "@/lib/color/solve";
 import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
-import type { HueConfig, PaletteState, ScaleConfig, StepTweak } from "@/lib/palette/types";
+import type { HueConfig, PaletteState, ScaleConfig, Shade, StepTweak } from "@/lib/palette/types";
 import { contentKey, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { useHistory } from "@/lib/palette/use-history";
@@ -46,6 +46,9 @@ import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { useMorph } from "./use-morph";
+import { PaletteSwitcher } from "./palette-switcher";
+import { usePaletteActions } from "./use-palette-actions";
 import { isPopupOpen, isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
@@ -72,6 +75,17 @@ interface PaletteAppProps {
   paletteId?: string;
   /** Start from the starter palette instead of the last autosave. */
   fresh?: boolean;
+}
+
+/** The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. */
+function Logo() {
+  return (
+    <span
+      role="img"
+      aria-label="Phase"
+      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
+    />
+  );
 }
 
 export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}) {
@@ -332,6 +346,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   };
 
   const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues, state.gamut), [state.space, state.scale, state.hues, state.gamut]);
+  const limitOf = React.useCallback((s: Shade) => maxChromaAt(SPACES[state.space], s.targetLuminance, s.hue, state.gamut), [state.space, state.gamut]);
+  /** What the square and chart draw: `generated`, or partway to it while switching palettes. */
+  const [shown, armMorph, morphing] = useMorph(generated, limitOf);
   const report = React.useMemo(() => validatePalette(generated, state.scale.rules), [generated, state.scale.rules]);
   // A removed color can't stay open, so fall back to the level above.
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
@@ -437,10 +454,14 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     toast.success("Back to the starter palette", { action: { label: "Undo", onClick: undo } });
   };
 
+  /** False when leaving would drop changes that were never saved and you decline. */
+  const confirmLeave = () => {
+    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
+    return !unsaved || window.confirm("You have changes that aren't saved. Leave anyway?");
+  };
   /** Back to every palette. Asks first when leaving would drop changes that were never saved. */
   const toList = () => {
-    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
-    if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
+    if (!confirmLeave()) return;
     // The palette's card on the home page zooms out of the square we're leaving.
     const square = document.querySelector("[data-palette-square]");
     if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
@@ -459,7 +480,44 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     toast.success(`Deleted ${current.name}`);
     router.push("/");
   };
-  const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
+  /** Opens another saved palette in place, so the colors can glide from this one's to that one's. */
+  const switchTo = async (id: string) => {
+    const cloud = getCloud();
+    if (!cloud) return;
+    try {
+      const loaded = await loadLatest(cloud, id);
+      armMorph();
+      setHistoryOpen(false);
+      setFocus({ hueId: null, grade: null });
+      loadState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
+      updateCurrent({ id: loaded.paletteId, name: loaded.paletteName, versionId: loaded.versionId, savedKey: contentKey(loaded.state) });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't open that palette.");
+    }
+  };
+  const { duplicate } = usePaletteActions(() => {});
+  /** Saves a copy of the last saved version, under "<name> copy". */
+  const duplicateCurrent = () => (current ? duplicate({ id: current.id, name: current.name, updatedAt: Date.now() }) : undefined);
+  const listCrumb = session
+    ? [
+        {
+          label: "Palettes",
+          onClick: toList,
+          render: (
+            <PaletteSwitcher
+              currentId={current?.id ?? null}
+              currentName={name}
+              onSwitch={(id) => {
+                if (confirmLeave()) void switchTo(id);
+              }}
+              onNew={() => {
+                if (confirmLeave()) router.push("/p/new");
+              }}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
   // steps up instead (handled above), and an open version history closes first.
@@ -496,72 +554,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <header className="border-b border-border bg-white dark:bg-black">
-        <div className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}>
-          {session ? (
-            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="w-fit justify-self-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
-            </button>
-          ) : (
-            <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
-          )}
-          <input
-            aria-label="Palette name"
-            value={name}
-            maxLength={80}
-            placeholder="Untitled palette"
-            onChange={(e) => updateName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
-            }}
-            onFocus={(e) => e.currentTarget.select()}
-            size={Math.max(12, name.length + 1)}
-            className="animate-in fade-in duration-300 motion-reduce:animate-none h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <div className="animate-in fade-in flex items-center justify-end gap-2 duration-300 motion-reduce:animate-none">
-            <div className="flex items-center" role="group" aria-label="History">
-              <Hint label="Undo" shortcut={["⌘", "Z"]}>
-                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-                <span className="inline-flex">
-                  <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
-                    <Undo2 />
-                  </Button>
-                </span>
-              </Hint>
-              <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
-                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-                <span className="inline-flex">
-                  <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
-                    <Redo2 />
-                  </Button>
-                </span>
-              </Hint>
-            </div>
-            <SavesDialog
-              open={historyOpen}
-              onOpenChange={setHistoryOpen}
-              slot={historySlot}
-              state={state}
-              name={name}
-              stateKey={stateKey}
-              current={current}
-              hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
-              onCurrent={updateCurrent}
-              onOpen={(loaded) => {
-                setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
-                setFocus({ hueId: null, grade: null });
-              }}
-            />
-            <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
-            <AccountMenu onSignedOut={() => updateCurrent(null)} />
-            <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
-            <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
-          </div>
-        </div>
-      </header>
-
       <main
-        className={`${PAGE_WIDTH} lg:[container-type:size] grid w-full flex-1 gap-6 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[auto_minmax(24rem,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0`}
+        className={`${PAGE_WIDTH} lg:[container-type:size] grid w-full flex-1 gap-6 py-4 lg:relative lg:h-dvh lg:min-h-0 lg:flex-none lg:grid-cols-[auto_minmax(24rem,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0`}
       >
         <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:-mx-10 lg:px-10 lg:py-6">
           <div className="my-auto space-y-6">
@@ -579,8 +573,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               <>
                 {/* The square and the sidebar are the same height, and the toolbar hangs above the square so it never moves the square off center. */}
                 <div className="relative mr-auto w-full lg:w-[min(100cqw-25.5rem,100cqh-9rem)]">
+                  <div>
                   <PaletteSquare
-                    generated={generated}
+                    generated={shown}
                     focusHueId={focused?.hue.id ?? null}
                     focusGrade={focusShade?.grade ?? null}
                     rules={state.scale.rules}
@@ -593,6 +588,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
                   />
+                  </div>
                   <div className="animate-in fade-in absolute inset-x-0 bottom-full mb-4 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none">
                     <ViewToolbar
                       overlay={overlay}
@@ -620,12 +616,55 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           </div>
         </section>
 
-        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="relative min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
+        <div className="animate-in fade-in mb-3 flex items-center justify-between gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
+          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="group" aria-label="History">
+            <Hint label="Undo" shortcut={["⌘", "Z"]}>
+              {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+              <span className="inline-flex">
+                <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={undo} disabled={!canUndo} aria-label="Undo">
+                  <Undo2 />
+                </button>
+              </span>
+            </Hint>
+            <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
+              {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+              <span className="inline-flex">
+                <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={redo} disabled={!canRedo} aria-label="Redo">
+                  <Redo2 />
+                </button>
+              </span>
+            </Hint>
+          </div>
+          </div>
+          <div className="flex items-center gap-2">
+          <SavesDialog
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            slot={historySlot}
+            state={state}
+            name={name}
+            stateKey={stateKey}
+            current={current}
+            hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
+            onCurrent={updateCurrent}
+            onOpen={(loaded) => {
+              setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
+              setFocus({ hueId: null, grade: null });
+            }}
+          />
+          <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
+          <AccountMenu onSignedOut={() => updateCurrent(null)} />
+          </div>
+          <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
+          <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
+        </div>
           {!ready ? null : (
             <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
             {historyOpen || generated.length === 0 ? null : (
               <div className="shrink-0 border-b border-border">
-                <PaletteChart generated={generated} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
+                <PaletteChart generated={shown} calm={morphing} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
               </div>
             )}
             <ScrollFade className="min-h-0 flex-1" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
@@ -666,7 +705,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
                 </SectionGroup>
@@ -675,6 +714,15 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             </div>
           )}
         </aside>
+        <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
+          {session ? (
+            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Logo />
+            </button>
+          ) : (
+            <Logo />
+          )}
+        </footer>
       </main>
     </div>
   );

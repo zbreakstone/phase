@@ -3,9 +3,10 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Mail, MoreHorizontal, Plus, X } from "lucide-react";
+import { Check, Mail, MoreHorizontal, Plus, RotateCcwClock, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { KbdGroup } from "@/components/ui/kbd";
 import { Hint } from "./hint";
+import { isPopupOpen, isTextEntry } from "./text-entry";
 import { AddVersionDialog } from "./add-version-dialog";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
@@ -79,10 +81,10 @@ export function SavesDialog({
 }: Props) {
   const enabled = cloudEnabled();
   const [session, setSession] = React.useState<Session | null>(null);
-  const [authReady, setAuthReady] = React.useState(false);
+  const [, setAuthReady] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   /** The last save, open or load failed. Cleared by the next one that works. */
-  const [failed, setFailed] = React.useState(false);
+  const [, setFailed] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [sent, setSent] = React.useState(false);
   const [code, setCode] = React.useState("");
@@ -125,6 +127,21 @@ export function SavesDialog({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [session]);
+
+  // V shows or hides the version history, unless you're typing or a dialog or menu is open.
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || e.key.toLowerCase() !== "v") return;
+      if (isTextEntry(e.target)) return;
+      if (isPopupOpen('[data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="select-content"], [role="menu"]')) return;
+      if (!buttonRef.current) return;
+      e.preventDefault();
+      buttonRef.current.click();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const refresh = React.useCallback(async (paletteId: string | null) => {
     const cloud = getCloud();
@@ -342,25 +359,6 @@ export function SavesDialog({
       }
     });
 
-  const status = failed
-    ? { label: "The last save failed", color: "bg-red-500" }
-    : dirty
-      ? { label: "Unsaved changes", color: "bg-amber-400" }
-      : current
-        ? { label: "All changes saved", color: "bg-green-500" }
-        : null;
-  const label = !authReady
-    ? "Save"
-    : !signedIn
-      ? "Sign in"
-      : failed
-        ? "Save failed"
-        : dirty
-          ? "Unsaved"
-          : current
-            ? "Saved"
-            : "Not saved";
-
   const panel = (
     <div className="flex h-full min-h-0 flex-col divide-y divide-border">
       <section className="flex items-center justify-between gap-2 px-5 py-4">
@@ -482,22 +480,18 @@ export function SavesDialog({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Version history"
-        aria-expanded={open}
-        onClick={toggle}
-        className={open ? "bg-muted" : undefined}
-      >
-        {status ? (
-          <span
-            aria-hidden
-            className={`size-1.5 shrink-0 rounded-full ${status.color}`}
-          />
-        ) : null}
-        <span className="hidden sm:inline">{label}</span>
-      </Button>
+      <Hint label="Show version history" shortcut={["V"]}>
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label="Version history"
+          aria-expanded={open}
+          onClick={toggle}
+          className={toggleVariants({ variant: "outline", size: "sm", className: open ? "bg-muted hover:bg-muted" : undefined })}
+        >
+          <RotateCcwClock />
+        </button>
+      </Hint>
       {open && slot ? createPortal(panel, slot) : null}
       <AddVersionDialog
         open={adding}
