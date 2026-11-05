@@ -349,17 +349,13 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           {leaving.filter((ex) => ex.anim.fade !== "none").map(renderLeaving)}
         </div>
 
-        {/* The row or column under the pointer. */}
+        {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are smaller. */}
         {hover && level !== "step" ? (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute rounded-xl ring-2 ring-white/70 transition-[top,left] duration-100 ring-inset"
-            style={
-              level === "all"
-                ? { left: 0, right: 0, top: `${(hover.row / R) * 100}%`, height: `${100 / R}%` }
-                : { top: 0, bottom: 0, left: `${(hover.col / C) * 100}%`, width: `${100 / C}%` }
-            }
-          />
+          <>
+            {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black and white. */}
+            <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-overlay" shadow="shadow-[inset_0_0_0_2px_#fff]" />
+            <HoverRing level={level} hover={hover} rows={R} cols={C} shadow="shadow-[inset_0_0_0_1px_#ffffff40]" />
+          </>
         ) : null}
 
         {/* One dot per thing you can open: a color's middle shade, or each step. */}
@@ -467,6 +463,29 @@ const hash = (x: number, y: number) => {
  * Paints the colors as a soft gradient. Each swatch becomes one pixel of a tiny canvas (so the browser
  * parses any CSS color, including Display P3), then the pixels are blended smoothly into a larger one.
  */
+/** The outline on the row or column under the pointer, clipped to the canvas so its outer corners follow the canvas's radius. */
+function HoverRing({ level, hover, rows, cols, className, shadow }: { level: "all" | "hue"; hover: { row: number; col: number }; rows: number; cols: number; className?: string; shadow: string }) {
+  const outer = "1.5rem";
+  const inner = "0.75rem";
+  const byRow = level === "all";
+  const first = byRow ? hover.row === 0 : hover.col === 0;
+  const last = byRow ? hover.row === rows - 1 : hover.col === cols - 1;
+  const [a, b] = [first ? outer : inner, last ? outer : inner];
+  return (
+    <div aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]", className)}>
+      <div
+        className={cn("absolute transition-[top,left,border-radius] duration-100", shadow)}
+        style={{
+          borderRadius: byRow ? `${a} ${a} ${b} ${b}` : `${a} ${b} ${b} ${a}`,
+          ...(byRow
+            ? { left: 0, right: 0, top: `${(hover.row / rows) * 100}%`, height: `${100 / rows}%` }
+            : { top: 0, bottom: 0, left: `${(hover.col / cols) * 100}%`, width: `${100 / cols}%` }),
+        }}
+      />
+    </div>
+  );
+}
+
 function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][]; grain: boolean; blend: Blend; size?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
