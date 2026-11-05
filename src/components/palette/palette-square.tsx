@@ -353,7 +353,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           <>
             {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black and white. */}
             <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-overlay" shadow="shadow-[inset_0_0_0_2px_#fff]" />
-            <HoverRing level={level} hover={hover} rows={R} cols={C} shadow="shadow-[inset_0_0_0_1px_#ffffff40]" />
+            <HoverRing level={level} hover={hover} rows={R} cols={C} shadow="shadow-[inset_0_0_0_1px_#ffffff66]" />
           </>
         ) : null}
 
@@ -441,15 +441,15 @@ function Dot({
         className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
         style={{ left: `${x}%`, top: `${y}%` }}
       >
-        <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_4px_6px_-1px_#0000001a,0_2px_4px_-2px_#0000001a]", shown, on)} style={{ backgroundColor: color }} />
+        <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff66,0_4px_6px_-1px_#0000001a,0_2px_4px_-2px_#0000001a]", shown, on)} style={{ backgroundColor: color }} />
         <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", shown, on)} />
       </button>
       {active ? (
         <div aria-hidden className="pointer-events-none absolute" style={chipAt}>
           <span className="relative rounded-md px-3 py-1.5 text-xs whitespace-nowrap text-white">
-            <span className="animate-in fade-in-0 absolute inset-0 rounded-md bg-black/70 mix-blend-multiply duration-150" />
+            <span className="animate-in fade-in-0 absolute inset-0 rounded-md bg-black/70 mix-blend-multiply backdrop-blur-md duration-150" />
             <span className="animate-in fade-in-0 absolute inset-0 rounded-md shadow-[inset_0_0_0_1.5px_#fff] mix-blend-overlay duration-150" />
-            <span className="absolute inset-0 rounded-md shadow-[inset_0_0_0_1px_#ffffff26]" />
+            <span className="absolute inset-0 rounded-md shadow-[inset_0_0_0_1px_#ffffff59]" />
             <span className="animate-in fade-in-0 relative duration-150">{chip}</span>
           </span>
         </div>
