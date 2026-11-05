@@ -32,13 +32,13 @@ import { ColorsList } from "./colors-list";
 import { PaletteChart } from "./palette-chart";
 import { HuePanel } from "./hue-panel";
 import { ContrastRulesSection, PaletteSettings } from "./palette-settings";
-import { PalettePreview, PaletteSquare, type SquareMode } from "./palette-square";
+import { PaletteSquare, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
 import { DisplaySettings, type Panel } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
-import { displayShade, type Overlay } from "@/lib/palette/overlay";
+import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import { AccountMenu } from "./account-menu";
 import { useApplyAccent } from "@/lib/accent";
@@ -721,10 +721,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               ready && generated.length > 0 ? (
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute -inset-x-6 top-1 -bottom-4 -z-10 overflow-hidden rounded-full opacity-0 blur-xl transition-opacity duration-300 group-focus-visible:opacity-80 group-hover:opacity-80 motion-reduce:transition-none"
-                >
-                  <PalettePreview generated={generated} gamut={state.gamut} />
-                </span>
+                  className="pointer-events-none absolute inset-x-1 -bottom-0.5 -z-10 h-3 rounded-full opacity-0 blur-md transition-opacity duration-300 group-focus-visible:opacity-60 group-hover:opacity-60 motion-reduce:transition-none"
+                  style={{ backgroundImage: `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` }}
+                />
               ) : null;
             return session ? (
               <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
