@@ -2,7 +2,6 @@
 
 import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +45,7 @@ import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { PaletteSwitcher } from "./palette-switcher";
 import { isPopupOpen, isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
@@ -72,6 +72,17 @@ interface PaletteAppProps {
   paletteId?: string;
   /** Start from the starter palette instead of the last autosave. */
   fresh?: boolean;
+}
+
+/** The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. */
+function Logo() {
+  return (
+    <span
+      role="img"
+      aria-label="Phase"
+      className="block aspect-[276/90] h-5 bg-gray-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-gray-700"
+    />
+  );
 }
 
 export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}) {
@@ -437,10 +448,14 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     toast.success("Back to the starter palette", { action: { label: "Undo", onClick: undo } });
   };
 
+  /** False when leaving would drop changes that were never saved and you decline. */
+  const confirmLeave = () => {
+    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
+    return !unsaved || window.confirm("You have changes that aren't saved. Leave anyway?");
+  };
   /** Back to every palette. Asks first when leaving would drop changes that were never saved. */
   const toList = () => {
-    const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
-    if (unsaved && !window.confirm("You have changes that aren't saved. Leave anyway?")) return;
+    if (!confirmLeave()) return;
     // The palette's card on the home page zooms out of the square we're leaving.
     const square = document.querySelector("[data-palette-square]");
     if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
@@ -459,7 +474,29 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     toast.success(`Deleted ${current.name}`);
     router.push("/");
   };
-  const listCrumb = session ? [{ label: "Palettes", onClick: toList }] : [];
+  const listCrumb = session
+    ? [
+        {
+          label: "Palettes",
+          onClick: toList,
+          render: (
+            <PaletteSwitcher
+              currentId={current?.id ?? null}
+              currentName={name}
+              onSwitch={(id) => {
+                if (confirmLeave()) router.push(`/p/${id}`);
+              }}
+              onRenamed={(id, next) => {
+                if (current?.id === id) updateCurrent({ ...current, name: next });
+              }}
+              onDeleted={(id) => {
+                if (current?.id === id) router.push("/");
+              }}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
   // steps up instead (handled above), and an open version history closes first.
@@ -497,14 +534,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="border-b border-border bg-white dark:bg-black">
-        <div className={`${PAGE_WIDTH} grid h-14 grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-3`}>
-          {session ? (
-            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="w-fit justify-self-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
-            </button>
-          ) : (
-            <Image src="/phase-lockup-white.png" alt="Phase" width={276} height={90} priority className="h-6 w-auto invert dark:invert-0" />
-          )}
+        <div className={`${PAGE_WIDTH} flex h-14 items-center justify-center`}>
           <input
             aria-label="Palette name"
             value={name}
@@ -518,45 +548,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             size={Math.max(12, name.length + 1)}
             className="animate-in fade-in duration-300 motion-reduce:animate-none h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           />
-          <div className="animate-in fade-in flex items-center justify-end gap-2 duration-300 motion-reduce:animate-none">
-            <div className="flex items-center" role="group" aria-label="History">
-              <Hint label="Undo" shortcut={["⌘", "Z"]}>
-                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-                <span className="inline-flex">
-                  <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
-                    <Undo2 />
-                  </Button>
-                </span>
-              </Hint>
-              <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
-                {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-                <span className="inline-flex">
-                  <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
-                    <Redo2 />
-                  </Button>
-                </span>
-              </Hint>
-            </div>
-            <SavesDialog
-              open={historyOpen}
-              onOpenChange={setHistoryOpen}
-              slot={historySlot}
-              state={state}
-              name={name}
-              stateKey={stateKey}
-              current={current}
-              hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
-              onCurrent={updateCurrent}
-              onOpen={(loaded) => {
-                setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
-                setFocus({ hueId: null, grade: null });
-              }}
-            />
-            <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
-            <AccountMenu onSignedOut={() => updateCurrent(null)} />
-            <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
-            <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
-          </div>
         </div>
       </header>
 
@@ -620,7 +611,46 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           </div>
         </section>
 
-        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
+        <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="relative min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
+        <div className="animate-in fade-in mb-3 flex items-center justify-end gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
+          <div className="flex items-center" role="group" aria-label="History">
+            <Hint label="Undo" shortcut={["⌘", "Z"]}>
+              {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+              <span className="inline-flex">
+                <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                  <Undo2 />
+                </Button>
+              </span>
+            </Hint>
+            <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
+              {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+              <span className="inline-flex">
+                <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                  <Redo2 />
+                </Button>
+              </span>
+            </Hint>
+          </div>
+          <SavesDialog
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            slot={historySlot}
+            state={state}
+            name={name}
+            stateKey={stateKey}
+            current={current}
+            hasUnsaved={current !== null && (current.savedKey !== stateKey || name.trim() !== current.name)}
+            onCurrent={updateCurrent}
+            onOpen={(loaded) => {
+              setState({ ...loaded.state, gamut: loaded.state.gamut ?? DEFAULT_GAMUT });
+              setFocus({ hueId: null, grade: null });
+            }}
+          />
+          <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
+          <AccountMenu onSignedOut={() => updateCurrent(null)} />
+          <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
+          <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
+        </div>
           {!ready ? null : (
             <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-large) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
             {historyOpen || generated.length === 0 ? null : (
@@ -676,6 +706,15 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
       </main>
+      <footer className="flex justify-center py-6 lg:pointer-events-none lg:fixed lg:inset-x-0 lg:bottom-0 lg:py-3">
+        {session ? (
+          <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Logo />
+          </button>
+        ) : (
+          <Logo />
+        )}
+      </footer>
     </div>
   );
 }
