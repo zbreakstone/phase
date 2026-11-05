@@ -13,12 +13,13 @@ const lerpHue = (a: number, b: number, t: number) => {
 const pick = (shades: Shade[], j: number, count: number) =>
   shades[count <= 1 ? 0 : Math.round((j * (shades.length - 1)) / (count - 1))];
 
-function morphShade(a: Shade | undefined, b: Shade, t: number): Shade {
+function morphShade(a: Shade | undefined, b: Shade, t: number, limitOf: (s: Shade) => number): Shade {
   if (!a) return b;
   const linear = a.linear.map((c, i) => lerp(c, b.linear[i], t)) as RGB;
   return {
     ...b,
     linear,
+    limit: lerp(limitOf(a), limitOf(b), t),
     hex: linearToHex(linear),
     targetLuminance: lerp(a.targetLuminance, b.targetLuminance, t),
     luminance: lerp(a.luminance, b.luminance, t),
@@ -34,10 +35,10 @@ function morphShade(a: Shade | undefined, b: Shade, t: number): Shade {
  * position, so palettes with different numbers of colors or steps still blend: the extra ones start from their nearest
  * neighbor. The result has `to`'s names, grades and structure.
  */
-export function morphGenerated(from: GeneratedHue[], to: GeneratedHue[], t: number): GeneratedHue[] {
+export function morphGenerated(from: GeneratedHue[], to: GeneratedHue[], t: number, limitOf: (s: Shade) => number): GeneratedHue[] {
   if (t >= 1 || from.length === 0) return to;
   return to.map((g, i) => {
     const src = from[Math.min(i, from.length - 1)];
-    return { ...g, shades: g.shades.map((s, j) => morphShade(pick(src.shades, j, g.shades.length), s, t)) };
+    return { ...g, shades: g.shades.map((s, j) => morphShade(pick(src.shades, j, g.shades.length), s, t, limitOf)) };
   });
 }

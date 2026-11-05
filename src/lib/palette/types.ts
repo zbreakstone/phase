@@ -102,6 +102,8 @@ export interface Shade {
   isSource?: boolean;
   /** True when the exact source color was kept (pinned) instead of the solved one. */
   pinned?: boolean;
+  /** Only on shades blended between two palettes: the chroma limit, blended too since it can't be recomputed from blended inputs. */
+  limit?: number;
 }
 
 export interface GeneratedHue {

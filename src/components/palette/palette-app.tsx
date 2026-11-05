@@ -9,10 +9,11 @@ import { toggleVariants } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
-import { type SpaceId } from "@/lib/color/spaces";
+import { SPACES, type SpaceId } from "@/lib/color/spaces";
+import { maxChromaAt } from "@/lib/color/solve";
 import { defaultState, hueFromPreset, hueFromSource, type HuePreset } from "@/lib/palette/defaults";
 import { convertHue, generatePalette } from "@/lib/palette/generate";
-import type { HueConfig, PaletteState, ScaleConfig, StepTweak } from "@/lib/palette/types";
+import type { HueConfig, PaletteState, ScaleConfig, Shade, StepTweak } from "@/lib/palette/types";
 import { contentKey, hashForState, stateFromHash } from "@/lib/palette/serialize";
 import { validatePalette } from "@/lib/palette/validate";
 import { useHistory } from "@/lib/palette/use-history";
@@ -345,8 +346,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   };
 
   const generated = React.useMemo(() => generatePalette(state.space, state.scale, state.hues, state.gamut), [state.space, state.scale, state.hues, state.gamut]);
+  const limitOf = React.useCallback((s: Shade) => maxChromaAt(SPACES[state.space], s.targetLuminance, s.hue, state.gamut), [state.space, state.gamut]);
   /** What the square and chart draw: `generated`, or partway to it while switching palettes. */
-  const [shown, armMorph, morphing] = useMorph(generated);
+  const [shown, armMorph, morphing] = useMorph(generated, limitOf);
   const report = React.useMemo(() => validatePalette(generated, state.scale.rules), [generated, state.scale.rules]);
   // A removed color can't stay open, so fall back to the level above.
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;

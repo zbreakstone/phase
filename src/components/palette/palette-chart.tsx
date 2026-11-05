@@ -288,7 +288,7 @@ export function PaletteChart({
       hex: s.hex,
       grade: s.grade,
       value: metric === "lightness" ? s.oklch.L : metric === "chroma" ? s.chroma : s.hue,
-      limit: metric === "chroma" ? maxChromaAt(def, s.targetLuminance, s.hue, gamut) : undefined,
+      limit: metric === "chroma" ? (s.limit ?? maxChromaAt(def, s.targetLuminance, s.hue, gamut)) : undefined,
       asked: metric === "chroma" ? s.requestedChroma : undefined,
       L: s.oklch.L,
       C: s.oklch.C,
@@ -345,9 +345,11 @@ export function PaletteChart({
     }
     return { cells: hatchCells, limit };
   }, [showLimit, points, xOf, yOf, domain, hatchCells]);
-  // While the palette is gliding to another, the hatching holds still, then fades to the new one: the gamut edge it
-  // draws is far too jumpy to follow through in-between colors.
-  const settled = useSettled(hatchLayer, calm);
+  // The chroma limit glides with the lines. The hatched cells of the other views can't be blended, so they hold still
+  // while the palette glides, then fade to the new ones.
+  const settledCells = useSettled(hatchLayer.cells, calm);
+  // Only the cells need a crossfade afterwards; the limit has already glided, and fading from its old self would bring the old edge back.
+  const settled = { value: { ...hatchLayer, cells: settledCells.value }, epoch: hatchLayer.cells ? settledCells.epoch : 0 };
   const viewKey = `${metric}|${showAll}|${focused?.hue.id ?? ""}|${level}|${settled.epoch}`;
   const fade = useCrossfade(settled.value, viewKey);
 
