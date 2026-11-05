@@ -71,7 +71,7 @@ export const ColorPickerContent = (props: React.ComponentProps<typeof ArkColorPi
         <ArkColorPicker.Content
           className={cn(
             "z-50 flex w-64 flex-col gap-3 p-3",
-            "rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10",
+            "rounded-lg bg-popover text-popover-foreground shadow-(--shadow-large)",
             "origin-(--transform-origin) outline-none",
             "data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:animate-in",
             "data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:animate-out",
