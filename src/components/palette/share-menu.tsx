@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Braces, ChevronRight, Link2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Hint } from "./hint";
 import { useKeyShortcut } from "./use-key-shortcut";
 import { CssLogo, FigmaLogo, TailwindLogo } from "./brand-icons";
@@ -25,57 +25,42 @@ export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolea
   const [open, setOpen] = React.useState(false);
   useKeyShortcut("KeyS", () => setOpen(true), { shift: true, enabled: !disabled });
 
+  // A menu rather than a popover, so the arrow keys, Home and End, and typing a name move through the choices.
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <Hint label="Share or export" shortcut={["⇧", "S"]}>
-        <PopoverTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="bg-clip-border shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
+        <DropdownMenuTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="bg-clip-border shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
           <Share2 />
           Share
-        </PopoverTrigger>
+        </DropdownMenuTrigger>
       </Hint>
-      <PopoverContent align="end" className="w-80 gap-0 p-0">
-        <div className="flex items-center gap-3 p-3">
+      <DropdownMenuContent align="end" className="w-80 gap-0 p-1.5">
+        <DropdownMenuItem onClick={onCopyLink} className="gap-3 rounded-lg p-1.5">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Link2 className="size-4" />
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Share a link</p>
-            <p className="text-xs text-muted-foreground">Anyone with it sees this exact palette.</p>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              setOpen(false);
-              onCopyLink();
-            }}
-          >
-            Copy link
-          </Button>
-        </div>
-        <div className="border-t border-border p-1.5">
-          <p className="px-1.5 pt-1 pb-1.5 text-xs font-medium text-muted-foreground">Export</p>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Copy link</span>
+            <span className="block text-xs font-normal text-muted-foreground">Anyone with it sees this exact palette.</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="-mx-1.5 my-1.5" />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-1.5 pt-1 pb-1.5">Export</DropdownMenuLabel>
           {EXPORTS.map(({ kind, title, description, icon: Icon }) => (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onExport(kind);
-              }}
-              className="flex w-full items-center gap-3 rounded-lg p-1.5 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
+            <DropdownMenuItem key={kind} onClick={() => onExport(kind)} className="gap-3 rounded-lg p-1.5">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <Icon className={kind === "json" ? "size-4" : "size-5 shrink-0"} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{title}</span>
-                <span className="block truncate text-xs text-muted-foreground">{description}</span>
+                <span className="block truncate text-xs font-normal text-muted-foreground">{description}</span>
               </span>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </button>
+            </DropdownMenuItem>
           ))}
-        </div>
-      </PopoverContent>
-    </Popover>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
