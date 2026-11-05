@@ -95,6 +95,10 @@ function ColorPad({
     return best;
   };
 
+  // With no theme color yet there are no dots, so the pad itself takes the arrow keys and the first one
+  // creates the color, starting from the middle of the field.
+  const seed: Handle = { id: "bg", label: "Background color", point: { x: 0.5, y: STEP * 3 }, color: "" };
+  const empty = handles.length === 0;
   const onKey = (h: Handle) => (e: React.KeyboardEvent) => {
     const big = e.shiftKey ? 3 : 1;
     const d: Record<string, Point> = {
@@ -113,6 +117,17 @@ function ColorPad({
   return (
     <div
       ref={ref}
+      data-color-pad=""
+      {...(empty && {
+        tabIndex: 0,
+        role: "group",
+        "aria-label": "Theme color. Arrow keys pick a hue and vividness.",
+        onKeyDown: (e: React.KeyboardEvent) => {
+          onKey(seed)(e);
+          // The pad lost its job to the new dot, so hand focus over instead of dropping it.
+          if (e.defaultPrevented) requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>("[role=slider]")?.focus());
+        },
+      })}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         const p = point(e);
@@ -126,7 +141,7 @@ function ColorPad({
         if (active.current) onCommit();
         active.current = null;
       }}
-      className="relative h-32 cursor-crosshair touch-none rounded-xl bg-muted p-3 select-none"
+      className="relative h-32 cursor-crosshair touch-none rounded-xl bg-muted p-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="grid h-full w-full place-items-center"
@@ -273,12 +288,13 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
           </span>
         </PopoverTrigger>
       </Hint>
-      {/* Start on the color dots (or the panel itself), not the first enabled button, so Enter right after opening can't sign you out. */}
+      {/* Start on the color dots (or the pad), not the first enabled button, so Enter right after opening can't sign you out. */}
       <PopoverContent
         align="end"
         className="w-72 gap-2 p-3"
         initialFocus={() =>
           document.querySelector<HTMLElement>("[data-slot=popover-content] [role=slider]") ??
+          document.querySelector<HTMLElement>("[data-slot=popover-content] [data-color-pad]") ??
           document.querySelector<HTMLElement>("[data-slot=popover-content]")
         }
       >
@@ -339,6 +355,8 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
             onClick={() => {
               setAccent(null);
               void saveAccent(null);
+              // This button disables itself, so move focus to the pad rather than dropping it.
+              requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-color-pad]")?.focus());
             }}
           >
             Use default
