@@ -1,15 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronDown, EllipsisVertical } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCloud } from "@/lib/cloud/client";
 import { type PaletteSummary, listPalettes } from "@/lib/cloud/palettes";
-import { RenamePaletteDialog } from "./rename-palette-dialog";
-import { usePaletteActions } from "./use-palette-actions";
 
 const when = (ms: number) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(ms);
 
@@ -20,20 +17,14 @@ interface Props {
   currentName: string;
   /** Opens another palette. The editor decides whether leaving needs a confirmation. */
   onSwitch: (id: string) => void;
-  /** A palette was renamed from here, so the editor can keep its own copy of the name in step. */
-  onRenamed: (id: string, name: string) => void;
-  /** A palette was deleted from here. */
-  onDeleted: (id: string) => void;
+  /** Starts a new palette. */
+  onNew: () => void;
 }
 
-/** The palette's name as a menu: pick another palette to open it, or act on any of them. */
-export function PaletteSwitcher({ currentId, currentName, onSwitch, onRenamed, onDeleted }: Props) {
+/** The palette's name as a menu: pick another palette to open it, or start a new one. */
+export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Props) {
   const [open, setOpen] = React.useState(false);
   const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
-  /** Bumped to load the list again after a duplicate, rename or delete. */
-  const [reload, setReload] = React.useState(0);
-  const [renaming, setRenaming] = React.useState<PaletteSummary | null>(null);
-  const actions = usePaletteActions(() => setReload((n) => n + 1));
 
   React.useEffect(() => {
     if (!open) return;
@@ -50,7 +41,7 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onRenamed, o
     return () => {
       canceled = true;
     };
-  }, [open, reload]);
+  }, [open]);
 
   const choose = (id: string) => {
     setOpen(false);
@@ -62,12 +53,12 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onRenamed, o
   const rows = (
     <ul className="max-h-80 overflow-y-auto">
       {palettes?.map((p) => (
-        <li key={p.id} className="group/row relative">
+        <li key={p.id}>
           <button
             type="button"
             onClick={() => choose(p.id)}
             aria-current={p.id === currentId ? "true" : undefined}
-            className="flex w-full items-center gap-2 rounded-md py-1.5 pr-10 pl-2 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-2 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-medium">{p.name}</span>
@@ -75,41 +66,6 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onRenamed, o
             </span>
             {p.id === currentId ? <Check aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /> : null}
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Actions for ${p.name}`}
-                  className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground aria-expanded:bg-muted"
-                />
-              }
-            >
-              <EllipsisVertical />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={() => choose(p.id)}>Open</DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setOpen(false);
-                  setRenaming(p);
-                }}
-              >
-                Edit info
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void actions.copyLink(p)}>Copy link</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void actions.duplicate(p)}>Duplicate</DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={async () => {
-                  if (await actions.remove(p)) onDeleted(p.id);
-                }}
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </li>
       ))}
     </ul>
@@ -143,19 +99,21 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onRenamed, o
           ) : (
             rows
           )}
+          <div className={palettes?.length ? "mt-1 border-t border-border pt-1" : ""}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onNew();
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <Plus aria-hidden className="size-4 text-muted-foreground" />
+              New palette
+            </button>
+          </div>
         </PopoverContent>
       </Popover>
-      <RenamePaletteDialog
-        name={renaming?.name ?? null}
-        onClose={() => setRenaming(null)}
-        onSubmit={async (name) => {
-          if (!renaming) return;
-          if (await actions.rename(renaming, name)) {
-            onRenamed(renaming.id, name);
-            setRenaming(null);
-          }
-        }}
-      />
     </>
   );
 }

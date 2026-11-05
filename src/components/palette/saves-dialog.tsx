@@ -3,9 +3,10 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import type { Session } from "@supabase/supabase-js";
-import { Check, Mail, MoreHorizontal, Plus, X } from "lucide-react";
+import { Check, Mail, MoreHorizontal, Plus, RotateCcwClock, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -482,22 +483,17 @@ export function SavesDialog({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Version history"
-        aria-expanded={open}
-        onClick={toggle}
-        className={open ? "bg-muted" : undefined}
-      >
-        {status ? (
-          <span
-            aria-hidden
-            className={`size-1.5 shrink-0 rounded-full ${status.color}`}
-          />
-        ) : null}
-        <span className="hidden sm:inline">{label}</span>
-      </Button>
+      <Hint label={`Version history: ${status?.label ?? label}`}>
+        <button
+          type="button"
+          aria-label="Version history"
+          aria-expanded={open}
+          onClick={toggle}
+          className={toggleVariants({ variant: "outline", size: "sm", className: open ? "bg-muted hover:bg-muted" : undefined })}
+        >
+          <RotateCcwClock />
+        </button>
+      </Hint>
       {open && slot ? createPortal(panel, slot) : null}
       <AddVersionDialog
         open={adding}

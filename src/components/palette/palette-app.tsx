@@ -5,7 +5,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
@@ -46,6 +46,7 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
 import { PaletteSwitcher } from "./palette-switcher";
+import { usePaletteActions } from "./use-palette-actions";
 import { isPopupOpen, isTextEntry } from "./text-entry";
 
 const AUTOSAVE_ID = "__autosave__";
@@ -80,7 +81,7 @@ function Logo() {
     <span
       role="img"
       aria-label="Phase"
-      className="block aspect-[276/90] h-5 bg-gray-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-gray-700"
+      className="block aspect-[276/90] h-5 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
     />
   );
 }
@@ -474,6 +475,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     toast.success(`Deleted ${current.name}`);
     router.push("/");
   };
+  const { duplicate } = usePaletteActions(() => {});
+  /** Saves a copy of the last saved version, under "<name> copy". */
+  const duplicateCurrent = () => (current ? duplicate({ id: current.id, name: current.name, updatedAt: Date.now() }) : undefined);
   const listCrumb = session
     ? [
         {
@@ -486,11 +490,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               onSwitch={(id) => {
                 if (confirmLeave()) router.push(`/p/${id}`);
               }}
-              onRenamed={(id, next) => {
-                if (current?.id === id) updateCurrent({ ...current, name: next });
-              }}
-              onDeleted={(id) => {
-                if (current?.id === id) router.push("/");
+              onNew={() => {
+                if (confirmLeave()) router.push("/p/new");
               }}
             />
           ),
@@ -533,26 +534,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <header className="border-b border-border bg-white dark:bg-black">
-        <div className={`${PAGE_WIDTH} flex h-14 items-center justify-center`}>
-          <input
-            aria-label="Palette name"
-            value={name}
-            maxLength={80}
-            placeholder="Untitled palette"
-            onChange={(e) => updateName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") e.currentTarget.blur();
-            }}
-            onFocus={(e) => e.currentTarget.select()}
-            size={Math.max(12, name.length + 1)}
-            className="animate-in fade-in duration-300 motion-reduce:animate-none h-8 field-sizing-content max-w-[min(24rem,40vw)] min-w-24 truncate rounded-md bg-transparent px-2 text-center text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
-      </header>
-
       <main
-        className={`${PAGE_WIDTH} lg:[container-type:size] grid w-full flex-1 gap-6 py-4 lg:h-[calc(100dvh-3.5rem)] lg:min-h-0 lg:flex-none lg:grid-cols-[auto_minmax(24rem,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0`}
+        className={`${PAGE_WIDTH} lg:[container-type:size] grid w-full flex-1 gap-6 py-4 lg:relative lg:h-dvh lg:min-h-0 lg:flex-none lg:grid-cols-[auto_minmax(24rem,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-center lg:overflow-clip lg:[overflow-clip-margin:2.5rem] lg:py-0`}
       >
         <section aria-label="Palette" className="flex min-w-0 flex-col lg:h-full lg:overflow-y-auto lg:-mx-10 lg:px-10 lg:py-6">
           <div className="my-auto space-y-6">
@@ -612,22 +595,23 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
         </section>
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="relative min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
-        <div className="animate-in fade-in mb-3 flex items-center justify-end gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
-          <div className="flex items-center" role="group" aria-label="History">
+        <div className="animate-in fade-in mb-3 flex items-center justify-between gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
+          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="group" aria-label="History">
             <Hint label="Undo" shortcut={["⌘", "Z"]}>
               {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
               <span className="inline-flex">
-                <Button variant="ghost" size="icon-sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={undo} disabled={!canUndo} aria-label="Undo">
                   <Undo2 />
-                </Button>
+                </button>
               </span>
             </Hint>
             <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
               {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
               <span className="inline-flex">
-                <Button variant="ghost" size="icon-sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={redo} disabled={!canRedo} aria-label="Redo">
                   <Redo2 />
-                </Button>
+                </button>
               </span>
             </Hint>
           </div>
@@ -646,8 +630,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               setFocus({ hueId: null, grade: null });
             }}
           />
+          </div>
+          <div className="flex items-center gap-2">
           <ShareMenu disabled={!ready} onCopyLink={share} onExport={setExportKind} />
           <AccountMenu onSignedOut={() => updateCurrent(null)} />
+          </div>
           <ResetDialog open={resetOpen} onOpenChange={setResetOpen} onReset={reset} />
           <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
         </div>
@@ -696,7 +683,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} />
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
                 </>
               )}
                 </SectionGroup>
@@ -705,16 +692,16 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             </div>
           )}
         </aside>
-      </main>
-      <footer className="flex justify-center py-6 lg:pointer-events-none lg:fixed lg:inset-x-0 lg:bottom-0 lg:py-3">
-        {session ? (
-          <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
+          {session ? (
+            <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="pointer-events-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Logo />
+            </button>
+          ) : (
             <Logo />
-          </button>
-        ) : (
-          <Logo />
-        )}
-      </footer>
+          )}
+        </footer>
+      </main>
     </div>
   );
 }
