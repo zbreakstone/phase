@@ -270,7 +270,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Hint label={`Account · ${email}`} shortcut={["A"]}>
+      <Hint label={email} shortcut={["A"]}>
         <PopoverTrigger
           aria-label="Account"
           className={toggleVariants({ variant: "outline", size: "sm", className: "size-7 min-w-0 rounded-full! p-0" })}
@@ -359,7 +359,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
               requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-color-pad]")?.focus());
             }}
           >
-            Use default
+            Reset theme
           </Button>
         </div>
         <Button variant="outline" size="sm" onClick={signOut} disabled={busy}>
