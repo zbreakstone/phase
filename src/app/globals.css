@@ -187,8 +187,8 @@ html.dark[data-accent] {
     cursor: grabbing !important;
   }
 }
-@keyframes logo-drift {
+@keyframes logo-swirl {
   to {
-    background-position: 200% 0;
+    rotate: 360deg;
   }
 }

@@ -82,30 +82,40 @@ const LOGO_MASK = "[mask-image:url(/phase-lockup-white.png)] [mask-position:cent
 
 /**
  * The wordmark in a quiet gray: a mask over the white artwork, so one file serves light and dark. Given the palette's
- * colors, hovering lights it up with them drifting through the letters and a soft glow of the same colors behind.
+ * colors, hovering lights it up with them swirling through the letters and a soft glow of the same colors behind.
  */
 function Logo({ colors }: { colors?: string[] }) {
-  // A soft round blob of each color, spread across a tile twice the logo's width. Each blob is also drawn a tile to
-  // either side, so the parts that spill over an edge carry on into the next tile and the drift loops without a seam.
+  // A soft round blob of each color, set around a ring on a square larger than the logo. The square turns, so the
+  // colors orbit through the letters instead of sliding past.
   const fill = colors?.length
     ? {
         backgroundImage: colors
-          .flatMap((c, i) => [-100, 0, 100].map((shift) => `radial-gradient(ellipse 28% 120% at ${(i / colors.length) * 100 + shift}% ${i % 2 ? 80 : 20}%, ${c}, ${c}00)`))
+          .map((c, i) => {
+            const a = (i / colors.length) * Math.PI * 2;
+            return `radial-gradient(circle at ${(50 + Math.cos(a) * 28).toFixed(1)}% ${(50 + Math.sin(a) * 28).toFixed(1)}%, ${c}, ${c}00 38%)`;
+          })
           .concat(`linear-gradient(${colors[0]}, ${colors[0]})`)
           .join(", "),
       }
     : null;
   const lit = "opacity-0 transition-opacity duration-500 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none";
-  const drift = "bg-[length:200%_100%] bg-repeat-x animate-[logo-drift_6s_linear_infinite] motion-reduce:animate-none";
+  const swirl = (
+    <span
+      className="absolute top-1/2 left-1/2 aspect-square w-[130%] -translate-x-1/2 -translate-y-1/2 animate-[logo-swirl_8s_linear_infinite] motion-reduce:animate-none"
+      style={fill ?? undefined}
+    />
+  );
   return (
     <span className="relative block">
       <span role="img" aria-label="Phase" className={cn("block aspect-[276/90] h-7 bg-stone-300 dark:bg-stone-700", LOGO_MASK)} />
       {fill ? (
         <>
           <span aria-hidden className={cn("pointer-events-none absolute inset-0 blur-md saturate-150", lit, "group-hover:opacity-90 group-focus-visible:opacity-90")}>
-            <span className={cn("block size-full", LOGO_MASK, drift)} style={fill} />
+            <span className={cn("absolute inset-0 overflow-hidden", LOGO_MASK)}>{swirl}</span>
           </span>
-          <span aria-hidden className={cn("pointer-events-none absolute inset-0", LOGO_MASK, drift, lit)} style={fill} />
+          <span aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden", LOGO_MASK, lit)}>
+            {swirl}
+          </span>
         </>
       ) : null}
     </span>
