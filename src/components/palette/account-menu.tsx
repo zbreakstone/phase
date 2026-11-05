@@ -265,7 +265,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
                 : colorFor(session.user.id),
               color: accent ? accentOn(accent) : undefined,
             }}
-            className="flex size-full items-center justify-center rounded-full text-xs font-semibold text-white"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
           >
             {initial}
           </span>
