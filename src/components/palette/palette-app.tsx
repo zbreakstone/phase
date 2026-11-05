@@ -83,7 +83,7 @@ function Logo() {
     <span
       role="img"
       aria-label="Phase"
-      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] dark:bg-stone-700"
+      className="block aspect-[276/90] h-7 bg-stone-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] group-focus-visible:[background-image:var(--logo-fill)] group-hover:[background-image:var(--logo-fill)] dark:bg-stone-700"
     />
   );
 }
@@ -715,24 +715,16 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           )}
         </aside>
         <footer className="flex justify-center py-6 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:bottom-0 lg:h-[calc((100cqh-min(100cqw-25.5rem,100cqh-9rem))/2)] lg:items-center lg:py-0">
-          {/* On hover the logo fills with a gradient of the palette on screen, so it changes with every palette. */}
+          {/* On hover the logo's fill becomes a gradient of the palette on screen, so it changes with every palette. */}
           {(() => {
-            const glow =
-              ready && generated.length > 0 ? (
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 [mask-image:url(/phase-lockup-white.png)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] group-focus-visible:opacity-100 group-hover:opacity-100 motion-reduce:transition-none"
-                  style={{ backgroundImage: `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` }}
-                />
-              ) : null;
+            const fill = ready && generated.length > 0 ? `linear-gradient(to right, ${[...generated, ...(generated.length === 1 ? generated : [])].map((g) => representativeShade(g).hex).join(", ")})` : undefined;
+            const vars = { "--logo-fill": fill } as React.CSSProperties;
             return session ? (
-              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                {glow}
+              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" style={vars}>
                 <Logo />
               </button>
             ) : (
-              <span className="group pointer-events-auto relative isolate rounded-md">
-                {glow}
+              <span className="group pointer-events-auto relative isolate rounded-md" style={vars}>
                 <Logo />
               </span>
             );
