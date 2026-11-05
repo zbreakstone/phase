@@ -22,15 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  type PaletteSummary,
-  createPalette,
-  createShare,
-  deletePalette,
-  listPalettes,
-  loadLatest,
-  renamePalette,
-} from "@/lib/cloud/palettes";
+import { type PaletteSummary, listPalettes, loadLatest } from "@/lib/cloud/palettes";
 import type { Gamut } from "@/lib/color/gamut";
 import { generatePalette } from "@/lib/palette/generate";
 import type { GeneratedHue } from "@/lib/palette/types";
@@ -38,6 +30,7 @@ import { AccountMenu } from "./account-menu";
 import { PAGE_WIDTH } from "./page-width";
 import { PalettePreview } from "./palette-square";
 import { RenamePaletteDialog } from "./rename-palette-dialog";
+import { usePaletteActions } from "./use-palette-actions";
 
 const when = (ms: number) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(ms);
@@ -71,63 +64,10 @@ export function PalettesHome() {
   const [reload, setReload] = React.useState(0);
   const [renaming, setRenaming] = React.useState<PaletteSummary | null>(null);
 
-  const act = async (task: () => Promise<void>) => {
-    try {
-      await task();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went wrong.");
-    }
+  const { copyLink, duplicate, remove, rename: renamePalette } = usePaletteActions(() => setReload((n) => n + 1));
+  const rename = async (p: PaletteSummary, name: string) => {
+    if (await renamePalette(p, name)) setRenaming(null);
   };
-
-  const copyLink = (p: PaletteSummary) =>
-    act(async () => {
-      const cloud = getCloud();
-      if (!cloud) return;
-      const { state } = await loadLatest(cloud, p.id);
-      const url = `${window.location.origin}/s/${await createShare(cloud, state)}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast.success(`Link copied: ${url}`);
-      } catch {
-        toast.message(url);
-      }
-    });
-
-  const duplicate = (p: PaletteSummary) =>
-    act(async () => {
-      const cloud = getCloud();
-      if (!cloud) return;
-      const { state } = await loadLatest(cloud, p.id);
-      const name = `${p.name} copy`.slice(0, 80);
-      await createPalette(cloud, name, state);
-      setReload((n) => n + 1);
-      toast.success(`Created ${name}`);
-    });
-
-  const remove = (p: PaletteSummary) => {
-    if (
-      !window.confirm(
-        `Delete "${p.name}" and all of its versions? This can't be undone.`,
-      )
-    )
-      return;
-    void act(async () => {
-      const cloud = getCloud();
-      if (!cloud) return;
-      await deletePalette(cloud, p.id);
-      setReload((n) => n + 1);
-      toast.success(`Deleted ${p.name}`);
-    });
-  };
-
-  const rename = (p: PaletteSummary, name: string) =>
-    act(async () => {
-      const cloud = getCloud();
-      if (!cloud) return;
-      await renamePalette(cloud, p.id, name);
-      setRenaming(null);
-      setReload((n) => n + 1);
-    });
 
   const menuItems = (p: PaletteSummary) => (
     <>
@@ -143,7 +83,7 @@ export function PalettesHome() {
       <DropdownMenuItem onClick={() => void duplicate(p)}>
         Duplicate
       </DropdownMenuItem>
-      <DropdownMenuItem variant="destructive" onClick={() => remove(p)}>
+      <DropdownMenuItem variant="destructive" onClick={() => void remove(p)}>
         Delete
       </DropdownMenuItem>
     </>
