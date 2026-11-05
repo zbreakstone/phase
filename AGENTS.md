@@ -17,4 +17,4 @@ Use the shadow tokens from `src/app/globals.css`, never stock Tailwind shadows (
 - `shadow-(--shadow-large)`: floating surfaces (popovers, dropdown, select and context menus, color pickers).
 - `shadow-(--shadow-extra-large)`: modals (dialogs).
 
-Set these in the shared primitives in `src/components/ui/`, not at call sites. Full detail is in `.cursor/rules/shadows.mdc`.
+Set these in the shared primitives in `src/components/ui/`, not at call sites. Full detail, with the rules for each tier, is in `src/components/ui/AGENTS.md`.
