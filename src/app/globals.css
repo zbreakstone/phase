@@ -187,6 +187,7 @@ html.dark[data-accent] {
     cursor: grabbing !important;
   }
 }
+
 @keyframes logo-swirl {
   to {
     rotate: 360deg;
