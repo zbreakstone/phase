@@ -256,7 +256,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
       <Hint label={email}>
         <PopoverTrigger
           aria-label="Account"
-          className={toggleVariants({ variant: "outline", size: "sm", className: "px-1" })}
+          className={toggleVariants({ variant: "outline", size: "sm", className: "size-7 min-w-0 rounded-full! p-0" })}
         >
           <span
             style={{
@@ -265,7 +265,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
                 : colorFor(session.user.id),
               color: accent ? accentOn(accent) : undefined,
             }}
-            className="flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+            className="flex size-full items-center justify-center rounded-full text-xs font-semibold text-white"
           >
             {initial}
           </span>
