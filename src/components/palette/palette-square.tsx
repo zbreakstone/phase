@@ -8,7 +8,6 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type SquareMode = "smooth" | "cells";
@@ -421,31 +420,41 @@ function Dot({
   chipSide: "right" | "top";
   onOpen: () => void;
 }) {
-  // Controlled: the square decides when a dot is "active" (the pointer is over its cell or column), not the
-  // dot's own hover. The tooltip renders in a portal, so the dot's hover scale doesn't distort it.
+  // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
+  // Nothing here sets a z-index, opacity or transform on a wrapper: those would wall the blended rings and the
+  // chip's tint off from the canvas, so they sit on the individual layers instead.
+  const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 pointer-coarse:opacity-100";
+  const on = active && "scale-150 opacity-100";
+  const chipAt =
+    chipSide === "right"
+      ? ({ left: `calc(${x}% + 1.5rem)`, top: `calc(${y}% - 1rem)`, height: "2rem", display: "flex", alignItems: "center" } as const)
+      : ({ left: `${x}%`, bottom: `calc(${100 - y}% + 1.5rem)`, width: 0, display: "flex", justifyContent: "center" } as const);
   return (
-    <Tooltip open={active}>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-            className={cn(
-              "absolute z-10 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white opacity-0 shadow-md transition-[opacity,transform] duration-150 group-hover/square:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:opacity-100",
-              active && "scale-150 opacity-100",
-            )}
-            style={{ left: `${x}%`, top: `${y}%`, backgroundColor: color }}
-          />
-        }
-      />
-      <TooltipContent side={chipSide} sideOffset={8}>
-        {chip}
-      </TooltipContent>
-    </Tooltip>
+    <>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen();
+        }}
+        className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        style={{ left: `${x}%`, top: `${y}%` }}
+      >
+        <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_4px_6px_-1px_#0000001a,0_2px_4px_-2px_#0000001a]", shown, on)} style={{ backgroundColor: color }} />
+        <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", shown, on)} />
+      </button>
+      {active ? (
+        <div aria-hidden className="pointer-events-none absolute" style={chipAt}>
+          <span className="relative rounded-md px-3 py-1.5 text-xs whitespace-nowrap text-white">
+            <span className="animate-in fade-in-0 absolute inset-0 rounded-md bg-black/70 mix-blend-multiply duration-150" />
+            <span className="animate-in fade-in-0 absolute inset-0 rounded-md shadow-[inset_0_0_0_1.5px_#fff] mix-blend-overlay duration-150" />
+            <span className="absolute inset-0 rounded-md shadow-[inset_0_0_0_1px_#ffffff26]" />
+            <span className="animate-in fade-in-0 relative duration-150">{chip}</span>
+          </span>
+        </div>
+      ) : null}
+    </>
   );
 }
 
