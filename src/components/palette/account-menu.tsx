@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Hint } from "./hint";
+import { useKeyShortcut } from "./use-key-shortcut";
 import { cloudEnabled, getCloud } from "@/lib/cloud/client";
 import {
   type Accent,
@@ -201,6 +202,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
   const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const accent = useAccent();
+  useKeyShortcut("KeyA", () => setOpen(true), { enabled: enabled && !!session });
 
   React.useEffect(() => {
     const cloud = getCloud();
@@ -253,7 +255,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Hint label={email}>
+      <Hint label={`Account · ${email}`} shortcut={["A"]}>
         <PopoverTrigger
           aria-label="Account"
           className={toggleVariants({ variant: "outline", size: "sm", className: "size-7 min-w-0 rounded-full! p-0" })}

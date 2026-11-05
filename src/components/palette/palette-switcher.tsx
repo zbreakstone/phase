@@ -5,6 +5,8 @@ import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Hint } from "./hint";
+import { useKeyShortcut } from "./use-key-shortcut";
 import { getCloud } from "@/lib/cloud/client";
 import { type PaletteSummary, listPalettes } from "@/lib/cloud/palettes";
 
@@ -25,6 +27,7 @@ interface Props {
 export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Props) {
   const [open, setOpen] = React.useState(false);
   const [palettes, setPalettes] = React.useState<PaletteSummary[] | null>(null);
+  useKeyShortcut("KeyP", () => setOpen(true));
 
   React.useEffect(() => {
     if (!open) return;
@@ -74,19 +77,21 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Pro
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Switch palette"
-              className="min-w-0 border-0 bg-white pr-1.5 pl-2.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) aria-expanded:bg-white aria-expanded:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30 dark:aria-expanded:bg-input/30"
-            />
-          }
-        >
-          <span className="truncate font-medium">{label}</span>
-          <ChevronDown className="shrink-0" />
-        </PopoverTrigger>
+        <Hint label="Switch palette" shortcut={["P"]}>
+          <PopoverTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Switch palette"
+                className="min-w-0 border-0 bg-white pr-1.5 pl-2.5 text-sm text-foreground shadow-(--shadow-default) transition-[color,box-shadow] hover:bg-white hover:shadow-(--shadow-large) aria-expanded:bg-white aria-expanded:shadow-(--shadow-large) dark:bg-input/30 dark:hover:bg-input/30 dark:aria-expanded:bg-input/30"
+              />
+            }
+          >
+            <span className="truncate font-medium">{label}</span>
+            <ChevronDown className="shrink-0" />
+          </PopoverTrigger>
+        </Hint>
         <PopoverContent align="start" className="w-72 gap-0 p-1">
           {palettes === null ? (
             <div aria-busy="true" aria-label="Loading your palettes" className="space-y-1 p-1">

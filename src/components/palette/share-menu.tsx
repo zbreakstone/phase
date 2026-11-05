@@ -4,6 +4,8 @@ import * as React from "react";
 import { Braces, ChevronRight, Link2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Hint } from "./hint";
+import { useKeyShortcut } from "./use-key-shortcut";
 import { CssLogo, FigmaLogo, TailwindLogo } from "./brand-icons";
 
 export type ExportKind = "css" | "json" | "tailwind" | "figma";
@@ -21,13 +23,16 @@ const EXPORTS: { kind: ExportKind; title: string; description: string; icon: Rea
  */
 export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolean; onCopyLink: () => void; onExport: (kind: ExportKind) => void }) {
   const [open, setOpen] = React.useState(false);
+  useKeyShortcut("KeyS", () => setOpen(true), { shift: true, enabled: !disabled });
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="bg-clip-border shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
-        <Share2 />
-        Share
-      </PopoverTrigger>
+      <Hint label="Share or export" shortcut={["⇧", "S"]}>
+        <PopoverTrigger render={<Button size="sm" disabled={disabled} aria-label="Share or export" className="bg-clip-border shadow-(--shadow-default) transition-[background-color,box-shadow] hover:shadow-(--shadow-large)" />}>
+          <Share2 />
+          Share
+        </PopoverTrigger>
+      </Hint>
       <PopoverContent align="end" className="w-80 gap-0 p-0">
         <div className="flex items-center gap-3 p-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
