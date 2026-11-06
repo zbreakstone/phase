@@ -18,6 +18,7 @@ import { Crumbs, type Crumb, type Stepper } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 import { isPopupOpen, isTextEntry } from "./text-entry";
+import { useRovingFocus } from "./use-roving-focus";
 import { useTheme } from "./use-theme";
 import type { Theme } from "@/lib/theme";
 
@@ -121,12 +122,17 @@ export function ViewToolbar({
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
+  const previewRef = React.useRef<HTMLDivElement>(null);
+  const displayRef = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(previewRef);
+  useRovingFocus(displayRef);
+
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
       <div className="min-w-0">
         <Crumbs items={crumbs} stepper={stepper} />
       </div>
-      <div className="flex items-center gap-2">
+      <div ref={previewRef} role="toolbar" aria-label="Preview" data-region="preview" className="flex items-center gap-2">
         <Select
           items={LENSES.map((l) => ({ value: l.id, label: l.label }))}
           value={lens}
@@ -178,7 +184,7 @@ export function ViewToolbar({
           </Toggle>
         </Hint>
       </div>
-      <div className="flex items-center justify-end gap-2">
+      <div ref={displayRef} role="toolbar" aria-label="Display" data-region="display" className="flex items-center justify-end gap-2">
         <DropdownMenu open={themeOpen} onOpenChange={setThemeOpen}>
           <Hint label="Change theme" shortcut={["T"]}>
             <DropdownMenuTrigger aria-label="Change theme" className={toggleVariants({ variant: "outline", size: "sm" })}>

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRovingFocus } from "./use-roving-focus";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
@@ -41,6 +42,9 @@ interface Props {
   reference: Shade | null;
   onOpenHue: (hueId: string) => void;
   onOpenStep: (hueId: string, grade: number) => void;
+  /** The color and step you last opened: where the keyboard lands when you come back to a level. */
+  currentHueId?: string | null;
+  currentGrade?: number | null;
 }
 
 interface Row {
@@ -188,7 +192,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -205,6 +209,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
+  // The dots are one tab stop: arrows move between them (up and down for colors, left and right for steps).
+  useRovingFocus(boxRef, { orientation: level === "all" ? "vertical" : "horizontal", enabled: level !== "step" });
 
   const locate = (e: React.PointerEvent | React.MouseEvent) => {
     const rect = boxRef.current?.getBoundingClientRect();
@@ -306,6 +312,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         ref={boxRef}
         data-palette-square
         role="group"
+        data-region="canvas"
+        // A single step has nothing to move between, but the group still takes focus so the keyboard stays on the canvas.
+        tabIndex={level === "step" ? -1 : undefined}
         aria-label={level === "all" ? "Your palette" : level === "hue" ? `${focused?.hue.name} steps` : `${focused?.hue.name} ${focusShade?.grade}`}
         onPointerMove={(e) => {
           if (level === "step") return;
@@ -317,7 +326,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           const at = locate(e);
           if (at) open(at.row, at.col);
         }}
-        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-default)", level !== "step" && "cursor-pointer")}
+        className={cn("group/square relative aspect-square w-full rounded-3xl shadow-(--shadow-default) outline-none", level !== "step" && "cursor-pointer")}
       >
         <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
           {/* A picture that stays opaque while the new one fades in sits beneath it; one that fades out sits on top. */}
@@ -349,6 +358,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   y={((r + 0.5) / R) * 100}
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
+                  current={row.g.hue.id === currentHueId}
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
+                  onBlur={() => setHover(null)}
                   label={`Open ${row.g.hue.name || "Unnamed"}`}
                   chip={row.g.hue.name || "Unnamed"}
                   chipSide="right"
@@ -368,6 +380,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   y={50}
                   color={colors[0][c]}
                   active={hover?.col === c}
+                  current={shade.grade === currentGrade}
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
+                  onBlur={() => setHover(null)}
                   label={`Open ${rows[0].g.hue.name} ${shade.grade}`}
                   chip={`${shade.grade} · ${text || hex}`}
                   chipSide="top"
@@ -386,6 +401,9 @@ function Dot({
   y,
   color,
   active,
+  current,
+  onFocus,
+  onBlur,
   label,
   chip,
   chipSide,
@@ -395,6 +413,10 @@ function Dot({
   y: number;
   color: string;
   active: boolean;
+  /** Where Tab lands when it enters the dots. */
+  current: boolean;
+  onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
+  onBlur: () => void;
   label: string;
   chip: string;
   chipSide: "right" | "top";
@@ -403,7 +425,7 @@ function Dot({
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
   // The button itself carries no z-index, opacity or transform: those would wall the blended ring off from the
   // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
-  const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 pointer-coarse:opacity-100";
+  const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   return (
     <Tooltip open={active}>
@@ -412,6 +434,9 @@ function Dot({
           <button
             type="button"
             aria-label={label}
+            data-current={current || undefined}
+            onFocus={onFocus}
+            onBlur={onBlur}
             onClick={(e) => {
               e.stopPropagation();
               onOpen();

@@ -48,6 +48,8 @@ import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
 import { useKeyShortcut } from "./use-key-shortcut";
+import { focusRegion, useRegionShortcuts } from "./use-region-shortcuts";
+import { useRovingFocus } from "./use-roving-focus";
 import { useMorph } from "./use-morph";
 import { PaletteSwitcher } from "./palette-switcher";
 import { usePaletteActions } from "./use-palette-actions";
@@ -432,11 +434,17 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   );
 
   useApplyAccent();
+  // Where the keyboard lands on the canvas when you come back to a level.
+  const [lastGrade, setLastGrade] = React.useState<number | null>(null);
+  const actionsRef = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(actionsRef);
+  useRegionShortcuts();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
     setFocus({ hueId, grade: null });
   };
   const openStep = (hueId: string, grade: number) => {
+    setLastGrade(grade);
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
     setFocus({ hueId, grade });
   };
@@ -646,6 +654,16 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [prevKey, nextKey] = stepper?.axis === "vertical" ? ["ArrowUp", "ArrowDown"] : ["ArrowLeft", "ArrowRight"];
   useKeyShortcut(prevKey, () => !arrowsBusy() && stepper?.onPrevious?.(), { enabled: !!stepper?.onPrevious });
   useKeyShortcut(nextKey, () => !arrowsBusy() && stepper?.onNext?.(), { enabled: !!stepper?.onNext });
+  // Opening or leaving a level moves the keyboard onto the canvas, so the arrows and Enter work straight away. It
+  // only takes focus that is up for grabs (nothing focused, or focus on the canvas or navigation it replaces).
+  React.useEffect(() => {
+    if (!ready) return;
+    const frame = requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!at || at === document.body || at.closest('[data-region="canvas"], [data-region="navigate"]')) focusRegion("canvas");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [level, ready]);
   const openPanel: Panel | null = panel === "report" ? panel : null;
 
   return (
@@ -683,6 +701,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     reference={reference}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
+                    currentHueId={state.selectedHueId}
+                    currentGrade={lastGrade}
                   />
                   </div>
                   <div className="animate-in fade-in absolute inset-x-0 bottom-full mb-4 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none">
@@ -714,7 +734,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
         </section>
 
         <aside aria-label={level === "all" ? "Palette settings" : level === "hue" ? "Color settings" : "Step settings"} className="relative min-w-0 pb-6 lg:h-[min(100cqw-25.5rem,100cqh-9rem)] lg:pb-0">
-        <div className="animate-in fade-in mb-3 flex items-center justify-between gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
+        <div ref={actionsRef} role="toolbar" aria-label="Palette actions" data-region="actions" className="animate-in fade-in mb-3 flex items-center justify-between gap-2 px-2 duration-300 fill-mode-backwards [animation-delay:200ms] motion-reduce:animate-none lg:absolute lg:inset-x-0 lg:bottom-full lg:mb-4">
           <div className="flex items-center gap-2">
           <div className="flex items-center gap-2" role="group" aria-label="History">
             <Hint label="Undo" shortcut={["⌘", "Z"]}>
@@ -758,7 +778,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
         </div>
           {!ready ? null : (
-            <div className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-default) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
+            <div data-region="panel" className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-default) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
             {historyOpen || generated.length === 0 ? null : (
               <div className="shrink-0 border-b border-border">
                 <PaletteChart generated={shown} calm={morphing} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />

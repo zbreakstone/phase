@@ -1,10 +1,11 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toggleVariants } from "@/components/ui/toggle";
 import { Hint } from "./hint";
+import { useRovingFocus } from "./use-roving-focus";
 
 export interface Crumb {
   label: string;
@@ -25,6 +26,8 @@ export interface Stepper {
 
 /** Where you are: a button back to the parent level ("< Green"), or the plain current level at the top. */
 export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(ref);
   const current = items[items.length - 1];
   const parent = [...items].reverse().find((c) => c.onClick || c.render);
   if (!current) return null;
@@ -32,7 +35,7 @@ export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }
   const vertical = stepper?.axis === "vertical";
   const [PrevIcon, NextIcon] = vertical ? [ArrowUp, ArrowDown] : [ArrowLeft, ArrowRight];
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <div ref={ref} {...(parent || stepper ? { role: "toolbar", "aria-label": "Navigate", "data-region": "navigate" } : {})} className="flex min-w-0 items-center gap-2">
     <nav
       aria-label="Where you are"
       className="flex min-w-0 text-sm text-muted-foreground"
