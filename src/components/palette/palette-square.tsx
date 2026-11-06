@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRovingFocus } from "./use-roving-focus";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
-import { type Gamut, cssColor } from "@/lib/color/gamut";
+import { type Gamut } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
@@ -281,12 +281,17 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
       {mode === "smooth" ? (
         <>
           <SmoothCanvas colors={colors} grain={grain} blend={blend} />
-          {/* The step being pointed at (or focused) shows its number, in the same spot as the swatch view. */}
+          {/* The step being pointed at (or focused) shows its name and number, in the same spots as the swatch view. */}
           {level === "hue" ? (
             <div className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
               {rows[0].shades.map((shade, c) => (
-                <div key={shade.grade} className="flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ color: readableOn(displayHex(shade, overlay)) }}>
-                  <span className={cn("mt-24 transition-opacity duration-150 pointer-coarse:opacity-100", hover?.col === c ? "opacity-100" : "opacity-0")}>{label(0, c).label}</span>
+                <div
+                  key={shade.grade}
+                  className={cn("relative flex items-center justify-center font-mono text-[11px] tabular-nums transition-opacity duration-150 pointer-coarse:opacity-100", hover?.col === c ? "opacity-100" : "opacity-0")}
+                  style={{ color: readableOn(displayHex(shade, overlay)) }}
+                >
+                  <StepName grade={shade.grade} />
+                  <span className="mt-24">{label(0, c).label}</span>
                 </div>
               ))}
             </div>
@@ -294,7 +299,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           {level === "all" && everyMark ? (
             <div className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
               {rows.map((row, r) =>
-                row.shades.map((shade, c) => (
+                row.shades.map((shade) => (
                   <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                     {shade !== middleShade(row.shades) ? (
                       <Mark
@@ -328,6 +333,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                     {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
                     {level === "all" ? null : text}
                   </span>
+                  {level === "hue" ? <StepName grade={shade.grade} className={LABEL_MOTION} /> : null}
                   {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
                   {level === "all" && everyMark && shade !== middleShade(row.shades) ? (
                     <Mark status={shadeStatus(row, shade)} light={fg === "#000000"} />
@@ -480,8 +486,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           : null}
         {level === "hue"
           ? rows[0].shades.map((shade, c) => {
-              const { label: text } = label(0, c);
-              const hex = cssColor(shade.hex, shade.linear, gamut);
               return (
                 <Dot
                   key={shade.grade}
@@ -496,7 +500,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: 0, col: c })}
                   onBlur={() => keyboardTo(null)}
                   label={`Open ${rows[0].g.hue.name} ${shade.grade}${ruleNote(rows[0].g.hue.id, shade.grade)}`}
-                  chip={`${shade.grade} · ${text || hex}`}
                   onOpen={() => onOpenStep(rows[0].g.hue.id, shade.grade)}
                 />
               );
@@ -508,6 +511,15 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 }
 
 type DotStatus = "pass" | "fail" | null;
+
+/** A step's name, above its dot as the score sits below it. */
+function StepName({ grade, className }: { grade: number; className?: string }) {
+  return (
+    <span aria-hidden className={cn("pointer-events-none absolute inset-0 flex items-center justify-center", className)}>
+      <span className="mb-24">{grade}</span>
+    </span>
+  );
+}
 
 /** A swatch's contrast mark where there's no dot to carry it, drawn the same way a dot draws its own. */
 function Mark({ status, light, className }: { status: DotStatus; light: boolean; className?: string }) {
@@ -562,7 +574,8 @@ function Dot({
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
   onBlur: () => void;
   label: string;
-  chip: string;
+  /** A name shown beside the dot while it's active; steps leave it out, since the canvas already names them. */
+  chip?: string;
   onOpen: () => void;
 }) {
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
@@ -573,38 +586,38 @@ function Dot({
   // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
   const marked = status ? (pinned ? "opacity-100 transition-[opacity,scale] duration-150" : "opacity-0 transition-[opacity,scale] duration-150 pointer-coarse:opacity-100") : shown;
   const Icon = status === "pass" ? Check : X;
+  const button = (
+    <button
+      type="button"
+      aria-label={label}
+      data-current={current || undefined}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none"
+      style={{ left: `${x}%`, top: `${y}%` }}
+    >
+      {/* With the contrast marks on, the mark stands in for the ring; otherwise the dot is a ring. */}
+      {status ? null : (
+        <>
+          <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+          <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
+        </>
+      )}
+      {status ? (
+        <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), marked, on)}>
+          <Icon className="size-4" strokeWidth={2.5} />
+        </span>
+      ) : null}
+    </button>
+  );
+  if (!chip) return button;
   return (
     <Tooltip open={active}>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            data-current={current || undefined}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-            className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none"
-            style={{ left: `${x}%`, top: `${y}%` }}
-          >
-            {/* With the contrast marks on, the mark stands in for the ring; otherwise the dot is a ring. */}
-            {status ? null : (
-              <>
-                <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-                <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
-              </>
-            )}
-            {status ? (
-              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), marked, on)}>
-                <Icon className="size-4" strokeWidth={2.5} />
-              </span>
-            ) : null}
-          </button>
-        }
-      />
+      <TooltipTrigger render={button} />
       <TooltipContent side="top" sideOffset={12} glass>
         {chip}
       </TooltipContent>
