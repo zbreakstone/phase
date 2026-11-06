@@ -68,7 +68,7 @@ export function AddColorPopover({ onAddPreset, onAddHex, render, children, align
               <span className="text-xs text-muted-foreground">Hex</span>
               <ColorPickerInput
                 aria-label="Hex"
-                className="min-w-0 flex-1 bg-transparent pr-2.5 text-right font-mono text-xs uppercase outline-none"
+                className="min-w-0 flex-1 bg-transparent pr-2.5 text-left font-mono text-xs uppercase outline-none"
               />
             </label>
           </div>

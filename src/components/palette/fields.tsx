@@ -94,7 +94,7 @@ export function SliderField({
             onKeyDown={(e) => {
               if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
             }}
-            className="h-7 w-20 px-2 text-right font-mono text-xs tabular-nums"
+            className="h-7 w-20 px-2 text-left font-mono text-xs tabular-nums"
           />
           {unit ? <span className="w-3 text-xs text-muted-foreground">{unit}</span> : null}
         </div>
