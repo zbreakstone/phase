@@ -438,6 +438,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [lastGrade, setLastGrade] = React.useState<number | null>(null);
   const actionsRef = React.useRef<HTMLDivElement>(null);
   useRovingFocus(actionsRef);
+  // The sidebar's section headers are one tab stop with up and down; Tab then goes into the open section.
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(panelRef, { orientation: "vertical", items: "[data-section-trigger]", enabled: ready });
   useRegionShortcuts();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
@@ -778,7 +781,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <ExportDialog kind={exportKind} onClose={() => setExportKind(null)} state={state} generated={generated} />
         </div>
           {!ready ? null : (
-            <div data-region="panel" className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-default) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
+            <div ref={panelRef} data-region="panel" className="animate-in fade-in slide-in-from-bottom-2 flex min-h-0 flex-col overflow-hidden rounded-3xl bg-white shadow-(--shadow-default) duration-300 fill-mode-backwards [animation-delay:150ms] motion-reduce:animate-none lg:h-full dark:bg-black">
             {historyOpen || generated.length === 0 ? null : (
               <div className="shrink-0 border-b border-border">
                 <PaletteChart generated={shown} calm={morphing} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
