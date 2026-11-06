@@ -105,7 +105,12 @@ interface LayerAnim {
   fade: "in" | "out" | "none";
   duration: number;
   easing?: string;
+  /** Scales one axis only, which would stretch any text in the picture, so labels hide while it plays. */
+  stretch?: boolean;
 }
+
+/** Labels and marks drawn in a layer: hidden at once while it stretches, faded back in once it settles. */
+const LABEL_MOTION = "transition-opacity duration-150 group-data-[stretching]/layer:opacity-0 group-data-[stretching]/layer:duration-0";
 
 // Zooming in covers a lot of ground (the picture scales up to 13x), so it eases in as well as out and takes longer, or it reads as a cut.
 const EASE_IN_OUT = "cubic-bezier(0.65, 0, 0.35, 1)";
@@ -133,8 +138,8 @@ function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim 
     const duration = 320;
     // Going in, the old picture zooms into the row underneath while the new one, already full size, fades in over it. (Growing the new one from the row left its hard edges visible against the old picture's soft blend between rows.)
     return deeper
-      ? { enter: { origin, from: REST, to: REST, fade: "in", duration: 320, easing: EASE_IN_OUT } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration: 320, easing: EASE_IN_OUT } as LayerAnim }
-      : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
+      ? { enter: { origin, from: REST, to: REST, fade: "in", duration: 320, easing: EASE_IN_OUT } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration: 320, easing: EASE_IN_OUT, stretch: true } as LayerAnim }
+      : { enter: { origin, from: scale(k), to: REST, fade: "none", duration, stretch: true } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration, stretch: true } as LayerAnim };
   };
   if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", pin(to.hueIdx, from.R), from.R, true);
   if (from.level === "hue" && to.level === "all" && to.R > 0) return zoom("y", pin(from.hueIdx, to.R), to.R, false);
@@ -151,13 +156,17 @@ function Layer({ children, enter, exit, onExited }: { children: React.ReactNode;
     if (!el) return null;
     el.style.transformOrigin = a.origin;
     const opacity = a.fade === "none" ? [1, 1] : a.fade === "in" ? [0, 1] : [1, 0];
-    return el.animate(
+    if (a.stretch) el.dataset.stretching = "";
+    const anim = el.animate(
       [
         { transform: a.from, opacity: opacity[0] },
         { transform: a.to, opacity: opacity[1] },
       ],
       { duration: a.duration, easing: a.easing ?? EASE_OUT, fill: leaving ? "forwards" : "backwards" },
     );
+    // A leaving layer stays stretched until it unmounts; an arriving one shows its labels again once it lands.
+    if (a.stretch && !leaving) anim.finished.then(() => delete el.dataset.stretching).catch(() => {});
+    return anim;
   };
   React.useLayoutEffect(() => {
     if (enter) play(enter, false);
@@ -175,7 +184,7 @@ function Layer({ children, enter, exit, onExited }: { children: React.ReactNode;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exit]);
   return (
-    <div ref={ref} className={cn("absolute inset-0", exit && "pointer-events-none")}>
+    <div ref={ref} className={cn("group/layer absolute inset-0", exit && "pointer-events-none")}>
       {children}
     </div>
   );
@@ -264,7 +273,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           <SmoothCanvas colors={colors} grain={grain} blend={blend} />
           {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
           {level === "step" && label(0, 0).label ? (
-            <div className="absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums" style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
+            <div className={cn(LABEL_MOTION, "absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums")} style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
               {label(0, 0).label}
             </div>
           ) : null}
@@ -277,19 +286,19 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               const fg = readableOn(displayHex(shade, overlay));
               return (
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
-                  <span className={cn(level === "hue" && "mt-24", level === "step" && "text-3xl")}>
+                  <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl")}>
                     {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
                     {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
                     {text}
                   </span>
-                  {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
+                  {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
                   {shade.isSource ? (
-                    <span className="pointer-events-none absolute top-1 right-1 opacity-80">
+                    <span className={cn(LABEL_MOTION, "pointer-events-none absolute top-1 right-1 opacity-80")}>
                       {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
                     </span>
                   ) : null}
                   {!shade.anchor && (tweakAt(row.g.hue, shade.grade).dh !== 0 || tweakAt(row.g.hue, shade.grade).dc !== 0) ? (
-                    <span aria-hidden title="Tuned" className="pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80" />
+                    <span aria-hidden title="Tuned" className={cn(LABEL_MOTION, "pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80")} />
                   ) : null}
                 </div>
               );
@@ -298,7 +307,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         </div>
       )}
       {showRules && rules.length > 0 && level === "step" ? (
-        <div aria-hidden className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+        <div aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row) =>
             row.shades.map((shade) => {
               const list = misses.get(`${row.g.hue.id}:${shade.grade}`) ?? [];
