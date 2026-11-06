@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,6 @@ interface Props {
   /** Renders the Settings section, with the delete button passed in to sit at its end. */
   settings: (danger: React.ReactNode) => React.ReactNode;
   /** Open the neighboring step, or null at either end. */
-  onPrevious: (() => void) | null;
-  onNext: (() => void) | null;
   /** Rename and delete for this step, which changes it in every color. */
   stepActions: StepHeaderActions;
 }
@@ -67,8 +65,6 @@ export function StepPanel({
   onResetStep,
   onResetAll,
   settings,
-  onPrevious,
-  onNext,
   stepActions,
 }: Props) {
   const hue = generated.hue;
@@ -150,30 +146,6 @@ export function StepPanel({
                     ? "Your base color landed here."
                     : "Nudge this step without moving its neighbors."}
               </p>
-            </div>
-            <div className="ml-auto flex shrink-0 items-center">
-              <Hint label="Previous step">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Previous step"
-                  disabled={!onPrevious}
-                  onClick={() => onPrevious?.()}
-                >
-                  <ChevronLeft />
-                </Button>
-              </Hint>
-              <Hint label="Next step">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Next step"
-                  disabled={!onNext}
-                  onClick={() => onNext?.()}
-                >
-                  <ChevronRight />
-                </Button>
-              </Hint>
             </div>
           </div>
           <div className="space-y-3">
