@@ -9,7 +9,6 @@ import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from 
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
 import type { Failure } from "@/lib/palette/validate";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type SquareMode = "smooth" | "cells";
@@ -478,7 +477,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: r, col: 0 })}
                   onBlur={() => keyboardTo(null)}
                   label={`Open ${row.g.hue.name || "Unnamed"}${row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? `, ${row.shades.filter((sh) => missesOf(row.g.hue.id, sh.grade).length > 0).length} steps miss contrast rules` : ""}`}
-                  chip={row.g.hue.name || "Unnamed"}
+                  name={row.g.hue.name || "Unnamed"}
                   onOpen={() => onOpenHue(row.g.hue.id)}
                 />
               );
@@ -556,7 +555,7 @@ function Dot({
   onFocus,
   onBlur,
   label,
-  chip,
+  name,
   onOpen,
 }: {
   x: number;
@@ -574,19 +573,19 @@ function Dot({
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
   onBlur: () => void;
   label: string;
-  /** A name shown beside the dot while it's active; steps leave it out, since the canvas already names them. */
-  chip?: string;
+  /** A name written above the dot while it's active; steps leave it out, since the canvas already names them. */
+  name?: string;
   onOpen: () => void;
 }) {
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
   // The button itself carries no z-index, opacity or transform: those would wall the blended ring off from the
-  // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
+  // canvas, so they sit on the inner layers instead.
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
   const marked = status ? (pinned ? "opacity-100 transition-[opacity,scale] duration-150" : "opacity-0 transition-[opacity,scale] duration-150 pointer-coarse:opacity-100") : shown;
   const Icon = status === "pass" ? Check : X;
-  const button = (
+  return (
     <button
       type="button"
       aria-label={label}
@@ -612,16 +611,19 @@ function Dot({
           <Icon className="size-4" strokeWidth={2.5} />
         </span>
       ) : null}
+      {name ? (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap transition-opacity duration-150 pointer-coarse:opacity-100",
+            light ? "text-black" : "text-white",
+            active ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {name}
+        </span>
+      ) : null}
     </button>
-  );
-  if (!chip) return button;
-  return (
-    <Tooltip open={active}>
-      <TooltipTrigger render={button} />
-      <TooltipContent side="top" sideOffset={12} glass>
-        {chip}
-      </TooltipContent>
-    </Tooltip>
   );
 }
 
