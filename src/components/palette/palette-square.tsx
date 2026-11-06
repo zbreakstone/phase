@@ -299,7 +299,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className="absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium text-white mix-blend-overlay tabular-nums shadow-[inset_0_0_0_2px_#fff]"
+                    className="absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium tabular-nums"
+                    style={{ color: readableOn(displayHex(shade, overlay)) }}
                   >
                     {list.length === 0 ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
@@ -406,6 +407,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
                   status={rowStatus(row)}
+                  darkInk={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
                   onBlur={() => setHover(null)}
@@ -429,6 +431,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={colors[0][c]}
                   active={hover?.col === c}
                   status={shadeStatus(rows[0], shade)}
+                  darkInk={readableOn(displayHex(shade, overlay)) === "#000000"}
                   current={shade.grade === currentGrade}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
                   onBlur={() => setHover(null)}
@@ -453,6 +456,7 @@ function Dot({
   color,
   active,
   status,
+  darkInk,
   current,
   onFocus,
   onBlur,
@@ -467,6 +471,8 @@ function Dot({
   active: boolean;
   /** When the contrast rules are shown: the mark drawn inside the dot, which then stays visible. */
   status: DotStatus;
+  /** The color is light enough that a dark mark reads better than a white one. */
+  darkInk: boolean;
   /** Where Tab lands when it enters the dots. */
   current: boolean;
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
@@ -503,12 +509,13 @@ function Dot({
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", marked, on)} />
             {status ? (
-              // Like the ring: one white mark blended into the color beneath, and a faint plain one so it still shows over black and white.
+              // Like the ring, the mark blends into the color beneath it: white on colors where white reads best, dark
+              // on light colors where it wouldn't. A faint plain copy keeps it visible at the extremes.
               <>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center text-white mix-blend-overlay", on)}>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center mix-blend-overlay", darkInk ? "text-black" : "text-white", on)}>
                   <Icon className="size-3" strokeWidth={3} />
                 </span>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center text-white/50", on)}>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", darkInk ? "text-black/40" : "text-white/50", on)}>
                   <Icon className="size-3" strokeWidth={2.5} />
                 </span>
               </>
