@@ -280,12 +280,12 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
       {mode === "smooth" ? (
         <>
           <SmoothCanvas colors={colors} grain={grain} blend={blend} />
-          {/* A color's steps show their numbers on hover, in the same spots as the swatch view. */}
+          {/* The step being pointed at (or focused) shows its number, in the same spot as the swatch view. */}
           {level === "hue" ? (
             <div className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
               {rows[0].shades.map((shade, c) => (
                 <div key={shade.grade} className="flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ color: readableOn(displayHex(shade, overlay)) }}>
-                  <span className="mt-24 opacity-0 transition-opacity duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100">{label(0, c).label}</span>
+                  <span className={cn("mt-24 transition-opacity duration-150 pointer-coarse:opacity-100", hover?.col === c ? "opacity-100" : "opacity-0")}>{label(0, c).label}</span>
                 </div>
               ))}
             </div>
