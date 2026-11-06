@@ -301,7 +301,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
                     className={cn("absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 px-1 text-[10px] font-medium tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000"))}
                   >
-                    {list.length === 0 ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" strokeWidth={3} />}
+                    {list.length === 0 ? <Check className="size-3" strokeWidth={2.5} /> : <X className="size-3" strokeWidth={2.5} />}
                     {list.length === 0 ? null : list.length}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
                   </span>
@@ -516,10 +516,10 @@ function Dot({
             style={{ left: `${x}%`, top: `${y}%` }}
           >
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_currentColor]", inkBlend(light), marked, on)} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
             {status ? (
               <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light), on)}>
-                <Icon className="size-2.5" strokeWidth={3} />
+                <Icon className="size-2.5" strokeWidth={2.5} />
               </span>
             ) : null}
           </button>
