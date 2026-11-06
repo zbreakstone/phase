@@ -55,7 +55,7 @@ function Slider({
               key={i}
               aria-hidden
               data-slot="slider-mark"
-              className="pointer-events-none absolute top-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/35 mix-blend-multiply dark:mix-blend-screen"
+              className="pointer-events-none absolute top-1/2 size-1.25 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/35 mix-blend-multiply dark:mix-blend-screen"
               style={{ left }}
             />
           )
