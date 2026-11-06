@@ -274,7 +274,7 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
               left: `${left}%`,
               width: `${Math.max(1, right - left)}%`,
               // Diagonal stripes, so the window reads as a range rather than a fill.
-              backgroundImage: `repeating-linear-gradient(135deg, rgb(${inRange ? "16 185 129" : "239 68 68"} / 0.5) 0 2px, rgb(${inRange ? "16 185 129" : "239 68 68"} / 0.15) 2px 4px)`,
+              backgroundImage: `repeating-linear-gradient(135deg, ${inRange ? "#22c55e" : "#ef4444"} 0 2px, ${inRange ? "#4ade80" : "#f87171"} 2px 4px)`,
             }}
           />
         </div>
