@@ -233,6 +233,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   }, [failures]);
   // Like a color's steps (mark on the dot, number below it), a single step puts its mark in the middle and its score underneath.
   const marksOn = showRules && rules.length > 0;
+  // The swatch view has room to mark every swatch on the palette, so each color's dot moves onto its middle swatch and carries that one's mark.
+  const everyMark = marksOn && mode === "cells";
   const missesOf = (hueId: string, grade: number) => (showRules ? (misses.get(`${hueId}:${grade}`) ?? []) : []);
   const ruleNote = (hueId: string, grade: number) => {
     const list = missesOf(hueId, grade);
@@ -311,6 +313,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                     {level === "all" ? null : text}
                   </span>
                   {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
+                  {level === "all" && everyMark && shade !== middleShade(row.shades) ? (
+                    <Mark status={shadeStatus(row, shade)} light={fg === "#000000"} />
+                  ) : null}
                   {shade.isSource ? (
                     <span className={cn(LABEL_MOTION, "pointer-events-none absolute top-1 right-1 opacity-80")}>
                       {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
@@ -440,11 +445,11 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               return (
                 <Dot
                   key={row.g.hue.id}
-                  x={50}
+                  x={everyMark ? ((row.shades.indexOf(mid) + 0.5) / C) * 100 : 50}
                   y={((r + 0.5) / R) * 100}
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
-                  status={rowStatus(row)}
+                  status={everyMark ? shadeStatus(row, mid) : rowStatus(row)}
                   pinned={mode === "cells"}
                   light={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
@@ -489,6 +494,17 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 }
 
 type DotStatus = "pass" | "warn" | "fail" | null;
+
+/** A swatch's contrast mark where there's no dot to carry it, drawn the same way a dot draws its own. */
+function Mark({ status, light }: { status: DotStatus; light: boolean }) {
+  if (!status) return null;
+  const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
+  return (
+    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light, true))}>
+      <Icon className="size-4" strokeWidth={2.5} />
+    </span>
+  );
+}
 
 /**
  * How a ring or mark blends into the color beneath it: plus-lighter adds white on dark colors and plus-darker takes
