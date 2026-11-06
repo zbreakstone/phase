@@ -14,7 +14,7 @@ import { Toggle, toggleVariants } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { VISIONS, type VisionId } from "@/lib/color/vision";
 import type { Overlay } from "@/lib/palette/overlay";
-import { Crumbs, type Crumb } from "./crumbs";
+import { Crumbs, type Crumb, type Stepper } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 import { isPopupOpen, isTextEntry } from "./text-entry";
@@ -48,6 +48,7 @@ export function ViewToolbar({
   overlay,
   onOverlay,
   crumbs,
+  stepper,
   mode,
   onMode,
   grain,
@@ -56,6 +57,7 @@ export function ViewToolbar({
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
   crumbs: Crumb[];
+  stepper?: Stepper;
   mode: SquareMode;
   onMode: (m: SquareMode) => void;
   grain: boolean;
@@ -122,7 +124,7 @@ export function ViewToolbar({
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
       <div className="min-w-0">
-        <Crumbs items={crumbs} />
+        <Crumbs items={crumbs} stepper={stepper} />
       </div>
       <div className="flex items-center gap-2">
         <Select

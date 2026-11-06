@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
+import type { Stepper } from "./crumbs";
 import { toggleVariants } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ContrastReport } from "./contrast-report";
@@ -625,6 +626,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     const next = focused?.shades[stepIndex + offset];
     return next && focused ? () => openStep(focused.hue.id, next.grade) : null;
   };
+  const hueIndex = focused ? generated.findIndex((g) => g.hue.id === focused.hue.id) : -1;
+  const goHue = (offset: number) => {
+    const next = generated[hueIndex + offset];
+    return next ? () => openHue(next.hue.id) : null;
+  };
+  const stepper: Stepper | undefined =
+    focused && focusShade ? { axis: "horizontal", label: "steps", onPrevious: goStep(-1), onNext: goStep(1) } : focused ? { axis: "vertical", label: "colors", onPrevious: goHue(-1), onNext: goHue(1) } : undefined;
   const openPanel: Panel | null = panel === "report" ? panel : null;
 
   return (
@@ -672,6 +680,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                       onMode={setMode}
                       grain={grain}
                       onGrain={setGrain}
+                      stepper={stepper}
                       crumbs={
                         focused && focusShade
                           ? [...listCrumb, { label: "All colors", onClick: up }, { label: focused.hue.name || "Unnamed", onClick: () => openHue(focused.hue.id) }, { label: `${focused.hue.name || "Unnamed"} ${focusShade.grade}` }]
@@ -757,8 +766,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onTweak={(patch) => tweakStep(focused.hue.id, focusShade.grade, patch)}
                   onResetStep={() => resetTweaks(focused.hue.id, focusShade.grade)}
                   onResetAll={() => resetTweaks(focused.hue.id)}
-                  onPrevious={goStep(-1)}
-                  onNext={goStep(1)}
                   stepActions={stepActions}
                   settings={renderSettings}
                 />

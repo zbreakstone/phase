@@ -1,8 +1,9 @@
 "use client";
 
 import type * as React from "react";
-import { ChevronLeft } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toggleVariants } from "@/components/ui/toggle";
 import { Hint } from "./hint";
 
 export interface Crumb {
@@ -13,13 +14,24 @@ export interface Crumb {
   render?: React.ReactNode;
 }
 
+/** Previous/next buttons beside the crumbs, for moving between siblings at this level (null disables one). */
+export interface Stepper {
+  /** Horizontal for steps along a scale, vertical for colors in a list. */
+  axis: "horizontal" | "vertical";
+  label: string;
+  onPrevious: (() => void) | null;
+  onNext: (() => void) | null;
+}
+
 /** Where you are: a button back to the parent level ("< Green"), or the plain current level at the top. */
-export function Crumbs({ items }: { items: Crumb[] }) {
+export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }) {
   const current = items[items.length - 1];
   const parent = [...items].reverse().find((c) => c.onClick);
   if (!current) return null;
   const label = <span className="truncate font-medium">{current.label}</span>;
+  const [PrevIcon, NextIcon] = stepper?.axis === "vertical" ? [ArrowUp, ArrowDown] : [ArrowLeft, ArrowRight];
   return (
+    <div className="flex min-w-0 items-center gap-2">
     <nav
       aria-label="Where you are"
       className="flex min-w-0 text-sm text-muted-foreground"
@@ -51,5 +63,25 @@ export function Crumbs({ items }: { items: Crumb[] }) {
         </span>
       )}
     </nav>
+    {stepper ? (
+      <div role="group" aria-label={`Move between ${stepper.label}`} className="flex shrink-0 items-center gap-2">
+        {(
+          [
+            { name: `Previous ${stepper.label.replace(/s$/, "")}`, Icon: PrevIcon, run: stepper.onPrevious },
+            { name: `Next ${stepper.label.replace(/s$/, "")}`, Icon: NextIcon, run: stepper.onNext },
+          ] as const
+        ).map(({ name, Icon, run }) => (
+          <Hint key={name} label={name}>
+            {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
+            <span className="inline-flex">
+              <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={() => run?.()} disabled={!run} aria-label={name}>
+                <Icon />
+              </button>
+            </span>
+          </Hint>
+        ))}
+      </div>
+    ) : null}
+    </div>
   );
 }
