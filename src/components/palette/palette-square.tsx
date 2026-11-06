@@ -299,14 +299,10 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className="absolute top-[72%] left-1/2 grid -translate-x-1/2 -translate-y-1/2 text-[10px] font-medium tabular-nums"
+                    className={cn("absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 px-1 text-[10px] font-medium tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000"))}
                   >
-                    {markLayers(readableOn(displayHex(shade, overlay)) === "#000000", colors[0][0]).map(({ className, color }) => (
-                      <span key={className} className={cn("col-start-1 row-start-1 inline-flex h-4 items-center gap-0.5 px-1", className)} style={{ color }}>
-                        {list.length === 0 ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" strokeWidth={3} />}
-                        {list.length === 0 ? null : list.length}
-                      </span>
-                    ))}
+                    {list.length === 0 ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" strokeWidth={3} />}
+                    {list.length === 0 ? null : list.length}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
                   </span>
                 </div>
@@ -455,13 +451,13 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 
 type DotStatus = "pass" | "warn" | "fail" | null;
 
-/** A contrast mark's layers: blended white with a faint plain white on dark colors (like the hover ring), or the
- * swatch's own color deepened and multiplied in, with a faint plain dark, on light ones. */
-function markLayers(light: boolean, color: string): { className: string; color?: string }[] {
-  return light
-    ? [{ className: "mix-blend-multiply", color: `color-mix(in oklab, ${color} 55%, black)` }, { className: "text-black/15" }]
-    : [{ className: "text-white mix-blend-overlay" }, { className: "text-white/25" }];
-}
+/**
+ * How a ring or mark blends into the color beneath it: plus-lighter adds white on dark colors and plus-darker takes
+ * it away on light ones, so even pure black and white still show it. Browsers without plus-darker (Chrome) get the
+ * nearest look from multiply.
+ */
+const inkBlend = (light: boolean) =>
+  light ? "text-black/35 mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "text-white/35 mix-blend-plus-lighter";
 
 function Dot({
   x,
@@ -501,7 +497,6 @@ function Dot({
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
-  const deep = light ? `color-mix(in oklab, ${color} 55%, black)` : "#fff";
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
@@ -520,18 +515,13 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            {/* On dark colors, the hover ring's recipe: white blended in, plus a faint plain white for black. Light colors
-                get its mirror image: the dot's own color, deepened and multiplied in so it reads as a richer shade of the
-                swatch, plus a faint plain dark for white. The mark inside follows the same layers. */}
-            <span aria-hidden className={cn("absolute inset-0 rounded-full", marked, on)} style={{ backgroundColor: color, boxShadow: `inset 0 0 0 1px ${light ? "#0000001f" : "#ffffff40"}, 0 1px 1px -1px #0000001a, 0 1px 2px 0 #0000000d` }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full", light ? "mix-blend-multiply" : "mix-blend-overlay", marked, on)} style={{ boxShadow: `inset 0 0 0 2px ${deep}` }} />
-            {status
-              ? markLayers(light, color).map(({ className, color: ink }) => (
-                  <span key={className} aria-hidden className={cn("absolute inset-0 flex items-center justify-center", className, on)} style={{ color: ink }}>
-                    <Icon className="size-2.5" strokeWidth={3} />
-                  </span>
-                ))
-              : null}
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_currentColor]", inkBlend(light), marked, on)} />
+            {status ? (
+              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light), on)}>
+                <Icon className="size-2.5" strokeWidth={3} />
+              </span>
+            ) : null}
           </button>
         }
       />
