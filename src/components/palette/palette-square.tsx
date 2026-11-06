@@ -388,9 +388,11 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are square. */}
         {hover && level !== "step" ? (
           <>
-            {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black and white. */}
+            {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black. */}
             <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-overlay" shadow="shadow-[inset_0_0_0_2px_#fff]" />
             <HoverRing level={level} hover={hover} rows={R} cols={C} shadow="shadow-[inset_0_0_0_1px_#ffffff40]" />
+            {/* White has nothing to brighten on light colors, so a dark ring multiplied in carries it there (and vanishes on dark ones). */}
+            <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-multiply" shadow="shadow-[inset_0_0_0_2px_#00000026]" />
           </>
         ) : null}
 
