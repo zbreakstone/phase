@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRovingFocus } from "./use-roving-focus";
-import { Check, Crosshair, Pin, TriangleAlert, X } from "lucide-react";
+import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
@@ -233,16 +233,15 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   }, [failures]);
   // Like a color's steps (mark on the dot, number below it), a single step puts its mark in the middle and its score underneath.
   const marksOn = showRules && rules.length > 0;
-  // The swatch view has room to mark every swatch on the palette, so each color's dot moves onto its middle swatch and carries that one's mark.
-  const everyMark = marksOn && mode === "cells";
+  // The palette marks every step (all at once over swatches, the pointed-at color's over the gradient), so each color's dot
+  // moves onto its middle step and carries that one's mark.
+  const everyMark = marksOn;
   const missesOf = (hueId: string, grade: number) => (showRules ? (misses.get(`${hueId}:${grade}`) ?? []) : []);
   const ruleNote = (hueId: string, grade: number) => {
     const list = missesOf(hueId, grade);
     return list.length === 0 ? "" : `, misses its contrast rule against ${list.length} step${list.length === 1 ? "" : "s"}`;
   };
 
-  /** The mark on a dot: a color is only flagged ("warn") so it can be opened; its steps then say which ones miss ("fail"). */
-  const rowStatus = (row: Row): DotStatus => (!showRules || rules.length === 0 ? null : row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? "warn" : "pass");
   const shadeStatus = (row: Row, shade: Shade): DotStatus => (!showRules || rules.length === 0 ? null : missesOf(row.g.hue.id, shade.grade).length > 0 ? "fail" : "pass");
 
   const boxRef = React.useRef<HTMLDivElement>(null);
@@ -290,6 +289,23 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   <span className={cn("mt-24 transition-opacity duration-150 pointer-coarse:opacity-100", hover?.col === c ? "opacity-100" : "opacity-0")}>{label(0, c).label}</span>
                 </div>
               ))}
+            </div>
+          ) : null}
+          {level === "all" && everyMark ? (
+            <div className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+              {rows.map((row, r) =>
+                row.shades.map((shade, c) => (
+                  <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
+                    {shade !== middleShade(row.shades) ? (
+                      <Mark
+                        status={shadeStatus(row, shade)}
+                        light={readableOn(displayHex(shade, overlay)) === "#000000"}
+                        className={cn("pointer-coarse:opacity-100", hover?.row === r ? "opacity-100" : "opacity-0")}
+                      />
+                    ) : null}
+                  </div>
+                )),
+              )}
             </div>
           ) : null}
           {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
@@ -449,7 +465,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   y={((r + 0.5) / R) * 100}
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
-                  status={everyMark ? shadeStatus(row, mid) : rowStatus(row)}
+                  status={shadeStatus(row, mid)}
                   pinned={mode === "cells"}
                   light={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
@@ -493,14 +509,14 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   );
 }
 
-type DotStatus = "pass" | "warn" | "fail" | null;
+type DotStatus = "pass" | "fail" | null;
 
 /** A swatch's contrast mark where there's no dot to carry it, drawn the same way a dot draws its own. */
-function Mark({ status, light }: { status: DotStatus; light: boolean }) {
+function Mark({ status, light, className }: { status: DotStatus; light: boolean; className?: string }) {
   if (!status) return null;
-  const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
+  const Icon = status === "pass" ? Check : X;
   return (
-    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light, true))}>
+    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light, true), className)}>
       <Icon className="size-4" strokeWidth={2.5} />
     </span>
   );
@@ -560,7 +576,7 @@ function Dot({
   const on = active && "scale-150 opacity-100";
   // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
   const marked = status ? (pinned ? "opacity-100 transition-[opacity,scale] duration-150" : "opacity-0 transition-[opacity,scale] duration-150 pointer-coarse:opacity-100") : shown;
-  const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
+  const Icon = status === "pass" ? Check : X;
   return (
     <Tooltip open={active}>
       <TooltipTrigger
