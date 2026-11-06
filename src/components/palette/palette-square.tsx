@@ -443,6 +443,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
                   status={rowStatus(row)}
+                  pinned={mode === "cells"}
                   light={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: r, col: 0 })}
@@ -467,6 +468,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={colors[0][c]}
                   active={hover?.col === c}
                   status={shadeStatus(rows[0], shade)}
+                  pinned={mode === "cells"}
                   light={readableOn(displayHex(shade, overlay)) === "#000000"}
                   current={shade.grade === currentGrade}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: 0, col: c })}
@@ -504,6 +506,7 @@ function Dot({
   color,
   active,
   status,
+  pinned,
   light,
   current,
   onFocus,
@@ -519,6 +522,8 @@ function Dot({
   active: boolean;
   /** When the contrast rules are shown: the mark drawn inside the dot, which then stays visible. */
   status: DotStatus;
+  /** Keep the mark showing without hover (the swatch view). */
+  pinned: boolean;
   /** A light color, where white has nothing to brighten, so the ring and mark go deeper instead. */
   light: boolean;
   /** Where Tab lands when it enters the dots. */
@@ -535,7 +540,8 @@ function Dot({
   // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
-  const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
+  // In the swatch view the marks stay up; over the gradient they come and go on hover like the rings do.
+  const marked = status && pinned ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
@@ -562,7 +568,7 @@ function Dot({
               </>
             )}
             {status ? (
-              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), on)}>
+              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), marked, on)}>
                 <Icon className="size-4" strokeWidth={2.5} />
               </span>
             ) : null}
