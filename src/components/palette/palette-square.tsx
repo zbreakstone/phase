@@ -299,7 +299,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className={cn("absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 px-1 text-[10px] font-medium tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000"))}
+                    className={cn("absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 px-1 text-[10px] font-medium tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
                   >
                     {list.length === 0 ? <Check className="size-3" strokeWidth={2.5} /> : <X className="size-3" strokeWidth={2.5} />}
                     {list.length === 0 ? null : list.length}
@@ -456,8 +456,12 @@ type DotStatus = "pass" | "warn" | "fail" | null;
  * it away on light ones, so even pure black and white still show it. Browsers without plus-darker (Chrome) get the
  * nearest look from multiply.
  */
-const inkBlend = (light: boolean) =>
-  light ? "text-black/50 mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "text-white/50 mix-blend-plus-lighter";
+const inkBlend = (light: boolean, strong = false) =>
+  cn(
+    light ? "mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "mix-blend-plus-lighter",
+    // Stronger while the contrast marks are on, so the marks and their rings stand out from the plain dots.
+    light ? (strong ? "text-black/50" : "text-black/35") : strong ? "text-white/50" : "text-white/35",
+  );
 
 function Dot({
   x,
@@ -516,9 +520,9 @@ function Dot({
             style={{ left: `${x}%`, top: `${y}%` }}
           >
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light, status !== null), marked, on)} />
             {status ? (
-              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light), on)}>
+              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), on)}>
                 <Icon className="size-2.5" strokeWidth={2.5} />
               </span>
             ) : null}
