@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Contrast, Eye, EyeOff, Moon, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
+import { Contrast, Eye, EyeOff, Moon, PanelLeftRightDashed, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -54,6 +54,8 @@ export function ViewToolbar({
   onMode,
   grain,
   onGrain,
+  ends,
+  onEnds,
 }: {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
@@ -63,6 +65,9 @@ export function ViewToolbar({
   onMode: (m: SquareMode) => void;
   grain: boolean;
   onGrain: (on: boolean) => void;
+  /** Whether each color's white and black ends are drawn on the canvas. */
+  ends: boolean;
+  onEnds: (on: boolean) => void;
 }) {
   const [theme, pickTheme] = useTheme();
   // One switch turns the preview on and off; the dropdown picks the lens. The last lens is remembered while
@@ -83,7 +88,7 @@ export function ViewToolbar({
       vision: next && next !== "luminance" ? next : "normal",
     });
 
-  // / turns the preview on and off, M opens the lens menu, T the theme menu, G toggles grain, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
+  // / turns the preview on and off, M opens the lens menu, T the theme menu, G toggles grain, B the white and black ends, [ and ] pick smooth or cells. Typing in a field or having a dialog open takes priority.
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
@@ -100,7 +105,8 @@ export function ViewToolbar({
         e.key !== "]" &&
         e.key.toLowerCase() !== "m" &&
         e.key.toLowerCase() !== "t" &&
-        e.key.toLowerCase() !== "g"
+        e.key.toLowerCase() !== "g" &&
+        e.key.toLowerCase() !== "b"
       )
         return;
       if (isTextEntry(e.target)) return;
@@ -114,6 +120,7 @@ export function ViewToolbar({
       if (e.key === "/") apply(active ? null : lens);
       else if (e.key.toLowerCase() === "m") setLensOpen(true);
       else if (e.key.toLowerCase() === "t") setThemeOpen(true);
+      else if (e.key.toLowerCase() === "b") onEnds(!ends);
       else if (e.key.toLowerCase() === "g") {
         if (mode === "smooth") onGrain(!grain);
       } else onMode(e.key === "[" ? "smooth" : "cells");
@@ -203,6 +210,11 @@ export function ViewToolbar({
         <Hint label={mode === "smooth" ? "Toggle grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
           <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Toggle grain">
             <Wheat />
+          </Toggle>
+        </Hint>
+        <Hint label={ends ? "Hide white and black" : "Show white and black"} shortcut={["B"]}>
+          <Toggle variant="outline" size="sm" pressed={ends} onPressedChange={onEnds} aria-label="Show white and black" aria-keyshortcuts="B">
+            <PanelLeftRightDashed />
           </Toggle>
         </Hint>
         <ToggleGroup

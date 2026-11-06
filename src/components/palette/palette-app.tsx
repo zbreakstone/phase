@@ -178,6 +178,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
   const [grain, setGrain] = React.useState(true);
+  const [ends, setEnds] = React.useState(true);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
@@ -638,9 +639,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
 
   const reference = focusShade ?? null;
   const level = focused ? (focusShade ? "step" : "hue") : "all";
-  const stepIndex = focused && focusShade ? focused.shades.findIndex((s) => s.grade === focusShade.grade) : -1;
+  // With the ends hidden, the arrows step only through the colors the user controls.
+  const steps = focused ? focused.shades.filter((s) => ends || !s.anchor || s.grade === focusShade?.grade) : [];
+  const stepIndex = focusShade ? steps.findIndex((s) => s.grade === focusShade.grade) : -1;
   const goStep = (offset: number) => {
-    const next = focused?.shades[stepIndex + offset];
+    const next = steps[stepIndex + offset];
     return next && focused ? () => openStep(focused.hue.id, next.grade) : null;
   };
   const hueIndex = focused ? generated.findIndex((g) => g.hue.id === focused.hue.id) : -1;
@@ -698,6 +701,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     gamut={state.gamut}
                     mode={mode}
                     grain={grain}
+                    ends={ends}
                     blend="mitchell"
                     reference={reference}
                     onOpenHue={openHue}
@@ -714,6 +718,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                       onMode={setMode}
                       grain={grain}
                       onGrain={setGrain}
+                      ends={ends}
+                      onEnds={setEnds}
                       stepper={stepper}
                       crumbs={
                         focused && focusShade
