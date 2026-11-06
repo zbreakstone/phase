@@ -56,6 +56,8 @@ export interface ScaleConfig {
   luminanceMode: LuminanceMode;
   /** Luminance override per grade, used when luminanceMode is "custom". */
   customLuminance: Record<string, number>;
+  /** Grades whose override is held exactly, even where it breaks a contrast rule (the rules never move it, so neighbors stay put). */
+  looseGrades?: number[];
   rules: ContrastRule[];
 }
 

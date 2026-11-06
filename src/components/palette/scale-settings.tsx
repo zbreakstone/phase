@@ -188,15 +188,20 @@ export function hasTargetOverrides(scale: ScaleConfig): boolean {
 }
 
 export function resetTargets(scale: ScaleConfig): ScaleConfig {
-  return { ...scale, luminanceMode: "envoy", customLuminance: {} };
+  return { ...scale, luminanceMode: "envoy", customLuminance: {}, looseGrades: [] };
 }
 
 /** Pins one step's luminance target. Every other step keeps following the rules. */
 export function setStepTarget(scale: ScaleConfig, grade: number, y: number): ScaleConfig {
+  // Outside the recommended window the target is held exactly, which breaks a rule somewhere.
+  const window = recommendedRange(scale, grade);
+  const outside = window.max >= window.min && (y < window.min - 1e-6 || y > window.max + 1e-6);
+  const loose = [...(scale.looseGrades ?? []).filter((g) => g !== grade), ...(outside ? [grade] : [])];
   return {
     ...scale,
     luminanceMode: "custom",
     customLuminance: { ...(scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance), [String(grade)]: Math.min(1, Math.max(0, y)) },
+    looseGrades: loose,
   };
 }
 
@@ -208,22 +213,46 @@ export function clearStepTarget(scale: ScaleConfig, grade: number): ScaleConfig 
   const base = scale.luminanceMode === "uniform" ? materialize(scale) : scale.customLuminance;
   const { [String(grade)]: _removed, ...rest } = base;
   void _removed;
-  return Object.keys(rest).length === 0 ? resetTargets(scale) : { ...scale, luminanceMode: "custom", customLuminance: rest };
+  const loose = (scale.looseGrades ?? []).filter((g) => g !== grade);
+  return Object.keys(rest).length === 0 ? resetTargets(scale) : { ...scale, luminanceMode: "custom", customLuminance: rest, looseGrades: loose };
+}
+
+/**
+ * The window the rules recommend for a step: where it can sit without moving any other step. Measured with this
+ * step at its default, so it stays put however far the step is dragged.
+ */
+export function recommendedRange(scale: ScaleConfig, grade: number): { min: number; max: number } {
+  return feasibleRange(isStepOverridden(scale, grade) ? clearStepTarget(scale, grade) : scale, grade);
 }
 
 /** One step's luminance target: a slider inside the window the rules allow, with dots at the stops it snaps to, plus the exact value. */
 export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleConfig; grade: number; overlay: Overlay; onChange: (y: number) => void }) {
   const y = targetLuminance(scale, grade);
-  const range = feasibleRange(scale, grade);
+  const range = recommendedRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
   // Lighter is on the left, like the grid above: white (Y = 1) sits at 0 and black at 1.
   const left = toPos(range.max) * 100;
   const right = toPos(range.min) * 100;
   // Quick stops inside the allowed window: lightest, middle, darkest. The thumb snaps onto them.
   const stops = range.max - range.min > 1e-6 ? [toPos(range.max), (toPos(range.max) + toPos(range.min)) / 2, toPos(range.min)] : [toPos(range.min)];
-  // Past the window a step would push its neighbors to keep the rules true, so the target stops at the window's edge.
-  const set = (v: number) => onChange(range.max >= range.min ? Math.min(range.max, Math.max(range.min, v)) : v);
-  const SNAP = 0.012;
+  const SNAP = 0.02;
+  // The window is a recommendation: dragging past its ends works, but the thumb clings to the edge like a magnet,
+  // stretching a little way (PULL, at a fraction of the pointer's travel) before letting go and following the pointer.
+  const PULL = 0.06;
+  const STRETCH = 0.35;
+  const windowLo = toPos(range.max);
+  const windowHi = toPos(range.min);
+  // While the pointer is in the pull zone the value is the edge itself (still within the recommendation) and only
+  // the thumb is drawn stretched past it, by `pull`.
+  const [pull, setPull] = React.useState(0);
+  const magnet = (raw: number): [value: number, pull: number] => {
+    if (windowHi < windowLo) return [raw, 0];
+    const edge = raw < windowLo ? windowLo : raw > windowHi ? windowHi : null;
+    if (edge === null) return [stops.find((p) => Math.abs(p - raw) <= SNAP) ?? raw, 0];
+    const beyond = Math.abs(raw - edge);
+    return beyond < PULL ? [edge, Math.sign(raw - edge) * beyond * STRETCH] : [raw, 0];
+  };
+  const set = onChange;
   const [draft, setDraft] = React.useState<string | null>(null);
   const pos = toPos(y);
 
@@ -283,7 +312,8 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
         </div>
         <Slider
           aria-label={`Luminance target for step ${grade}`}
-          value={[pos]}
+          value={[pos + pull]}
+          onValueCommitted={() => setPull(0)}
           min={0}
           max={1}
           step={0.002}
@@ -301,15 +331,22 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
               // Arrow keys move in small steps; landing on the first stop they cross lets keyboard users reach each one
               // exactly, and the next press carries on past it (so a stop never traps the thumb).
               const crossed = stops.filter((p) => (pos < p && raw >= p) || (pos > p && raw <= p)).sort((a, b) => Math.abs(a - pos) - Math.abs(b - pos))[0];
+              setPull(0);
               set(fromPos(crossed ?? raw));
               return;
             }
-            const near = stops.find((p) => Math.abs(p - raw) <= SNAP);
-            set(fromPos(near ?? raw));
+            const [next, stretch] = magnet(raw);
+            setPull(stretch);
+            set(fromPos(next));
           }}
           className="relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-track]]:bg-transparent"
         />
       </div>
+      {inRange ? null : (
+        <p role="status" className="font-sans text-[11px] text-red-600 dark:text-red-400">
+          Outside the recommended range. This breaks a contrast rule somewhere.
+        </p>
+      )}
     </div>
   );
 }

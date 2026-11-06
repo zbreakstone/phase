@@ -137,6 +137,8 @@ function resolveTargets(scale: ScaleConfig): Map<number, number> {
   const u = grades.map((g) => Math.log(baseLuminance(scale, g) + 0.05));
   // A rule that no scale could satisfy is held at the most the gap can reach.
   const rules = scale.rules.map((r) => ({ ...r, ratio: Math.min(r.ratio, uniformRatioForDiff(r.minDiff) * (1 - 1e-7)) }));
+  // A loose step is held where the user put it: the rules move everything else around it, never it.
+  const held = grades.map((g, k) => k === 0 || k === last || (scale.luminanceMode === "custom" && (scale.looseGrades ?? []).includes(g)));
   const pairs: { i: number; j: number; c: number }[] = [];
   for (let i = 0; i < grades.length; i++) {
     for (let j = i + 1; j < grades.length; j++) {
@@ -151,9 +153,9 @@ function resolveTargets(scale: ScaleConfig): Map<number, number> {
       const v = c - (u[i] - u[j]);
       if (v <= 0) continue;
       worst = Math.max(worst, v);
-      if (i === 0 && j === last) continue;
-      if (i === 0) u[j] -= v;
-      else if (j === last) u[i] += v;
+      if (held[i] && held[j]) continue;
+      if (held[i]) u[j] -= v;
+      else if (held[j]) u[i] += v;
       else {
         u[i] += v / 2;
         u[j] -= v / 2;
@@ -189,7 +191,7 @@ export function maxRatioForDiff(diff: number): number {
  * Envoy and even scales have no per-step values, so they just take the new list.
  */
 export function withGrades(scale: ScaleConfig, grades: number[]): ScaleConfig {
-  if (scale.luminanceMode !== "custom") return { ...scale, grades, customLuminance: {} };
+  if (scale.luminanceMode !== "custom") return { ...scale, grades, customLuminance: {}, looseGrades: [] };
 
   const known = new Map<number, number>([[0, WHITE_Y], [SCALE_MAX, BLACK_Y]]);
   for (const g of scale.grades) known.set(g, targetLuminance(scale, g));
@@ -209,7 +211,7 @@ export function withGrades(scale: ScaleConfig, grades: number[]): ScaleConfig {
     const t = (g - lower) / (upper - lower);
     customLuminance[String(g)] = (y0 + 0.05) * Math.pow((y1 + 0.05) / (y0 + 0.05), t) - 0.05;
   }
-  return { ...scale, grades, customLuminance };
+  return { ...scale, grades, customLuminance, looseGrades: (scale.looseGrades ?? []).filter((g) => grades.includes(g)) };
 }
 
 /** Every grade the system reasons about. White (0) and black (1000) always anchor the ends. */
