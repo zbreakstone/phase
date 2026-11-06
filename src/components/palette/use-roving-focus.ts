@@ -10,11 +10,12 @@ const DEFAULT_ITEMS = 'button, [role="combobox"]';
  *
  * It works on the DOM rather than through props so it can wrap any triggers, tooltips and menus without them
  * knowing. Items that set their own tabindex (toggle groups) are corrected back, and text fields are left alone.
- * Modified arrows (Alt+↑ to reorder, for example) pass through untouched.
+ * With `singleTabStop: false` only the arrow keys are added and every item stays in the Tab order (an accordion's
+ * headers, where Tab should still step header, section, next header). Modified arrows (Alt+↑ to reorder, for example) pass through untouched.
  */
 export function useRovingFocus<T extends HTMLElement>(
   ref: React.RefObject<T | null>,
-  { orientation = "horizontal", items = DEFAULT_ITEMS, enabled = true }: { orientation?: "horizontal" | "vertical"; items?: string; enabled?: boolean } = {},
+  { orientation = "horizontal", items = DEFAULT_ITEMS, enabled = true, singleTabStop = true }: { orientation?: "horizontal" | "vertical"; items?: string; enabled?: boolean; singleTabStop?: boolean } = {},
 ) {
   React.useEffect(() => {
     const root = ref.current;
@@ -29,6 +30,7 @@ export function useRovingFocus<T extends HTMLElement>(
       const all = list();
       const focused = all.find((el) => el === document.activeElement);
       active = focused ?? (active && all.includes(active) ? active : null) ?? all.find((el) => el.dataset.current === "true") ?? all[0] ?? null;
+      if (!singleTabStop) return;
       for (const el of all) {
         const want = el === active ? 0 : -1;
         if (el.tabIndex !== want) el.tabIndex = want;
@@ -66,5 +68,5 @@ export function useRovingFocus<T extends HTMLElement>(
       root.removeEventListener("focusin", onFocusIn);
       root.removeEventListener("keydown", onKeyDown);
     };
-  }, [ref, orientation, items, enabled]);
+  }, [ref, orientation, items, enabled, singleTabStop]);
 }

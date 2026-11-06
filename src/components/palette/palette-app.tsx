@@ -438,9 +438,10 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [lastGrade, setLastGrade] = React.useState<number | null>(null);
   const actionsRef = React.useRef<HTMLDivElement>(null);
   useRovingFocus(actionsRef);
-  // The sidebar's section headers are one tab stop with up and down; Tab then goes into the open section.
+  // The sidebar's section headers stay in the Tab order (header, its section, next header, as in an accordion), and
+  // up and down arrows jump between headers as a shortcut.
   const panelRef = React.useRef<HTMLDivElement>(null);
-  useRovingFocus(panelRef, { orientation: "vertical", items: "[data-section-trigger]", enabled: ready });
+  useRovingFocus(panelRef, { orientation: "vertical", items: "[data-section-trigger]", enabled: ready, singleTabStop: false });
   useRegionShortcuts();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
