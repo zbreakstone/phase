@@ -299,12 +299,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className={cn(
-                      "absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium text-white shadow-(--shadow-border) tabular-nums",
-                      list.length === 0 ? "bg-emerald-600" : "bg-red-600",
-                    )}
+                    className="absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium text-white mix-blend-overlay tabular-nums shadow-[inset_0_0_0_2px_#fff]"
                   >
-                    {list.length === 0 ? <Check className="size-2.5" /> : <X className="size-2.5" />}
+                    {list.length === 0 ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
                     {list.length === 0 ? null : list.length}
                   </span>
@@ -506,9 +503,15 @@ function Dot({
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
             <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", marked, on)} />
             {status ? (
-              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center rounded-full text-white shadow-[inset_0_0_0_1px_#ffffff80]", status === "pass" ? "bg-emerald-600" : status === "warn" ? "bg-amber-500" : "bg-red-600", on)}>
-                <Icon className="size-2.5" strokeWidth={3} />
-              </span>
+              // Like the ring: one white mark blended into the color beneath, and a faint plain one so it still shows over black and white.
+              <>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center text-white mix-blend-overlay", on)}>
+                  <Icon className="size-3" strokeWidth={3} />
+                </span>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center text-white/50", on)}>
+                  <Icon className="size-3" strokeWidth={2.5} />
+                </span>
+              </>
             ) : null}
           </button>
         }
