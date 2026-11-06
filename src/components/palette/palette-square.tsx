@@ -260,7 +260,15 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   const content = (
     <>
       {mode === "smooth" ? (
-        <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+        <>
+          <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+          {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
+          {level === "step" && label(0, 0).label ? (
+            <div className="absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums" style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
+              {label(0, 0).label}
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row, r) =>
