@@ -633,6 +633,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   };
   const stepper: Stepper | undefined =
     focused && focusShade ? { axis: "horizontal", label: "steps", onPrevious: goStep(-1), onNext: goStep(1) } : focused ? { axis: "vertical", label: "colors", onPrevious: goHue(-1), onNext: goHue(1) } : undefined;
+  // Arrows move along the row of steps or the list of colors, unless a slider or tab strip has focus and wants them.
+  const arrowsBusy = () => Boolean(document.activeElement?.closest('[role="slider"], [role="tab"], input[type="range"]'));
+  const [prevKey, nextKey] = stepper?.axis === "vertical" ? ["ArrowUp", "ArrowDown"] : ["ArrowLeft", "ArrowRight"];
+  useKeyShortcut(prevKey, () => !arrowsBusy() && stepper?.onPrevious?.(), { enabled: !!stepper?.onPrevious });
+  useKeyShortcut(nextKey, () => !arrowsBusy() && stepper?.onNext?.(), { enabled: !!stepper?.onNext });
   const openPanel: Panel | null = panel === "report" ? panel : null;
 
   return (

@@ -29,7 +29,8 @@ export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }
   const parent = [...items].reverse().find((c) => c.onClick);
   if (!current) return null;
   const label = <span className="truncate font-medium">{current.label}</span>;
-  const [PrevIcon, NextIcon] = stepper?.axis === "vertical" ? [ArrowUp, ArrowDown] : [ArrowLeft, ArrowRight];
+  const vertical = stepper?.axis === "vertical";
+  const [PrevIcon, NextIcon] = vertical ? [ArrowUp, ArrowDown] : [ArrowLeft, ArrowRight];
   return (
     <div className="flex min-w-0 items-center gap-2">
     <nav
@@ -67,14 +68,14 @@ export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }
       <div role="group" aria-label={`Move between ${stepper.label}`} className="flex shrink-0 items-center gap-2">
         {(
           [
-            { name: `Previous ${stepper.label.replace(/s$/, "")}`, Icon: PrevIcon, run: stepper.onPrevious },
-            { name: `Next ${stepper.label.replace(/s$/, "")}`, Icon: NextIcon, run: stepper.onNext },
+            { name: `Previous ${stepper.label.replace(/s$/, "")}`, Icon: PrevIcon, run: stepper.onPrevious, key: vertical ? "ArrowUp" : "ArrowLeft", glyph: vertical ? "↑" : "←" },
+            { name: `Next ${stepper.label.replace(/s$/, "")}`, Icon: NextIcon, run: stepper.onNext, key: vertical ? "ArrowDown" : "ArrowRight", glyph: vertical ? "↓" : "→" },
           ] as const
-        ).map(({ name, Icon, run }) => (
-          <Hint key={name} label={name}>
+        ).map(({ name, Icon, run, key, glyph }) => (
+          <Hint key={name} label={name} shortcut={[glyph]}>
             {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
             <span className="inline-flex">
-              <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={() => run?.()} disabled={!run} aria-label={name}>
+              <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={() => run?.()} disabled={!run} aria-label={name} aria-keyshortcuts={key}>
                 <Icon />
               </button>
             </span>
