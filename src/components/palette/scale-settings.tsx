@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Overlay } from "@/lib/palette/overlay";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { makeRules, uid } from "@/lib/palette/defaults";
@@ -15,6 +16,7 @@ import {
   ruleFeasibility,
   targetLuminance,
 } from "@/lib/palette/scale";
+import { luminanceFromMetric, stepMetric } from "./step-metric";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
 const toPos = (y: number) => Math.log((y + 0.05) / 1.05) / Math.log(0.05 / 1.05);
@@ -210,7 +212,7 @@ export function clearStepTarget(scale: ScaleConfig, grade: number): ScaleConfig 
 }
 
 /** One step's luminance target: a slider inside the window the rules allow, with dots at the stops it snaps to, plus the exact value. */
-export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; grade: number; onChange: (y: number) => void }) {
+export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleConfig; grade: number; overlay: Overlay; onChange: (y: number) => void }) {
   const y = targetLuminance(scale, grade);
   const range = feasibleRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
@@ -224,10 +226,11 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
   const pos = toPos(y);
 
   const id = `step-${grade}-luminance`;
+  const shown = stepMetric(overlay, y);
 
   const commit = (raw: string) => {
     const n = Number(raw);
-    if (raw.trim() !== "" && Number.isFinite(n)) onChange(Math.min(1, Math.max(0, n)));
+    if (raw.trim() !== "" && Number.isFinite(n)) onChange(luminanceFromMetric(overlay, n));
     setDraft(null);
   };
 
@@ -236,7 +239,7 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
         <Label htmlFor={id} className="font-sans text-sm">
-          Luminance
+          {shown.label}
         </Label>
         <div
           onMouseDown={(e) => {
@@ -249,13 +252,11 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
         >
           <Input
             id={id}
-            aria-label={`Luminance for step ${grade}`}
+            aria-label={`${shown.label} for step ${grade}`}
             type="number"
             inputMode="decimal"
-            min={0}
-            max={1}
-            step={0.001}
-            value={draft ?? y.toFixed(3)}
+            step={overlay.metric === "luminance" ? 0.001 : overlay.metric === "contrast" ? 0.01 : 1}
+            value={draft ?? shown.value}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={(e) => commit(e.target.value)}
             onKeyDown={(e) => {

@@ -3,12 +3,12 @@
 import * as React from "react";
 import { ChevronDown, Ellipsis, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apcaContrastLinear, contrastFromLuminance } from "@/lib/color/contrast";
 import type { Overlay } from "@/lib/palette/overlay";
 import { targetLuminance } from "@/lib/palette/scale";
 import type { ScaleConfig } from "@/lib/palette/types";
 import { midpointGrade } from "@/lib/palette/steps";
 import { CollapsibleSection } from "./panel-section";
+import { stepMetric } from "./step-metric";
 import { StepMenu, type StepHeaderActions } from "./step-header";
 import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, resetTargets, setStepTarget } from "./scale-settings";
 
@@ -16,20 +16,6 @@ import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, rese
  * The scale's steps, one per row: name, luminance target and contrast against white. Click a row to adjust its
  * target; the "..." menu renames, adds after, or deletes it. White (0) and black (1000) always bookend the scale.
  */
-/** The one number each row shows, following the "Show" setting: luminance, or contrast / APCA against white or black. */
-function stepMetric(overlay: Overlay, y: number): { header: string; title?: string; value: string } {
-  const edge = overlay.against === "black" ? 0 : 1;
-  const edgeName = edge === 0 ? "black" : "white";
-  if (overlay.metric === "contrast") return { header: `vs ${edgeName}`, title: `WCAG contrast ratio against ${edgeName}.`, value: contrastFromLuminance(edge, y).toFixed(2) };
-  if (overlay.metric === "apca") {
-    // A gray with this luminance stands in for the step, which is all APCA needs from it.
-    const gray: [number, number, number] = [y, y, y];
-    const lc = apcaContrastLinear([edge, edge, edge], gray);
-    return { header: `Lc vs ${edgeName}`, title: `APCA lightness contrast with ${edgeName} text.`, value: String(Math.round(Math.abs(lc))) };
-  }
-  return { header: "Luminance", title: "Relative luminance (WCAG Y): 1 is white, 0 is black.", value: y.toFixed(3) };
-}
-
 export function StepsEditor({ actions, scale, onScale, overlay }: { actions: StepHeaderActions; scale: ScaleConfig; onScale: (scale: ScaleConfig) => void; overlay: Overlay }) {
   const { grades } = actions;
   const [editing, setEditing] = React.useState<number | null>(null);
@@ -97,7 +83,7 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
               </div>
               {open ? (
                 <div className="space-y-2 pb-2">
-                  <StepTarget scale={scale} grade={grade} onChange={(y) => onScale(setStepTarget(scale, grade, y))} />
+                  <StepTarget overlay={overlay} scale={scale} grade={grade} onChange={(y) => onScale(setStepTarget(scale, grade, y))} />
                   {isStepOverridden(scale, grade) ? (
                     <Button variant="ghost" size="xs" onClick={() => onScale(clearStepTarget(scale, grade))}>
                       <RotateCcw />
