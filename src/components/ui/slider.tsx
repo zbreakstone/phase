@@ -8,8 +8,16 @@ function Slider({
   min = 0,
   max = 100,
   "aria-label": ariaLabel,
+  thumbAlignment = "edge",
+  marks,
+  getAriaValueText,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: SliderPrimitive.Root.Props & {
+  /** What a screen reader announces for the value, for sliders whose raw number means little on its own. */
+  getAriaValueText?: (formattedValue: string, value: number, index: number) => string
+  /** Values (in the slider's own units) to dot along the track, such as stops the thumb can snap onto. Purely visual: the snapping itself belongs to the caller. */
+  marks?: number[]
+}) {
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -24,7 +32,7 @@ function Slider({
       value={value}
       min={min}
       max={max}
-      thumbAlignment="edge"
+      thumbAlignment={thumbAlignment}
       aria-label={ariaLabel}
       {...props}
     >
@@ -38,12 +46,27 @@ function Slider({
             className="bg-primary select-none data-horizontal:h-full data-vertical:w-full"
           />
         </SliderPrimitive.Track>
+        {marks?.map((mark, i) => {
+          const pct = ((mark - min) / (max - min)) * 100
+          // Edge alignment keeps the thumb inside the track, so a mark shifts by the same amount the thumb does (thumb is 12px).
+          const left = thumbAlignment === "edge" ? `calc(${pct}% + ${(0.5 - pct / 100) * 12}px)` : `${pct}%`
+          return (
+            <span
+              key={i}
+              aria-hidden
+              data-slot="slider-mark"
+              className="pointer-events-none absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/50"
+              style={{ left }}
+            />
+          )
+        })}
         {Array.from({ length: _values.length }, (_, index) => (
           <SliderPrimitive.Thumb
             data-slot="slider-thumb"
             key={index}
             // The focusable thumb is what a screen reader lands on, so it carries the name.
             aria-label={ariaLabel}
+            getAriaValueText={getAriaValueText}
             className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
           />
         ))}

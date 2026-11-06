@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { contrastFromLuminance } from "@/lib/color/contrast";
 import { makeRules, uid } from "@/lib/palette/defaults";
 import {
   RULE_PRESETS,
@@ -209,41 +208,53 @@ export function clearStepTarget(scale: ScaleConfig, grade: number): ScaleConfig 
   return Object.keys(rest).length === 0 ? resetTargets(scale) : { ...scale, luminanceMode: "custom", customLuminance: rest };
 }
 
-/** One step's luminance target: a slider inside the window the rules allow, plus the exact value and its contrast against white. */
-export function StepTarget({ scale, grade, referenceY = 1, onChange }: { scale: ScaleConfig; grade: number; referenceY?: number; onChange: (y: number) => void }) {
+/** One step's luminance target: a slider inside the window the rules allow, with dots at the stops it snaps to, plus the exact value. */
+export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; grade: number; onChange: (y: number) => void }) {
   const y = targetLuminance(scale, grade);
   const range = feasibleRange(scale, grade);
   const inRange = y >= range.min - 1e-6 && y <= range.max + 1e-6;
   // Lighter is on the left, like the grid above: white (Y = 1) sits at 0 and black at 1.
   const left = toPos(range.max) * 100;
   const right = toPos(range.min) * 100;
-  // Quick stops inside the allowed window: lightest, middle, darkest.
+  // Quick stops inside the allowed window: lightest, middle, darkest. The thumb snaps onto them.
   const stops = range.max - range.min > 1e-6 ? [toPos(range.max), (toPos(range.max) + toPos(range.min)) / 2, toPos(range.min)] : [toPos(range.min)];
   const SNAP = 0.012;
   const [draft, setDraft] = React.useState<string | null>(null);
+  const pos = toPos(y);
 
   return (
-    <div className="grid grid-cols-[1fr_4.5rem_3rem] items-center gap-2">
+    <div className="grid grid-cols-[1fr_6rem] items-center gap-2">
       <div className="relative py-1.5">
-        <div aria-hidden className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 bg-muted" />
+        {/* The window the rules allow: green while the target sits inside it, red when it doesn't. */}
+        <div aria-hidden className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted" />
         <div
           aria-hidden
-          className={`absolute top-1/2 h-2 -translate-y-1/2 ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
+          className={`absolute top-1/2 h-2 -translate-y-1/2 rounded-full ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
           style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
         />
-        {stops.map((p, i) => (
-          <div key={i} aria-hidden className="pointer-events-none absolute top-1/2 h-3.5 w-px -translate-y-1/2 bg-foreground/50" style={{ left: `${p * 100}%` }} />
-        ))}
         <Slider
           aria-label={`Luminance target for step ${grade}`}
-          value={[toPos(y)]}
+          value={[pos]}
           min={0}
           max={1}
           step={0.002}
-          // Center alignment puts the handle exactly at value% of the width, which is where the band and ticks are drawn.
+          marks={stops}
+          // Center alignment puts the handle exactly at value% of the width, which is where the band and dots are drawn.
           thumbAlignment="center"
-          onValueChange={(v) => {
+          getAriaValueText={(_, v) => {
+            const luminance = fromPos(v);
+            const snapped = stops.some((p) => Math.abs(p - v) < 1e-6);
+            return `Luminance ${luminance.toFixed(3)}${snapped ? ", at a stop" : ""}`;
+          }}
+          onValueChange={(v, details) => {
             const raw = Array.isArray(v) ? v[0] : v;
+            if (details.reason === "keyboard") {
+              // Arrow keys move in small steps; landing on the first stop they cross lets keyboard users reach each one
+              // exactly, and the next press carries on past it (so a stop never traps the thumb).
+              const crossed = stops.filter((p) => (pos < p && raw >= p) || (pos > p && raw <= p)).sort((a, b) => Math.abs(a - pos) - Math.abs(b - pos))[0];
+              onChange(fromPos(crossed ?? raw));
+              return;
+            }
             const near = stops.find((p) => Math.abs(p - raw) <= SNAP);
             onChange(fromPos(near ?? raw));
           }}
@@ -265,7 +276,6 @@ export function StepTarget({ scale, grade, referenceY = 1, onChange }: { scale: 
         }}
         className="h-7 px-1.5 text-left font-mono text-[11px] tabular-nums md:text-[11px]"
       />
-      <span className="text-right font-mono text-[11px] tabular-nums text-muted-foreground">{contrastFromLuminance(referenceY, y).toFixed(2)}</span>
     </div>
   );
 }
