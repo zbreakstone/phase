@@ -66,7 +66,7 @@ export function SectionTabs() {
   if (!group) return null;
   const { tabs, activeId, select } = group;
   return (
-    <div className="flex shrink-0 items-center px-5 pt-3 pb-1">
+    <div className="flex shrink-0 items-center px-5 pt-3 pb-2">
       <div ref={ref} role="tablist" aria-label="Sidebar sections" className="-ml-1.5 flex min-w-0 items-center gap-0.5">
         {tabs.map((t) => {
           const on = t.id === activeId;
@@ -83,7 +83,7 @@ export function SectionTabs() {
               // Arrow keys move focus along the tabs, and the tab under focus is the one shown.
               onFocus={(e) => e.currentTarget.matches(":focus-visible") && select(t.id)}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 on ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
