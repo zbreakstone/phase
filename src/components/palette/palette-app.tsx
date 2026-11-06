@@ -563,7 +563,23 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   };
   /** Starts a blank palette, asking first when leaving would drop changes that were never saved. */
   const newPalette = () => {
-    if (confirmLeave()) router.push("/p/new");
+    if (!confirmLeave()) return;
+    if (!fresh) {
+      router.push("/p/new");
+      return;
+    }
+    // Already on the new-palette page, where pushing the same route would do nothing (and a palette saved from here
+    // only changes the address, not the page), so start over in place.
+    setHistoryOpen(false);
+    setFocus({ hueId: null, grade: null });
+    loadState(defaultState());
+    setCurrent(null);
+    setName("");
+    remember(() => {
+      window.localStorage.removeItem(CURRENT_KEY);
+      window.localStorage.removeItem(NAME_KEY);
+    });
+    if (window.location.pathname !== "/p/new") window.history.replaceState(null, "", "/p/new");
   };
   useKeyShortcut("KeyN", newPalette, { command: true, enabled: !!session });
   const { duplicate } = usePaletteActions(() => {});
