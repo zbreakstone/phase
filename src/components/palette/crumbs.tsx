@@ -8,7 +8,7 @@ import { Hint } from "./hint";
 
 export interface Crumb {
   label: string;
-  /** Omit on the current page. */
+  /** Omit on the current page (unless it has a `render`, which makes it a parent without a back action). */
   onClick?: () => void;
   /** Shown in place of the back button when this is the parent, e.g. a menu that goes straight to a sibling. */
   render?: React.ReactNode;
@@ -26,7 +26,7 @@ export interface Stepper {
 /** Where you are: a button back to the parent level ("< Green"), or the plain current level at the top. */
 export function Crumbs({ items, stepper }: { items: Crumb[]; stepper?: Stepper }) {
   const current = items[items.length - 1];
-  const parent = [...items].reverse().find((c) => c.onClick);
+  const parent = [...items].reverse().find((c) => c.onClick || c.render);
   if (!current) return null;
   const label = <span className="truncate font-medium">{current.label}</span>;
   const vertical = stepper?.axis === "vertical";
