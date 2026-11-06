@@ -221,6 +221,8 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
   const right = toPos(range.min) * 100;
   // Quick stops inside the allowed window: lightest, middle, darkest. The thumb snaps onto them.
   const stops = range.max - range.min > 1e-6 ? [toPos(range.max), (toPos(range.max) + toPos(range.min)) / 2, toPos(range.min)] : [toPos(range.min)];
+  // Past the window a step would push its neighbors to keep the rules true, so the target stops at the window's edge.
+  const set = (v: number) => onChange(range.max >= range.min ? Math.min(range.max, Math.max(range.min, v)) : v);
   const SNAP = 0.012;
   const [draft, setDraft] = React.useState<string | null>(null);
   const pos = toPos(y);
@@ -230,7 +232,7 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
 
   const commit = (raw: string) => {
     const n = Number(raw);
-    if (raw.trim() !== "" && Number.isFinite(n)) onChange(luminanceFromMetric(overlay, n));
+    if (raw.trim() !== "" && Number.isFinite(n)) set(luminanceFromMetric(overlay, n));
     setDraft(null);
   };
 
@@ -299,11 +301,11 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
               // Arrow keys move in small steps; landing on the first stop they cross lets keyboard users reach each one
               // exactly, and the next press carries on past it (so a stop never traps the thumb).
               const crossed = stops.filter((p) => (pos < p && raw >= p) || (pos > p && raw <= p)).sort((a, b) => Math.abs(a - pos) - Math.abs(b - pos))[0];
-              onChange(fromPos(crossed ?? raw));
+              set(fromPos(crossed ?? raw));
               return;
             }
             const near = stops.find((p) => Math.abs(p - raw) <= SNAP);
-            onChange(fromPos(near ?? raw));
+            set(fromPos(near ?? raw));
           }}
           className="relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-track]]:bg-transparent"
         />
