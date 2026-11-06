@@ -48,8 +48,7 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
     <CollapsibleSection
       id="steps"
       title="Steps"
-      count={grades.length}
-      className="space-y-2 pt-2"
+      className="space-y-2"
       action={
         <Button variant="ghost" size="icon-sm" aria-label="Add a step" title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : "Add a step"} disabled={actions.stepLimit === "max"} onClick={addInWidestGap}>
           <Plus />

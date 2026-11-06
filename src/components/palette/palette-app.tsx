@@ -27,7 +27,7 @@ import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { AddColorEnd } from "./color-label";
-import { SectionGroup } from "./panel-section";
+import { SectionGroup, SectionTabs } from "./panel-section";
 import { ColorsList } from "./colors-list";
 import { PaletteChart } from "./palette-chart";
 import { HuePanel } from "./hue-panel";
@@ -443,10 +443,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [lastGrade, setLastGrade] = React.useState<number | null>(null);
   const actionsRef = React.useRef<HTMLDivElement>(null);
   useRovingFocus(actionsRef);
-  // The sidebar's section headers stay in the Tab order (header, its section, next header, as in an accordion), and
-  // up and down arrows jump between headers as a shortcut.
   const panelRef = React.useRef<HTMLDivElement>(null);
-  useRovingFocus(panelRef, { orientation: "vertical", items: "[data-section-trigger]", enabled: ready, singleTabStop: false });
   useRegionShortcuts();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
@@ -793,11 +790,14 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 <PaletteChart generated={shown} calm={morphing} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
               </div>
             )}
-            <ScrollFade className="min-h-0 flex-1" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
-              {historyOpen ? (
+            {historyOpen ? (
+              <ScrollFade className="min-h-0 flex-1" innerClassName="h-full">
                 <div ref={setHistorySlot} className="h-full" />
-              ) : (
-                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
+              </ScrollFade>
+            ) : (
+              <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
+                <SectionTabs />
+                <ScrollFade className="min-h-0 flex-1">
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -832,9 +832,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} /> : null} />
                 </>
               )}
-                </SectionGroup>
-              )}
-            </ScrollFade>
+                </ScrollFade>
+              </SectionGroup>
+            )}
             </div>
           )}
         </aside>
