@@ -18,3 +18,11 @@ Use the shadow tokens from `src/app/globals.css`, never stock Tailwind shadows (
 - `shadow-(--shadow-extra-large)`: modals (dialogs).
 
 Set these in the shared primitives in `src/components/ui/`, not at call sites. Full detail, with the rules for each tier, is in `src/components/ui/AGENTS.md`.
+
+## Corner radii
+
+Nested rounded surfaces follow `inner radius + padding = outer radius` (so `outer - padding = inner`), where padding is the gap between the two edges. Floating surfaces are `rounded-xl` with `p-1` padding and `rounded-lg` items. Details and the radius scale are in `src/components/ui/AGENTS.md`.
+
+## Spacing grid
+
+Spacing and sizes sit on a 4px baseline grid (one Tailwind token is 4px). Half and quarter tokens (2px and 1px steps) are fine. Details are in `src/components/ui/AGENTS.md`.
