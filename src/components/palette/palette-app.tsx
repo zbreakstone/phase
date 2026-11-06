@@ -1,6 +1,5 @@
 "use client";
 
-import { peekCardOrigin, rememberLeavingSquare } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -168,8 +167,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const { session } = useSession();
   const { state, edit: setState, silent: selectSilently, replace: loadState, undo, redo, canUndo, canRedo } = useHistory<PaletteState>(() => defaultState(), keepSelection);
   const [ready, setReady] = React.useState(false);
-  // Opened from a palette card: the square zooms out of the card once it loads, so don't show a skeleton in its place.
-  const [fromCard] = React.useState(() => peekCardOrigin() !== null);
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
   const [mode, setMode] = React.useState<SquareMode>("smooth");
@@ -534,15 +531,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     const unsaved = current !== null ? current.savedKey !== stateKey || name.trim() !== current.name : stateKey !== contentKey(defaultState());
     return !unsaved || window.confirm("You have changes that aren't saved. Leave anyway?");
   };
-  /** Back to every palette. Asks first when leaving would drop changes that were never saved. */
-  const toList = () => {
-    if (!confirmLeave()) return;
-    // The palette's card on the home page zooms out of the square we're leaving.
-    const square = document.querySelector("[data-palette-square]");
-    if (current && square) rememberLeavingSquare(current.id, square.getBoundingClientRect());
-    router.push("/");
-  };
-  /** Deletes the saved palette and returns to the list, skipping the unsaved-changes prompt. */
+  /** Deletes the saved palette and moves on to the most recent remaining one (or a new palette), skipping the unsaved-changes prompt. */
   const deleteCurrent = async () => {
     const cloud = getCloud();
     if (!cloud || !current) return;
@@ -577,7 +566,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     ? [
         {
           label: "Palettes",
-          onClick: toList,
           render: (
             <PaletteSwitcher
               currentId={current?.id ?? null}
@@ -594,8 +582,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       ]
     : [];
 
-  // Esc at the top level goes back to Palettes, asking first when there is unsaved work. Inside a color or step it
-  // steps up instead (handled above), and an open version history closes first.
+  // Esc inside a color or step steps up a level, and an open version history closes first.
   const onEscape = React.useRef<(e: KeyboardEvent) => void>(() => {});
   onEscape.current = (e) => {
     if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -605,10 +592,9 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       (e.target as HTMLElement).blur();
       return;
     }
-    // One step per press: close history, else go up a level inside a color or step, else leave for Palettes.
+    // One step per press: close history, else go up a level inside a color or step.
     if (historyOpen) setHistoryOpen(false);
     else if (focused) up();
-    else if (session) toList();
   };
   // Subscribed once, so this listener keeps its place at the front of the capture phase instead of being re-added behind others on every render.
   React.useEffect(() => {
@@ -636,7 +622,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="my-auto space-y-6">
             {!ready ? (
               <div aria-busy="true" aria-label="Loading your palette" className="mr-auto">
-                <Skeleton className={`aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)] ${fromCard ? "invisible" : ""}`} />
+                <Skeleton className="aspect-square w-full rounded-3xl lg:w-[min(100cqw-25.5rem,100cqh-9rem)]" />
               </div>
             ) : generated.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-3xl border border-dashed border-border p-12 text-center">
@@ -796,11 +782,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             const tones = generated.map(representativeShade);
             const vivid = tones.filter((t) => t.chroma >= 0.04);
             const colors = ready ? (vivid.length ? vivid : tones).map((t) => t.hex) : undefined;
-            return session ? (
-              <button type="button" onClick={toList} aria-label="Phase, back to Palettes" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <Logo colors={colors} />
-              </button>
-            ) : (
+            return (
               <span className="group pointer-events-auto relative isolate rounded-md">
                 <Logo colors={colors} />
               </span>

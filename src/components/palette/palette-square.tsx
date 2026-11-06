@@ -1,6 +1,5 @@
 "use client";
 
-import { flightKeyframes, forgetCardOrigin, peekCardOrigin } from "@/lib/palette/card-origin";
 import * as React from "react";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
@@ -106,7 +105,7 @@ const EASE_OUT = "cubic-bezier(0.23, 1, 0.32, 1)";
 const REST = "scale(1, 1)";
 const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** The square arriving, for instance from the palettes page: settles from slightly small. */
+/** The square arriving: settles in from slightly small. */
 const ARRIVE: LayerAnim = { origin: "50% 50%", from: "scale(0.97, 0.97)", to: REST, fade: "in", duration: 320 };
 const DISSOLVE: LayerAnim = { origin: "50% 50%", from: REST, to: REST, fade: "out", duration: 200 };
 const SETTLE: LayerAnim = { origin: "50% 50%", from: "scale(0.985, 0.985)", to: REST, fade: "none", duration: 200 };
@@ -273,28 +272,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     C: focused ? focused.shades.length : (generated[0]?.shades.length ?? 0),
   };
   const [shown, setShown] = React.useState({ key, view });
-  // Arriving from a palette card the whole square zooms out of the card (below); otherwise it just settles in.
-  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() || peekCardOrigin() ? null : ARRIVE));
-  React.useLayoutEffect(() => {
-    const from = peekCardOrigin();
-    const el = boxRef.current;
-    if (!from || !el || prefersReducedMotion()) return;
-    const to = el.getBoundingClientRect();
-    if (to.width === 0 || to.height === 0) return;
-    el.style.zIndex = "20";
-    const flight = el.animate(
-      flightKeyframes(from, to, 16, 24),
-      { duration: 420, easing: EASE_IN_OUT },
-    );
-    flight.onfinish = () => {
-      el.style.zIndex = "";
-      forgetCardOrigin();
-    };
-    return () => {
-      flight.cancel();
-      el.style.zIndex = "";
-    };
-  }, []);
+  // The square settles in when it first appears.
+  const [enterAnim, setEnterAnim] = React.useState<LayerAnim | null>(() => (prefersReducedMotion() ? null : ARRIVE));
   const [exiting, setExiting] = React.useState<{ id: string; node: React.ReactNode; anim: LayerAnim }[]>([]);
   const lastContent = React.useRef<React.ReactNode>(content);
   React.useEffect(() => {
