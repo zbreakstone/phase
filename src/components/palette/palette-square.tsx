@@ -299,12 +299,15 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className="absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium tabular-nums"
-                    style={{ color: readableOn(displayHex(shade, overlay)) }}
+                    className="absolute top-[72%] left-1/2 grid -translate-x-1/2 -translate-y-1/2 text-[10px] font-medium tabular-nums"
                   >
-                    {list.length === 0 ? <Check className="size-2.5" strokeWidth={3} /> : <X className="size-2.5" strokeWidth={3} />}
+                    {MARK_LAYERS.map((layer) => (
+                      <span key={layer} className={cn("col-start-1 row-start-1 inline-flex h-4 items-center gap-0.5 px-1", layer)}>
+                        {list.length === 0 ? <Check className="size-3" strokeWidth={3} /> : <X className="size-3" strokeWidth={3} />}
+                        {list.length === 0 ? null : list.length}
+                      </span>
+                    ))}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
-                    {list.length === 0 ? null : list.length}
                   </span>
                 </div>
               );
@@ -409,7 +412,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
                   status={rowStatus(row)}
-                  darkInk={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
                   onBlur={() => setHover(null)}
@@ -433,7 +435,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   color={colors[0][c]}
                   active={hover?.col === c}
                   status={shadeStatus(rows[0], shade)}
-                  darkInk={readableOn(displayHex(shade, overlay)) === "#000000"}
                   current={shade.grade === currentGrade}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
                   onBlur={() => setHover(null)}
@@ -452,13 +453,15 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 
 type DotStatus = "pass" | "warn" | "fail" | null;
 
+/** A contrast mark drawn like the hover ring: blended white, faint plain white, and a dark copy multiplied in. */
+const MARK_LAYERS = ["text-white mix-blend-overlay", "text-white/25", "text-black/15 mix-blend-multiply"];
+
 function Dot({
   x,
   y,
   color,
   active,
   status,
-  darkInk,
   current,
   onFocus,
   onBlur,
@@ -473,8 +476,6 @@ function Dot({
   active: boolean;
   /** When the contrast rules are shown: the mark drawn inside the dot, which then stays visible. */
   status: DotStatus;
-  /** The color is light enough that a dark mark reads better than a white one. */
-  darkInk: boolean;
   /** Where Tab lands when it enters the dots. */
   current: boolean;
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
@@ -490,9 +491,6 @@ function Dot({
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
-  const ink = darkInk ? `color-mix(in oklab, ${color} 75%, black)` : `color-mix(in oklab, ${color} 55%, white)`;
-  const glow = darkInk ? color : "#fff";
-  const blend = darkInk ? "mix-blend-multiply" : "mix-blend-overlay";
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
@@ -511,23 +509,18 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            {/* Ring and mark start as a tone of the dot's own color, so they always read, then a blended copy on top
-                pushes them deeper (multiplying the color into itself on light colors) or brighter (a white overlay on dark
-                ones, like the hover ring), so they glow with the swatch instead of sitting on it. */}
-            <span
-              aria-hidden
-              className={cn("absolute inset-0 rounded-full", marked, on)}
-              style={{ backgroundColor: color, boxShadow: `inset 0 0 0 1.5px ${ink}, 0 1px 2px 0 #0000001a` }}
-            />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full", blend, marked, on)} style={{ boxShadow: `inset 0 0 0 1.5px ${glow}` }} />
+            {/* The same three layers as the hover ring: white blended into the color, a faint plain white for black,
+                and a dark ring multiplied in for light colors. The mark inside follows the same recipe. */}
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", marked, on)} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#00000026] mix-blend-multiply", marked, on)} />
             {status ? (
               <>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", on)} style={{ color: ink }}>
-                  <Icon className="size-2.5" strokeWidth={3} />
-                </span>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", blend, on)} style={{ color: glow }}>
-                  <Icon className="size-2.5" strokeWidth={3} />
-                </span>
+                {MARK_LAYERS.map((layer) => (
+                  <span key={layer} aria-hidden className={cn("absolute inset-0 flex items-center justify-center", layer, on)}>
+                    <Icon className="size-2.5" strokeWidth={3} />
+                  </span>
+                ))}
               </>
             ) : null}
           </button>
