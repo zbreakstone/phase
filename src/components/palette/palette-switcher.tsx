@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { KbdGroup } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Hint } from "./hint";
 import { useKeyShortcut } from "./use-key-shortcut";
@@ -156,6 +157,7 @@ export function PaletteSwitcher({ currentId, currentName, onSwitch, onNew }: Pro
         }} onClick={onNew} className="gap-2 py-1.5 pl-2 font-medium">
           <Plus aria-hidden className="size-4 text-muted-foreground" />
           New palette
+          <KbdGroup keys={["⌘", "N"]} size="sm" className="ml-auto" />
         </DropdownMenuItem>
       </DropdownMenuContent>
       {open && peek
