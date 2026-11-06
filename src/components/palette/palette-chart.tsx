@@ -7,6 +7,7 @@ import { maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
+import { useRovingFocus } from "./use-roving-focus";
 
 type Metric = "lightness" | "chroma" | "hue";
 
@@ -365,6 +366,8 @@ export function PaletteChart({
   const [metric, setMetric] = React.useState<Metric>("chroma");
   const [grade, setGrade] = React.useState<number | "all">(500);
   const [hover, setHover] = React.useState<string | null>(null);
+  const controlsRef = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(controlsRef);
   const patternId = React.useId().replace(/:/g, "");
   const def = SPACES[space];
 
@@ -503,7 +506,7 @@ export function PaletteChart({
   return (
     <div>
       <div className="px-5 pt-3 pb-2">
-      <div className="flex items-center justify-between gap-2">
+      <div ref={controlsRef} role="toolbar" aria-label="Chart controls" className="flex items-center justify-between gap-2">
           <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
             {METRICS.map((m) => (
               <button
@@ -547,7 +550,30 @@ export function PaletteChart({
           )}
         </div>
       </div>
-      <div className="animate-in fade-in relative duration-300">
+      <div
+        className="animate-in fade-in relative duration-300 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        // The chart reads out values as you hover. For the keyboard, the plot takes focus and the arrows step through
+        // the points, with the same readout announced politely.
+        tabIndex={0}
+        role="group"
+        aria-label={`${METRICS.find((m) => m.id === metric)?.label} values. Use the left and right arrow keys to read each step.`}
+        onFocus={(e) => {
+          if (e.target === e.currentTarget && e.currentTarget.matches(":focus-visible")) setHover((h) => h ?? points[activeIndex >= 0 ? activeIndex : 0]?.key ?? null);
+        }}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setHover(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) || points.length === 0) return;
+          const from = activeIndex >= 0 ? activeIndex : 0;
+          const to = e.key === "ArrowLeft" ? from - 1 : e.key === "ArrowRight" ? from + 1 : e.key === "Home" ? 0 : points.length - 1;
+          e.preventDefault();
+          setHover(points[Math.min(points.length - 1, Math.max(0, to))].key);
+        }}
+      >
+      <p className="sr-only" aria-live="polite">
+        {active ? `${focused ? `${focused.hue.name || "Unnamed"} · ` : ""}${active.label} · ${format(metric, active.value)}` : ""}
+      </p>
       <svg
         role="img"
         aria-label={`${METRICS.find((m) => m.id === metric)?.label} ${focused ? `of ${focused.hue.name || "this color"} from the lightest step to the darkest` : showAll ? "of every color at every step" : `of every color at step ${level}`}`}
