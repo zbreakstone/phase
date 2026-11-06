@@ -42,6 +42,7 @@ import { displayShade, representativeShade, type Overlay } from "@/lib/palette/o
 import { tweakAt } from "@/lib/palette/tweaks";
 import { AccountMenu } from "./account-menu";
 import { useApplyAccent } from "@/lib/accent";
+import { usePrefsSync, useViewPref } from "@/lib/prefs";
 import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
@@ -165,6 +166,8 @@ function Logo({ colors }: { colors?: string[] }) {
   );
 }
 
+const DEFAULT_OVERLAY: Overlay = { metric: "contrast", against: "white", grayscale: false, vision: "normal" };
+
 export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}) {
   const router = useRouter();
   const { session } = useSession();
@@ -172,14 +175,16 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [ready, setReady] = React.useState(false);
   /** Which color and step fill the square. Both null is the resting state showing every color. */
   const [focus, setFocus] = React.useState<{ hueId: string | null; grade: number | null }>({ hueId: null, grade: null });
-  const [mode, setMode] = React.useState<SquareMode>("smooth");
   const [resetOpen, setResetOpen] = React.useState(false);
   /** The version history takes over the sidebar, drawn into this element by the history menu. */
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
-  const [grain, setGrain] = React.useState(true);
-  const [ends, setEnds] = React.useState(true);
-  const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
+  // How you like to look at palettes is remembered for you, but a shared link always opens in the default view.
+  const keepView = !shareCode;
+  const [mode, setMode] = useViewPref("mode", "smooth" as SquareMode, keepView);
+  const [grain, setGrain] = useViewPref("grain", true, keepView);
+  const [ends, setEnds] = useViewPref("ends", true, keepView);
+  const [overlay, setOverlay] = useViewPref("overlay", DEFAULT_OVERLAY, keepView);
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
   const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
@@ -433,6 +438,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   );
 
   useApplyAccent();
+  usePrefsSync();
   // Where the keyboard lands on the canvas when you come back to a level.
   const [lastGrade, setLastGrade] = React.useState<number | null>(null);
   const actionsRef = React.useRef<HTMLDivElement>(null);

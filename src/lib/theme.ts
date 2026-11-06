@@ -23,6 +23,20 @@ export const THEME_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");var 
 
 export const THEME_EVENT = "phase:theme-change";
 
+/** Remembers and applies a theme. Returns false when this device can't remember it (private mode); it still applies. */
+export const saveTheme = (next: Theme): boolean => {
+  let kept = true;
+  try {
+    if (next === "system") window.localStorage.removeItem(THEME_KEY);
+    else window.localStorage.setItem(THEME_KEY, next);
+  } catch {
+    kept = false;
+  }
+  applyTheme(next);
+  window.dispatchEvent(new Event(THEME_EVENT));
+  return kept;
+};
+
 export const subscribeTheme = (onChange: () => void) => {
   window.addEventListener(THEME_EVENT, onChange);
   window.addEventListener("storage", onChange);

@@ -22,9 +22,7 @@ import {
   accentContrast,
   accentOn,
   colorCss,
-  parseAccent,
   sameColor,
-  getAccent,
   setAccent,
   useAccent,
 } from "@/lib/accent";
@@ -69,7 +67,7 @@ function ColorPad({
 }: {
   handles: Handle[];
   onMove: (id: Handle["id"], p: Point) => void;
-  onCommit: () => void;
+  onCommit?: () => void;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const active = React.useRef<Handle["id"] | null>(null);
@@ -111,7 +109,7 @@ function ColorPad({
     if (!next) return;
     e.preventDefault();
     onMove(h.id, next);
-    onCommit();
+    onCommit?.();
   };
 
   return (
@@ -138,7 +136,7 @@ function ColorPad({
         active.current && e.buttons && onMove(active.current, point(e))
       }
       onPointerUp={() => {
-        if (active.current) onCommit();
+        if (active.current) onCommit?.();
         active.current = null;
       }}
       className="relative h-32 cursor-crosshair touch-none rounded-xl bg-muted p-3 outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -222,11 +220,7 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
   React.useEffect(() => {
     const cloud = getCloud();
     if (!cloud) return;
-    cloud.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      const saved = parseAccent(data.session?.user.user_metadata?.accent);
-      if (saved) setAccent(saved);
-    });
+    cloud.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = cloud.auth.onAuthStateChange((_event, next) =>
       setSession(next),
     );
@@ -234,23 +228,6 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
   }, []);
 
   if (!enabled || !session) return null;
-  // Supabase reports most failures as a returned error rather than a throw, so handle both. A fixed toast id
-  // keeps a drag of failing saves from stacking up.
-  const saveAccent = async (next: Accent | null) => {
-    const cloud = getCloud();
-    if (!cloud) return;
-    try {
-      const { error } = await cloud.auth.updateUser({ data: { accent: next } });
-      if (error) throw error;
-    } catch (e) {
-      toast.error(
-        e instanceof Error
-          ? `Couldn't save your theme color: ${e.message}`
-          : "Couldn't save your theme color.",
-        { id: "accent-save" },
-      );
-    }
-  };
   const email = session.user.email ?? "";
   const initial = (email[0] ?? "?").toUpperCase();
 
@@ -338,7 +315,6 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
             if (next.fg && sameColor(next, next.fg)) return;
             setAccent(next);
           }}
-          onCommit={() => void saveAccent(getAccent())}
         />
         {accent?.fg && accentContrast(accent) < 4.5 && (
           <p className="text-xs text-destructive">
@@ -354,7 +330,6 @@ export function AccountMenu({ onSignedOut }: { onSignedOut: () => void }) {
             disabled={!accent}
             onClick={() => {
               setAccent(null);
-              void saveAccent(null);
               // This button disables itself, so move focus to the pad rather than dropping it.
               requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-color-pad]")?.focus());
             }}

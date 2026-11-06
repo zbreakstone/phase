@@ -116,7 +116,7 @@ export const setAccent = (next: Accent | null) => {
   listeners.forEach((l) => l());
 };
 
-const subscribe = (cb: () => void) => {
+export const subscribeAccent = (cb: () => void) => {
   listeners.add(cb);
   window.addEventListener("storage", cb);
   return () => {
@@ -127,7 +127,7 @@ const subscribe = (cb: () => void) => {
 
 /** The saved accent, or null for the default theme. */
 export const useAccent = () =>
-  React.useSyncExternalStore(subscribe, read, () => null);
+  React.useSyncExternalStore(subscribeAccent, read, () => null);
 
 /** Mirror the accent onto <html> so CSS can retheme primary actions. Mount once. */
 export const useApplyAccent = () => {
