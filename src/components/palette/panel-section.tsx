@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { SlidingPill } from "./sliding-pill";
 import { useRovingFocus } from "./use-roving-focus";
 
 /** One block of the sidebar. The card draws full-width dividers between sections, so padding lives here. */
@@ -67,7 +68,8 @@ export function SectionTabs() {
   const { tabs, activeId, select } = group;
   return (
     <div className="flex shrink-0 items-center px-5 pt-4">
-      <div ref={ref} role="tablist" aria-label="Sidebar sections" className="-ml-1.5 flex min-w-0 items-center gap-0.5">
+      <div ref={ref} role="tablist" aria-label="Sidebar sections" className="relative -ml-1.5 flex min-w-0 items-center gap-0.5">
+        <SlidingPill activeKey={activeId} />
         {tabs.map((t) => {
           const on = t.id === activeId;
           return (
@@ -79,12 +81,13 @@ export function SectionTabs() {
               aria-selected={on}
               aria-controls={`${t.id}-body`}
               data-current={on || undefined}
+              data-active={on}
               onClick={() => select(t.id)}
               // Arrow keys move focus along the tabs, and the tab under focus is the one shown.
               onFocus={(e) => e.currentTarget.matches(":focus-visible") && select(t.id)}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                on ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+                "relative flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                on ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {t.title}
