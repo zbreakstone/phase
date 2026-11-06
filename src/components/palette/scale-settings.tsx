@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import type { Overlay } from "@/lib/palette/overlay";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import { makeRules, uid } from "@/lib/palette/defaults";
 import {
   RULE_PRESETS,
@@ -372,6 +373,15 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
           aria-label={`Luminance target for step ${grade}`}
           value={[pos + pull]}
           onValueCommitted={springBack}
+          // Like a rubber band: the further it's pulled, the longer and thinner the thumb, anchored on the side it's
+          // pulled from. Stretching tracks the pointer; letting go (or breaking free) snaps the shape back with a wobble.
+          style={
+            {
+              "--thumb-sx": 1 + 0.6 * Math.min(1, Math.abs(pull) / (PULL * STRETCH)),
+              "--thumb-sy": 1 - 0.3 * Math.min(1, Math.abs(pull) / (PULL * STRETCH)),
+              "--thumb-origin": pull > 0 ? "left" : pull < 0 ? "right" : "center",
+            } as React.CSSProperties
+          }
           min={0}
           max={1}
           step={0.002}
@@ -398,7 +408,10 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
             setPull(stretch);
             set(fromPos(next));
           }}
-          className="relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-track]]:bg-transparent"
+          className={cn(
+            "relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-thumb]]:origin-(--thumb-origin) [&_[data-slot=slider-thumb]]:[scale:var(--thumb-sx)_var(--thumb-sy)] [&_[data-slot=slider-track]]:bg-transparent",
+            pull === 0 && "[&_[data-slot=slider-thumb]]:transition-[scale] [&_[data-slot=slider-thumb]]:duration-300 [&_[data-slot=slider-thumb]]:ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:[&_[data-slot=slider-thumb]]:transition-none",
+          )}
         />
       </div>
       {broken.length > 0 ? (
