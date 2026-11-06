@@ -271,6 +271,16 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
       {mode === "smooth" ? (
         <>
           <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+          {/* A color's steps show their numbers on hover, in the same spots as the swatch view. */}
+          {level === "hue" ? (
+            <div className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+              {rows[0].shades.map((shade, c) => (
+                <div key={shade.grade} className="flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ color: readableOn(displayHex(shade, overlay)) }}>
+                  <span className="mt-24 opacity-0 transition-opacity duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100">{label(0, c).label}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
           {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
           {level === "step" && label(0, 0).label ? (
             <div className={cn(LABEL_MOTION, "absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums")} style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
@@ -289,7 +299,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl")}>
                     {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
                     {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
-                    {text}
+                    {level === "all" ? null : text}
                   </span>
                   {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
                   {shade.isSource ? (
