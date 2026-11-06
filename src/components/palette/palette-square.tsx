@@ -243,6 +243,13 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
+  // A dot's keyboard focus shows the same way as pointing at it (the outline round its row or column, the dot enlarged),
+  // so there's no separate ring to linger once the pointer takes over.
+  const keyboardAt = React.useRef<{ row: number; col: number } | null>(null);
+  const keyboardTo = (at: { row: number; col: number } | null) => {
+    keyboardAt.current = at;
+    setHover(at);
+  };
   // The dots are one tab stop: arrows move between them (up and down for colors, left and right for steps).
   useRovingFocus(boxRef, { orientation: level === "all" ? "vertical" : "horizontal", enabled: level !== "step" });
 
@@ -395,7 +402,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           const at = locate(e);
           setHover((prev) => (prev && at && prev.row === at.row && prev.col === at.col ? prev : at));
         }}
-        onPointerLeave={() => setHover(null)}
+        // Leaving with the pointer hands the highlight back to the dot the keyboard is on, if any.
+        onPointerLeave={() => setHover(keyboardAt.current)}
         onClick={(e) => {
           const at = locate(e);
           if (at) open(at.row, at.col);
@@ -437,8 +445,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   status={rowStatus(row)}
                   light={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
-                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
-                  onBlur={() => setHover(null)}
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: r, col: 0 })}
+                  onBlur={() => keyboardTo(null)}
                   label={`Open ${row.g.hue.name || "Unnamed"}${row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? `, ${row.shades.filter((sh) => missesOf(row.g.hue.id, sh.grade).length > 0).length} steps miss contrast rules` : ""}`}
                   chip={row.g.hue.name || "Unnamed"}
                   chipSide="right"
@@ -461,8 +469,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   status={shadeStatus(rows[0], shade)}
                   light={readableOn(displayHex(shade, overlay)) === "#000000"}
                   current={shade.grade === currentGrade}
-                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
-                  onBlur={() => setHover(null)}
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: 0, col: c })}
+                  onBlur={() => keyboardTo(null)}
                   label={`Open ${rows[0].g.hue.name} ${shade.grade}${ruleNote(rows[0].g.hue.id, shade.grade)}`}
                   chip={`${shade.grade} · ${text || hex}`}
                   chipSide="top"
@@ -543,7 +551,7 @@ function Dot({
               e.stopPropagation();
               onOpen();
             }}
-            className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
             {/* With the contrast marks on, the mark stands in for the ring; otherwise the dot is a ring. */}
