@@ -269,8 +269,13 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
         {/* The bar, with the window the rules allow on it: green while the target sits inside, red when it doesn't. */}
         <div aria-hidden className="absolute inset-x-0 h-4 overflow-hidden rounded-full bg-muted shadow-(--shadow-default)">
           <div
-            className={`absolute inset-y-0 ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
-            style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
+            className="absolute inset-y-0"
+            style={{
+              left: `${left}%`,
+              width: `${Math.max(1, right - left)}%`,
+              // Diagonal stripes, so the window reads as a range rather than a fill.
+              backgroundImage: `repeating-linear-gradient(135deg, rgb(${inRange ? "16 185 129" : "239 68 68"} / 0.5) 0 2px, rgb(${inRange ? "16 185 129" : "239 68 68"} / 0.15) 2px 4px)`,
+            }}
           />
         </div>
         <Slider
