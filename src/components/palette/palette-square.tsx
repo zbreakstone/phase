@@ -457,7 +457,7 @@ type DotStatus = "pass" | "warn" | "fail" | null;
  * nearest look from multiply.
  */
 const inkBlend = (light: boolean) =>
-  light ? "text-black/35 mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "text-white/35 mix-blend-plus-lighter";
+  light ? "text-black/50 mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "text-white/50 mix-blend-plus-lighter";
 
 function Dot({
   x,
