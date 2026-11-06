@@ -34,8 +34,8 @@ export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolea
           Share
         </DropdownMenuTrigger>
       </Hint>
-      <DropdownMenuContent align="end" className="w-80 gap-0 p-1.5">
-        <DropdownMenuItem onClick={onCopyLink} className="gap-3 rounded-lg p-1.5">
+      <DropdownMenuContent align="end" className="w-80 gap-0 p-1">
+        <DropdownMenuItem onClick={onCopyLink} className="gap-3 p-1.5">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Link2 className="size-4" />
           </span>
@@ -44,12 +44,12 @@ export function ShareMenu({ disabled, onCopyLink, onExport }: { disabled: boolea
             <span className="block text-xs font-normal text-muted-foreground">Anyone with it sees this exact palette.</span>
           </span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="-mx-1.5 my-1.5" />
+        <DropdownMenuSeparator className="-mx-1 my-1" />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-1.5 pt-1 pb-1.5">Export</DropdownMenuLabel>
           {EXPORTS.map(({ kind, title, description, icon: Icon }) => (
-            <DropdownMenuItem key={kind} onClick={() => onExport(kind)} className="gap-3 rounded-lg p-1.5">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <DropdownMenuItem key={kind} onClick={() => onExport(kind)} className="gap-3 p-1.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
                 <Icon className={kind === "json" ? "size-4" : "size-5 shrink-0"} />
               </span>
               <span className="min-w-0 flex-1">
