@@ -546,11 +546,16 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light, status !== null), marked, on)} />
+            {/* With the contrast marks on, the mark stands in for the ring; otherwise the dot is a ring. */}
+            {status ? null : (
+              <>
+                <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+                <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
+              </>
+            )}
             {status ? (
               <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), on)}>
-                <Icon className="size-2.5" strokeWidth={2.5} />
+                <Icon className="size-4" strokeWidth={2.5} />
               </span>
             ) : null}
           </button>
