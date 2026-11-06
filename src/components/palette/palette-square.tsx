@@ -231,6 +231,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     }
     return map;
   }, [failures]);
+  // Like a color's steps (mark on the dot, number below it), a single step puts its mark in the middle and its score underneath.
+  const marksOn = showRules && rules.length > 0;
   const missesOf = (hueId: string, grade: number) => (showRules ? (misses.get(`${hueId}:${grade}`) ?? []) : []);
   const ruleNote = (hueId: string, grade: number) => {
     const list = missesOf(hueId, grade);
@@ -291,7 +293,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
           {level === "step" && label(0, 0).label ? (
             <div className={cn(LABEL_MOTION, "absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums")} style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
-              {label(0, 0).label}
+              <span className={cn(marksOn && "mt-32")}>{label(0, 0).label}</span>
             </div>
           ) : null}
         </>
@@ -303,7 +305,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               const fg = readableOn(displayHex(shade, overlay));
               return (
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
-                  <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl")}>
+                  <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl", level === "step" && marksOn && "mt-32")}>
                     {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
                     {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
                     {level === "all" ? null : text}
@@ -333,7 +335,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className={cn("absolute top-[calc(50%+4rem)] left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
+                    className={cn("absolute top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
                   >
                     {list.length === 0 ? <Check className="size-8" strokeWidth={2.5} /> : <X className="size-8" strokeWidth={2.5} />}
                     {list.length === 0 ? null : list.length}
