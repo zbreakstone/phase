@@ -3,7 +3,8 @@
 import * as React from "react";
 import { ChevronDown, Ellipsis, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { contrastFromLuminance } from "@/lib/color/contrast";
+import { apcaContrastLinear, contrastFromLuminance } from "@/lib/color/contrast";
+import type { Overlay } from "@/lib/palette/overlay";
 import { targetLuminance } from "@/lib/palette/scale";
 import type { ScaleConfig } from "@/lib/palette/types";
 import { midpointGrade } from "@/lib/palette/steps";
@@ -15,7 +16,21 @@ import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, rese
  * The scale's steps, one per row: name, luminance target and contrast against white. Click a row to adjust its
  * target; the "..." menu renames, adds after, or deletes it. White (0) and black (1000) always bookend the scale.
  */
-export function StepsEditor({ actions, scale, onScale }: { actions: StepHeaderActions; scale: ScaleConfig; onScale: (scale: ScaleConfig) => void }) {
+/** The one number each row shows, following the "Show" setting: luminance, or contrast / APCA against white or black. */
+function stepMetric(overlay: Overlay, y: number): { header: string; title?: string; value: string } {
+  const edge = overlay.against === "black" ? 0 : 1;
+  const edgeName = edge === 0 ? "black" : "white";
+  if (overlay.metric === "contrast") return { header: `vs ${edgeName}`, title: `WCAG contrast ratio against ${edgeName}.`, value: contrastFromLuminance(edge, y).toFixed(2) };
+  if (overlay.metric === "apca") {
+    // A gray with this luminance stands in for the step, which is all APCA needs from it.
+    const gray: [number, number, number] = [y, y, y];
+    const lc = apcaContrastLinear([edge, edge, edge], gray);
+    return { header: `Lc vs ${edgeName}`, title: `APCA lightness contrast with ${edgeName} text.`, value: String(Math.round(Math.abs(lc))) };
+  }
+  return { header: "Luminance", title: "Relative luminance (WCAG Y): 1 is white, 0 is black.", value: y.toFixed(3) };
+}
+
+export function StepsEditor({ actions, scale, onScale, overlay }: { actions: StepHeaderActions; scale: ScaleConfig; onScale: (scale: ScaleConfig) => void; overlay: Overlay }) {
   const { grades } = actions;
   const [editing, setEditing] = React.useState<number | null>(null);
 
@@ -44,10 +59,9 @@ export function StepsEditor({ actions, scale, onScale }: { actions: StepHeaderAc
       <p className="text-[11px] text-muted-foreground">
         Shared by every color. Each step has a luminance target: how bright it is between white and black. Open one to adjust it within what your contrast rules allow.
       </p>
-      <div className="grid grid-cols-[1fr_3.5rem_3.5rem_1.5rem] gap-2 px-0 text-[10px] text-muted-foreground">
+      <div className="grid grid-cols-[1fr_6rem_1.5rem] gap-2 px-0 text-[10px] text-muted-foreground">
         <span>Step</span>
-        <span className="text-right" title="Relative luminance (WCAG Y): 1 is white, 0 is black.">Luminance</span>
-        <span className="text-right">vs white</span>
+        <span className="text-right" title={stepMetric(overlay, 0.5).title}>{stepMetric(overlay, 0.5).header}</span>
         <span />
       </div>
       <ul>
@@ -57,21 +71,20 @@ export function StepsEditor({ actions, scale, onScale }: { actions: StepHeaderAc
           const open = editing === grade;
           return (
             <li key={grade} className="-mx-2 rounded-lg px-2 font-mono text-sm tabular-nums hover:bg-muted/60">
-              <div className="grid grid-cols-[1fr_3.5rem_3.5rem_1.5rem] items-center gap-2">
+              <div className="grid grid-cols-[1fr_6rem_1.5rem] items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setEditing(open ? null : grade)}
                   aria-expanded={open}
                   aria-label={`Luminance target for step ${grade}`}
-                  className="col-span-3 -mx-2 grid min-h-8 grid-cols-subgrid items-center rounded-lg px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="col-span-2 -mx-2 grid min-h-8 grid-cols-subgrid items-center rounded-lg px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="flex items-center gap-1.5">
                     {grade}
                     {isStepOverridden(scale, grade) ? <span aria-hidden title="Adjusted" className="size-1.5 rounded-full bg-foreground/60" /> : null}
                     <ChevronDown aria-hidden className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
                   </span>
-                  <span className="text-right text-xs text-muted-foreground">{y.toFixed(3)}</span>
-                  <span className="text-right text-xs text-muted-foreground">{contrastFromLuminance(1, y).toFixed(2)}</span>
+                  <span className="text-right text-xs text-muted-foreground">{stepMetric(overlay, y).value}</span>
                 </button>
                 <StepMenu
                   grade={grade}
