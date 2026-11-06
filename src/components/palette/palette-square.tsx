@@ -506,8 +506,8 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", marked, on)} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full", darkInk ? "shadow-[inset_0_0_0_1px_#00000026,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]" : "shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full mix-blend-overlay", darkInk ? "shadow-[inset_0_0_0_2px_#000]" : "shadow-[inset_0_0_0_2px_#fff]", marked, on)} />
             {status ? (
               // Like the ring, the mark blends into the color beneath it: white on colors where white reads best, dark
               // on light colors where it wouldn't. A faint plain copy keeps it visible at the extremes.
