@@ -263,7 +263,7 @@ export function StepTarget({ scale, grade, referenceY = 1, onChange }: { scale: 
           if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
           setDraft(null);
         }}
-        className="h-7 px-1.5 text-right font-mono text-[11px] tabular-nums md:text-[11px]"
+        className="h-7 px-1.5 text-left font-mono text-[11px] tabular-nums md:text-[11px]"
       />
       <span className="text-right font-mono text-[11px] tabular-nums text-muted-foreground">{contrastFromLuminance(referenceY, y).toFixed(2)}</span>
     </div>
