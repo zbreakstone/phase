@@ -234,7 +234,6 @@ export function HuePanel({
         </div>
 
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold tracking-wide uppercase">Chroma</h3>
           <SliderField
             id="chroma"
             label="Colorfulness"
@@ -251,10 +250,12 @@ export function HuePanel({
       </CollapsibleSection>
 
       {settings(
-        <Button variant="destructive" className="mt-3 w-full" onClick={() => setDeleting(true)}>
-          <Trash2 />
-          Delete {hue.name || "this color"}
-        </Button>,
+        <div className="mt-3 space-y-2">
+          <Button variant="destructive" className="w-full" onClick={() => setDeleting(true)}>
+            <Trash2 />
+            Delete {hue.name || "this color"}
+          </Button>
+        </div>,
       )}
 
       <ConfirmDeleteDialog
