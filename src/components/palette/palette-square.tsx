@@ -349,7 +349,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           {leaving.filter((ex) => ex.anim.fade !== "none").map(renderLeaving)}
         </div>
 
-        {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are smaller. */}
+        {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are square. */}
         {hover && level !== "step" ? (
           <>
             {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black and white. */}
@@ -468,8 +468,10 @@ const hash = (x: number, y: number) => {
  */
 /** The outline on the row or column under the pointer, clipped to the canvas so its outer corners follow the canvas's radius. */
 function HoverRing({ level, hover, rows, cols, className, shadow }: { level: "all" | "hue"; hover: { row: number; col: number }; rows: number; cols: number; className?: string; shadow: string }) {
-  const outer = "1.5rem";
-  const inner = "0.75rem";
+  // The ring spans the canvas edge to edge, so its only rounded corners are the ones in the canvas's own corners;
+  // anywhere else it meets a straight edge and stays square.
+  const outer = "var(--radius-3xl)";
+  const inner = "0px";
   const byRow = level === "all";
   const first = byRow ? hover.row === 0 : hover.col === 0;
   const last = byRow ? hover.row === rows - 1 : hover.col === cols - 1;
