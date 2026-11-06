@@ -66,7 +66,7 @@ export function SectionTabs() {
   if (!group) return null;
   const { tabs, activeId, select } = group;
   return (
-    <div className="flex shrink-0 items-center px-5 pt-3 pb-2">
+    <div className="flex shrink-0 items-center px-5 pt-4">
       <div ref={ref} role="tablist" aria-label="Sidebar sections" className="-ml-1.5 flex min-w-0 items-center gap-0.5">
         {tabs.map((t) => {
           const on = t.id === activeId;
