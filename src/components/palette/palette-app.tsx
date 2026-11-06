@@ -739,7 +739,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
           <div className="flex items-center gap-2" role="group" aria-label="History">
             <Hint label="Undo" shortcut={["⌘", "Z"]}>
               {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-              <span className="inline-flex">
+              <span className={cn("inline-flex", !canUndo && "cursor-not-allowed")}>
                 <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={undo} disabled={!canUndo} aria-label="Undo">
                   <Undo2 />
                 </button>
@@ -747,7 +747,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             </Hint>
             <Hint label="Redo" shortcut={["⇧", "⌘", "Z"]}>
               {/* A disabled button gets no pointer events, so the tooltip hangs off a wrapper instead. */}
-              <span className="inline-flex">
+              <span className={cn("inline-flex", !canRedo && "cursor-not-allowed")}>
                 <button type="button" className={toggleVariants({ variant: "outline", size: "sm" })} onClick={redo} disabled={!canRedo} aria-label="Redo">
                   <Redo2 />
                 </button>
