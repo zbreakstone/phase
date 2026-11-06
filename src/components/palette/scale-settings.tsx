@@ -13,7 +13,9 @@ import {
   RULE_PRESETS,
   feasibleRange,
   maxRatioForDiff,
+  requiredRatio,
   ruleFeasibility,
+  systemGrades,
   targetLuminance,
 } from "@/lib/palette/scale";
 import { luminanceFromMetric, stepMetric } from "./step-metric";
@@ -244,7 +246,40 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
   const windowHi = toPos(range.min);
   // While the pointer is in the pull zone the value is the edge itself (still within the recommendation) and only
   // the thumb is drawn stretched past it, by `pull`.
-  const [pull, setPull] = React.useState(0);
+  const [pull, setPullState] = React.useState(0);
+  const pullRef = React.useRef(0);
+  const springFrame = React.useRef<number | null>(null);
+  const setPull = (p: number) => {
+    pullRef.current = p;
+    setPullState(p);
+  };
+  const stopSpring = () => {
+    if (springFrame.current !== null) cancelAnimationFrame(springFrame.current);
+    springFrame.current = null;
+  };
+  React.useEffect(() => stopSpring, []);
+  // Let go while stretched and the thumb springs back onto the edge dot, overshooting a touch before it settles.
+  const springBack = () => {
+    stopSpring();
+    let x = pullRef.current;
+    if (x === 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setPull(0);
+    let v = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      v += (-700 * x - 28 * v) * dt;
+      x += v * dt;
+      if (Math.abs(x) < 1e-4 && Math.abs(v) < 1e-3) {
+        springFrame.current = null;
+        return setPull(0);
+      }
+      setPull(x);
+      springFrame.current = requestAnimationFrame(tick);
+    };
+    springFrame.current = requestAnimationFrame(tick);
+  };
   const magnet = (raw: number): [value: number, pull: number] => {
     if (windowHi < windowLo) return [raw, 0];
     const edge = raw < windowLo ? windowLo : raw > windowHi ? windowHi : null;
@@ -253,6 +288,29 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
     return beyond < PULL ? [edge, Math.sign(raw - edge) * beyond * STRETCH] : [raw, 0];
   };
   const set = onChange;
+
+  // What leaving the recommendation costs, spelled out: every rule now broken (worst first), or else the steps the
+  // rules had to move out of the way.
+  const all = systemGrades(scale);
+  const broken = inRange
+    ? []
+    : all
+        .flatMap((lo, i) =>
+          all.slice(i + 1).flatMap((hi) => {
+            const need = requiredRatio(hi - lo, scale.rules);
+            if (need === null) return [];
+            // Below 1 means the pair is the wrong way round: the lower grade should be the lighter one.
+            const ratio = (targetLuminance(scale, lo) + 0.05) / (targetLuminance(scale, hi) + 0.05);
+            if (ratio >= need - 1e-3) return [];
+            const minDiff = Math.max(...scale.rules.filter((r) => r.minDiff <= hi - lo && r.ratio === need).map((r) => r.minDiff));
+            return [{ lo, hi, ratio, need, minDiff }];
+          }),
+        )
+        .sort((p, q) => p.ratio / p.need - q.ratio / q.need);
+  const before = inRange || broken.length > 0 ? null : clearStepTarget(scale, grade);
+  const moved = before ? scale.grades.filter((g) => g !== grade && Math.abs(targetLuminance(scale, g) - targetLuminance(before, g)) > 1e-4) : [];
+  const stepName = (g: number) => (g === 0 ? "white" : g === 1000 ? "black" : `step ${g}`);
+  const list = (gs: number[]) => (gs.length === 1 ? gs[0] : `${gs.slice(0, -1).join(", ")} and ${gs.at(-1)}`);
   const [draft, setDraft] = React.useState<string | null>(null);
   const pos = toPos(y);
 
@@ -313,7 +371,7 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
         <Slider
           aria-label={`Luminance target for step ${grade}`}
           value={[pos + pull]}
-          onValueCommitted={() => setPull(0)}
+          onValueCommitted={springBack}
           min={0}
           max={1}
           step={0.002}
@@ -327,6 +385,7 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
           }}
           onValueChange={(v, details) => {
             const raw = Array.isArray(v) ? v[0] : v;
+            stopSpring();
             if (details.reason === "keyboard") {
               // Arrow keys move in small steps; landing on the first stop they cross lets keyboard users reach each one
               // exactly, and the next press carries on past it (so a stop never traps the thumb).
@@ -342,11 +401,20 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
           className="relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-track]]:bg-transparent"
         />
       </div>
-      {inRange ? null : (
-        <p role="status" className="font-sans text-[11px] text-red-600 dark:text-red-400">
-          Outside the recommended range. This breaks a contrast rule somewhere.
+      {broken.length > 0 ? (
+        <div role="status" className="space-y-0.5 font-sans text-[11px] text-red-600 dark:text-red-400">
+          {broken.slice(0, 2).map((b) => (
+            <p key={`${b.lo}-${b.hi}`}>
+              {b.lo === 0 ? "White" : `Step ${b.lo}`} and {stepName(b.hi)} {b.ratio < 1 ? "are the wrong way round" : `only reach ${b.ratio.toFixed(2)}:1`}. Steps {b.minDiff} apart need {b.need}:1.
+            </p>
+          ))}
+          {broken.length > 2 ? <p>And {broken.length - 2} more.</p> : null}
+        </div>
+      ) : moved.length > 0 ? (
+        <p role="status" className="font-sans text-[11px] text-muted-foreground">
+          Moves {moved.length === 1 ? "step" : "steps"} {list(moved)} to keep your contrast rules.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
