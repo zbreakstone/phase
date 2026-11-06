@@ -445,7 +445,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           {leaving.filter((ex) => ex.anim.fade !== "none").map(renderLeaving)}
         </div>
 
-        {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are square. */}
+        {/* The row or column under the pointer. Its sides along the canvas edge are clipped away. */}
         {hover && level !== "step" ? (
           <>
             {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black. */}
@@ -620,34 +620,31 @@ const hash = (x: number, y: number) => {
 };
 
 /**
- * Paints the colors as a soft gradient. Each swatch becomes one pixel of a tiny canvas (so the browser
- * parses any CSS color, including Display P3), then the pixels are blended smoothly into a larger one.
+ * The outline on the row or column under the pointer. It runs past the canvas on every side that touches the canvas
+ * edge, and the canvas clips it there, so only the borders between neighbours show and the canvas's own corners
+ * stay clean.
  */
-/** The outline on the row or column under the pointer, clipped to the canvas so its outer corners follow the canvas's radius. */
 function HoverRing({ level, hover, rows, cols, className, shadow }: { level: "all" | "hue"; hover: { row: number; col: number }; rows: number; cols: number; className?: string; shadow: string }) {
-  // The ring spans the canvas edge to edge, so its only rounded corners are the ones in the canvas's own corners;
-  // anywhere else it meets a straight edge and stays square.
-  const outer = "var(--radius-3xl)";
-  const inner = "0px";
+  const bleed = "-4px";
   const byRow = level === "all";
-  const first = byRow ? hover.row === 0 : hover.col === 0;
-  const last = byRow ? hover.row === rows - 1 : hover.col === cols - 1;
-  const [a, b] = [first ? outer : inner, last ? outer : inner];
+  const index = byRow ? hover.row : hover.col;
+  const count = byRow ? rows : cols;
+  const start = index === 0 ? bleed : `${(index / count) * 100}%`;
+  const end = index === count - 1 ? bleed : `${((count - index - 1) / count) * 100}%`;
   return (
     <div aria-hidden className={cn("pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]", className)}>
       <div
-        className={cn("absolute transition-[top,left,border-radius] duration-100", shadow)}
-        style={{
-          borderRadius: byRow ? `${a} ${a} ${b} ${b}` : `${a} ${b} ${b} ${a}`,
-          ...(byRow
-            ? { left: 0, right: 0, top: `${(hover.row / rows) * 100}%`, height: `${100 / rows}%` }
-            : { top: 0, bottom: 0, left: `${(hover.col / cols) * 100}%`, width: `${100 / cols}%` }),
-        }}
+        className={cn("absolute transition-[top,bottom,left,right] duration-100", shadow)}
+        style={byRow ? { left: bleed, right: bleed, top: start, bottom: end } : { top: bleed, bottom: bleed, left: start, right: end }}
       />
     </div>
   );
 }
 
+/**
+ * Paints the colors as a soft gradient. Each swatch becomes one pixel of a tiny canvas (so the browser
+ * parses any CSS color, including Display P3), then the pixels are blended smoothly into a larger one.
+ */
 function SmoothCanvas({ colors, grain, blend, size = SIZE }: { colors: string[][]; grain: boolean; blend: Blend; size?: number }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
