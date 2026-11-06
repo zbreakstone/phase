@@ -68,6 +68,12 @@ export function CollapsibleSection({
   const group = React.useContext(SectionGroupContext);
   const [ownOpen, setOwnOpen] = React.useState(defaultOpen);
   const open = group ? group.openId === id : ownOpen;
+  // A folded section keeps its action (like "+") visible and clickable, but Tab skips it: the header is the one stop,
+  // and opening the section brings its action into the tab order.
+  const actionRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    for (const el of actionRef.current?.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]") ?? []) el.tabIndex = open ? 0 : -1;
+  }, [open, action]);
   const toggle = () => (group ? group.setOpenId(open ? null : id) : setOwnOpen((o) => !o));
   return (
     <PanelSection role="region" aria-labelledby={`${id}-heading`}>
@@ -95,7 +101,7 @@ export function CollapsibleSection({
             />
           </button>
         </h2>
-        {action}
+        {action ? <div ref={actionRef} className="contents">{action}</div> : null}
       </div>
       {/* Height animates through the grid row (0fr to 1fr); inert keeps a folded body out of the tab order. */}
       <div
