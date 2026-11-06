@@ -488,7 +488,9 @@ function Dot({
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
-  const ink = darkInk ? `color-mix(in oklab, ${color} 60%, black)` : `color-mix(in oklab, ${color} 45%, white)`;
+  const ink = darkInk ? `color-mix(in oklab, ${color} 75%, black)` : `color-mix(in oklab, ${color} 55%, white)`;
+  const glow = darkInk ? color : "#fff";
+  const blend = darkInk ? "mix-blend-multiply" : "mix-blend-overlay";
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
@@ -507,17 +509,24 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            {/* Ring and mark are the dot's own color pushed darker (on light colors) or lighter (on dark ones), so they
-                read as a tone of the swatch instead of a gray sitting on top of it. */}
+            {/* Ring and mark start as a tone of the dot's own color, so they always read, then a blended copy on top
+                pushes them deeper (multiplying the color into itself on light colors) or brighter (a white overlay on dark
+                ones, like the hover ring), so they glow with the swatch instead of sitting on it. */}
             <span
               aria-hidden
               className={cn("absolute inset-0 rounded-full", marked, on)}
               style={{ backgroundColor: color, boxShadow: `inset 0 0 0 1.5px ${ink}, 0 1px 2px 0 #0000001a` }}
             />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full", blend, marked, on)} style={{ boxShadow: `inset 0 0 0 1.5px ${glow}` }} />
             {status ? (
-              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", on)} style={{ color: ink }}>
-                <Icon className="size-2.5" strokeWidth={3} />
-              </span>
+              <>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", on)} style={{ color: ink }}>
+                  <Icon className="size-2.5" strokeWidth={3} />
+                </span>
+                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", blend, on)} style={{ color: glow }}>
+                  <Icon className="size-2.5" strokeWidth={3} />
+                </span>
+              </>
             ) : null}
           </button>
         }
