@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Contrast, Eye, EyeOff, Moon, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
+import { Contrast, Eye, EyeOff, Moon, ShieldCheck, Sun, SunMoon, SwatchBook, Wheat } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -48,6 +48,10 @@ const LENSES: { id: Lens; label: string; note?: string }[] = [
 export function ViewToolbar({
   overlay,
   onOverlay,
+  showRules,
+  onShowRules,
+  ruleCount,
+  failingPairs,
   crumbs,
   stepper,
   mode,
@@ -57,6 +61,11 @@ export function ViewToolbar({
 }: {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
+  /** Marks every swatch with whether it keeps the contrast rules. */
+  showRules: boolean;
+  onShowRules: (on: boolean) => void;
+  ruleCount: number;
+  failingPairs: number;
   crumbs: Crumb[];
   stepper?: Stepper;
   mode: SquareMode;
@@ -100,7 +109,8 @@ export function ViewToolbar({
         e.key !== "]" &&
         e.key.toLowerCase() !== "m" &&
         e.key.toLowerCase() !== "t" &&
-        e.key.toLowerCase() !== "g"
+        e.key.toLowerCase() !== "g" &&
+        e.key.toLowerCase() !== "r"
       )
         return;
       if (isTextEntry(e.target)) return;
@@ -114,6 +124,9 @@ export function ViewToolbar({
       if (e.key === "/") apply(active ? null : lens);
       else if (e.key.toLowerCase() === "m") setLensOpen(true);
       else if (e.key.toLowerCase() === "t") setThemeOpen(true);
+      else if (e.key.toLowerCase() === "r") {
+        if (ruleCount > 0) onShowRules(!showRules);
+      }
       else if (e.key.toLowerCase() === "g") {
         if (mode === "smooth") onGrain(!grain);
       } else onMode(e.key === "[" ? "smooth" : "cells");
@@ -200,6 +213,14 @@ export function ViewToolbar({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Hint
+          label={ruleCount === 0 ? "No contrast rules are set" : failingPairs === 0 ? "Show contrast rules (all pass)" : `Show contrast rules (${failingPairs} pair${failingPairs === 1 ? "" : "s"} fail)`}
+          shortcut={ruleCount > 0 ? ["R"] : undefined}
+        >
+          <Toggle variant="outline" size="sm" pressed={showRules && ruleCount > 0} disabled={ruleCount === 0} onPressedChange={onShowRules} aria-label="Show contrast rules" aria-keyshortcuts="R">
+            <ShieldCheck />
+          </Toggle>
+        </Hint>
         <Hint label={mode === "smooth" ? "Toggle grain" : "Grain only applies to the smooth view"} shortcut={mode === "smooth" ? ["G"] : undefined}>
           <Toggle variant="outline" size="sm" pressed={grain && mode === "smooth"} disabled={mode !== "smooth"} onPressedChange={onGrain} aria-label="Toggle grain">
             <Wheat />

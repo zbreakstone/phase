@@ -12,14 +12,9 @@ import {
 import type { Against, Metric, Overlay } from "@/lib/palette/overlay";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 
-export type Panel = "report";
-
 interface Props {
   overlay: Overlay;
   onOverlay: (o: Overlay) => void;
-  /** The one panel open under the square, if any. */
-  panel: Panel | null;
-  onPanel: (p: Panel | null) => void;
   /** Render just the rows, to sit inside another section. */
   bare?: boolean;
   /** Extra content at the end of the section, such as a delete button. */
@@ -39,17 +34,10 @@ const AGAINST: { id: Against; label: string }[] = [
   { id: "selected", label: "Open step" },
 ];
 
-const PANELS: { id: Panel | "none"; label: string }[] = [
-  { id: "none", label: "None" },
-  { id: "report", label: "Contrast report" },
-];
-
-/** How the square is drawn, what's printed on it, and which secondary panel sits under it. Shown at every level of the sidebar. */
+/** How the square is drawn, what's printed on it. Shown at every level of the sidebar. */
 export function DisplaySettings({
   overlay,
   onOverlay,
-  panel,
-  onPanel,
   bare,
   extra,
 }: Props) {
@@ -102,29 +90,6 @@ export function DisplaySettings({
           </Select>
         </SettingRow>
       ) : null}
-      <SettingRow id="display-panel" label="Below">
-        <Select
-          items={PANELS.map((m) => ({ value: m.id, label: m.label }))}
-          value={panel ?? "none"}
-          onValueChange={(v) =>
-            onPanel(!v || v === "none" ? null : (v as Panel))
-          }
-        >
-          <SelectTrigger id="display-panel" size="sm" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PANELS.map((m) => (
-              <SelectItem
-                key={m.id}
-                value={m.id}
-              >
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
     </>
   );
   if (bare) return rows;

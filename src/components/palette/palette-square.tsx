@@ -8,6 +8,7 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
+import type { Failure } from "@/lib/palette/validate";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,9 @@ interface Props {
   focusGrade: number | null;
   rules: ContrastRule[];
   overlay: Overlay;
+  /** Mark every swatch with whether it keeps the contrast rules, using the failing pairs below. */
+  showRules?: boolean;
+  failures?: Failure[];
   gamut: Gamut;
   mode: SquareMode;
   /** Visible film grain over the smooth gradient. A faint dither is always applied to hide banding. */
@@ -192,7 +196,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, showRules = false, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -206,6 +210,23 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   const R = rows.length;
   const C = rows[0]?.shades.length ?? 0;
   const colors = React.useMemo(() => rows.map((r) => r.shades.map((s) => displayShade(s, overlay, gamut))), [rows, overlay, gamut]);
+
+  // For every swatch, the other swatches it fails its contrast rule against.
+  const misses = React.useMemo(() => {
+    const map = new Map<string, string[]>();
+    const add = (hueId: string, grade: number, text: string) => map.set(`${hueId}:${grade}`, [...(map.get(`${hueId}:${grade}`) ?? []), text]);
+    for (const f of failures) {
+      const ratio = `${f.ratio.toFixed(2)}:1, needs ${f.required}:1`;
+      add(f.fgHueId, f.fg.grade, `${f.bgHue || "Unnamed"} ${f.bg.grade} (${ratio})`);
+      add(f.bgHueId, f.bg.grade, `${f.fgHue || "Unnamed"} ${f.fg.grade} (${ratio})`);
+    }
+    return map;
+  }, [failures]);
+  const missesOf = (hueId: string, grade: number) => (showRules ? (misses.get(`${hueId}:${grade}`) ?? []) : []);
+  const ruleNote = (hueId: string, grade: number) => {
+    const list = missesOf(hueId, grade);
+    return list.length === 0 ? "" : `, misses its contrast rule against ${list.length} step${list.length === 1 ? "" : "s"}`;
+  };
 
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
@@ -264,6 +285,31 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           )}
         </div>
       )}
+      {showRules && rules.length > 0 ? (
+        <div aria-hidden className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+          {rows.map((row) =>
+            row.shades.map((shade) => {
+              const list = misses.get(`${row.g.hue.id}:${shade.grade}`) ?? [];
+              const pair = list.length === 1 ? "1 pair" : `${list.length} pairs`;
+              return (
+                <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
+                  <span
+                    title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
+                    className={cn(
+                      "absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 rounded-full px-1 text-[10px] font-medium text-white shadow-(--shadow-border) tabular-nums",
+                      list.length === 0 ? "bg-emerald-600" : "bg-red-600",
+                    )}
+                  >
+                    {list.length === 0 ? <Check className="size-2.5" /> : <X className="size-2.5" />}
+                    {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
+                    {list.length === 0 ? null : list.length}
+                  </span>
+                </div>
+              );
+            }),
+          )}
+        </div>
+      ) : null}
     </>
   );
 
@@ -361,7 +407,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   current={row.g.hue.id === currentHueId}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
                   onBlur={() => setHover(null)}
-                  label={`Open ${row.g.hue.name || "Unnamed"}`}
+                  label={`Open ${row.g.hue.name || "Unnamed"}${row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? `, ${row.shades.filter((sh) => missesOf(row.g.hue.id, sh.grade).length > 0).length} steps miss contrast rules` : ""}`}
                   chip={row.g.hue.name || "Unnamed"}
                   chipSide="right"
                   onOpen={() => onOpenHue(row.g.hue.id)}
@@ -383,7 +429,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   current={shade.grade === currentGrade}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
                   onBlur={() => setHover(null)}
-                  label={`Open ${rows[0].g.hue.name} ${shade.grade}`}
+                  label={`Open ${rows[0].g.hue.name} ${shade.grade}${ruleNote(rows[0].g.hue.id, shade.grade)}`}
                   chip={`${shade.grade} · ${text || hex}`}
                   chipSide="top"
                   onOpen={() => onOpenStep(rows[0].g.hue.id, shade.grade)}
