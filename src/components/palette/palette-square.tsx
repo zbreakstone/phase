@@ -326,9 +326,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className={cn("absolute top-[72%] left-1/2 inline-flex h-4 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 px-1 text-[10px] font-medium tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
+                    className={cn("absolute top-[calc(50%+4rem)] left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
                   >
-                    {list.length === 0 ? <Check className="size-3" strokeWidth={2.5} /> : <X className="size-3" strokeWidth={2.5} />}
+                    {list.length === 0 ? <Check className="size-8" strokeWidth={2.5} /> : <X className="size-8" strokeWidth={2.5} />}
                     {list.length === 0 ? null : list.length}
                     {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
                   </span>
