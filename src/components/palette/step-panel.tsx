@@ -14,6 +14,7 @@ import { type Gamut, cssColor } from "@/lib/color/gamut";
 import type { RGB } from "@/lib/color/convert";
 import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES } from "@/lib/color/spaces";
+import type { Overlay } from "@/lib/palette/overlay";
 import type { GeneratedHue, Shade, StepTweak } from "@/lib/palette/types";
 import { SliderField } from "./fields";
 import { CollapsibleSection, SettingRow } from "./panel-section";
@@ -30,6 +31,8 @@ interface Props {
   onTweak: (patch: Partial<StepTweak>) => void;
   onResetStep: () => void;
   onResetAll: () => void;
+  /** When measuring against a step, that step of this color gets its own contrast row. */
+  overlay: Overlay;
   /** Renders the Settings section, with the delete button passed in to sit at its end. */
   settings: (danger: React.ReactNode) => React.ReactNode;
   /** Open the neighboring step, or null at either end. */
@@ -64,6 +67,7 @@ export function StepPanel({
   onTweak,
   onResetStep,
   onResetAll,
+  overlay,
   settings,
   stepActions,
 }: Props) {
@@ -73,6 +77,7 @@ export function StepPanel({
   const here = tweak.dh !== 0 || tweak.dc !== 0;
   const tuned = generated.shades.filter((s) => s.tweaked).length;
   const others = tuned - (here ? 1 : 0);
+  const reference = typeof overlay.against === "number" ? (generated.shades.find((s) => s.grade === overlay.against) ?? null) : null;
   const [confirming, setConfirming] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [nameDraft, setNameDraft] = React.useState<string | null>(null);
@@ -123,6 +128,14 @@ export function StepPanel({
       label: "On black",
       value: `${contrastFromLuminance(0, shade.luminance).toFixed(2)}:1 · Lc ${Math.round(Math.abs(apcaContrastLinear(BLACK, shade.linear)))}`,
     },
+    ...(reference && reference !== shade
+      ? [
+          {
+            label: `On step ${reference.grade}`,
+            value: `${contrastFromLuminance(reference.luminance, shade.luminance).toFixed(2)}:1 · Lc ${Math.round(Math.abs(apcaContrastLinear(reference.linear, shade.linear)))}`,
+          },
+        ]
+      : []),
   ];
 
   return (

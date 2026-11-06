@@ -7,6 +7,7 @@ import { maxChromaAt } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import type { GeneratedHue, Shade } from "@/lib/palette/types";
 import { cn } from "@/lib/utils";
+import { SlidingPill } from "./sliding-pill";
 import { useRovingFocus } from "./use-roving-focus";
 
 type Metric = "lightness" | "chroma" | "hue";
@@ -507,17 +508,19 @@ export function PaletteChart({
     <div>
       <div className="px-5 pt-3 pb-2">
       <div ref={controlsRef} role="toolbar" aria-label="Chart controls" className="flex items-center justify-between gap-2">
-          <div role="group" aria-label="Chart metric" className="-ml-1.5 flex items-center gap-0.5">
+          <div role="group" aria-label="Chart metric" className="relative -ml-1.5 flex items-center gap-0.5">
+            <SlidingPill activeKey={metric} />
             {METRICS.map((m) => (
               <button
                 key={m.id}
                 type="button"
                 title={m.title}
                 aria-pressed={metric === m.id}
+                data-active={metric === m.id}
                 onClick={() => setMetric(m.id)}
                 className={cn(
-                  "rounded-md px-1.5 py-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  metric === m.id ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+                  "relative rounded-md px-1.5 py-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  metric === m.id ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {m.label}

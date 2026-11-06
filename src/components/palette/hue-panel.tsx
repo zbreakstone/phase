@@ -6,10 +6,10 @@ import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { contrastFromLuminance } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { solveForLuminance } from "@/lib/color/solve";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
+import { swatchLabel, type Overlay } from "@/lib/palette/overlay";
 import type { GeneratedHue, HueConfig, Shade } from "@/lib/palette/types";
 import { SliderField } from "./fields";
 import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
@@ -27,6 +27,8 @@ interface Props {
   onOpenStep: (grade: number) => void;
   /** How swatches are painted under the current view (vision simulation, grayscale). */
   display: (shade: Shade) => string;
+  /** What each step's number shows, and against what. */
+  overlay: Overlay;
   /** Renders the Settings section, with the delete button passed in to sit at its end. */
   settings: (danger: React.ReactNode) => React.ReactNode;
 }
@@ -55,6 +57,7 @@ export function HuePanel({
   onResetTweaks,
   onOpenStep,
   display,
+  overlay,
   settings,
 }: Props) {
   const stepsRef = React.useRef<HTMLUListElement>(null);
@@ -67,6 +70,7 @@ export function HuePanel({
   const lockedLight = generated.source?.grade === first?.grade;
   const lockedDark = generated.source?.grade === last?.grade && ramp.length > 1;
   const tuned = generated.shades.filter((s) => s.tweaked).length;
+  const reference = typeof overlay.against === "number" ? (generated.shades.find((s) => s.grade === overlay.against) ?? null) : null;
   const [confirming, setConfirming] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -183,7 +187,7 @@ export function HuePanel({
                     {s.hex}
                   </span>
                   <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
-                    {contrastFromLuminance(1, s.luminance).toFixed(2)}
+                    {s === reference && overlay.metric !== "luminance" && overlay.metric !== "off" ? "—" : swatchLabel(s, overlay, reference)}
                   </span>
                 </button>
               </li>

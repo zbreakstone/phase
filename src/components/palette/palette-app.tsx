@@ -27,7 +27,7 @@ import { PAGE_WIDTH } from "./page-width";
 import { getStorage } from "@/lib/storage";
 import { ExportDialog } from "./export-dialog";
 import { AddColorEnd } from "./color-label";
-import { SectionGroup } from "./panel-section";
+import { SectionGroup, SectionTabs } from "./panel-section";
 import { ColorsList } from "./colors-list";
 import { PaletteChart } from "./palette-chart";
 import { HuePanel } from "./hue-panel";
@@ -184,7 +184,12 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [mode, setMode] = useViewPref("mode", "smooth" as SquareMode, keepView);
   const [grain, setGrain] = useViewPref("grain", true, keepView);
   const [ends, setEnds] = useViewPref("ends", true, keepView);
-  const [overlay, setOverlay] = useViewPref("overlay", DEFAULT_OVERLAY, keepView);
+  const [savedOverlay, setOverlay] = useViewPref("overlay", DEFAULT_OVERLAY, keepView);
+  // Measuring against a step this palette doesn't have (deleted, or saved from another palette) falls back to white.
+  const overlay = React.useMemo(
+    () => (typeof savedOverlay.against === "number" && !state.scale.grades.includes(savedOverlay.against) ? { ...savedOverlay, against: "white" as const } : savedOverlay),
+    [savedOverlay, state.scale.grades],
+  );
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
   const [current, setCurrent] = React.useState<CurrentPalette | null>(null);
@@ -434,7 +439,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
   const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
   const renderSettings = (danger: React.ReactNode) => (
-    <DisplaySettings overlay={overlay} onOverlay={setOverlay} extra={danger} />
+    <DisplaySettings overlay={overlay} onOverlay={setOverlay} grades={state.scale.grades} extra={danger} />
   );
 
   useApplyAccent();
@@ -443,10 +448,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [lastGrade, setLastGrade] = React.useState<number | null>(null);
   const actionsRef = React.useRef<HTMLDivElement>(null);
   useRovingFocus(actionsRef);
-  // The sidebar's section headers stay in the Tab order (header, its section, next header, as in an accordion), and
-  // up and down arrows jump between headers as a shortcut.
   const panelRef = React.useRef<HTMLDivElement>(null);
-  useRovingFocus(panelRef, { orientation: "vertical", items: "[data-section-trigger]", enabled: ready, singleTabStop: false });
   useRegionShortcuts();
   const openHue = (hueId: string) => {
     selectSilently((s) => ({ ...s, selectedHueId: hueId }));
@@ -643,7 +645,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
 
-  const reference = focusShade ?? null;
   const level = focused ? (focusShade ? "step" : "hue") : "all";
   // With the ends hidden, the arrows step only through the colors the user controls.
   const steps = focused ? focused.shades.filter((s) => ends || !s.anchor || s.grade === focusShade?.grade) : [];
@@ -709,7 +710,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     grain={grain}
                     ends={ends}
                     blend="mitchell"
-                    reference={reference}
                     onOpenHue={openHue}
                     onOpenStep={openStep}
                     currentHueId={state.selectedHueId}
@@ -793,11 +793,14 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 <PaletteChart generated={shown} calm={morphing} focusId={focused?.hue.id ?? null} focusGrade={focusShade?.grade ?? null} space={state.space} gamut={state.gamut} />
               </div>
             )}
-            <ScrollFade className="min-h-0 flex-1" innerClassName={historyOpen ? "h-full" : "divide-y divide-border"}>
-              {historyOpen ? (
+            {historyOpen ? (
+              <ScrollFade className="min-h-0 flex-1" innerClassName="h-full">
                 <div ref={setHistorySlot} className="h-full" />
-              ) : (
-                <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
+              </ScrollFade>
+            ) : (
+              <SectionGroup key={focused ? "focus" : "all"} defaultOpen={focused ? "details" : "colors"}>
+                <SectionTabs />
+                <ScrollFade className="min-h-0 flex-1">
               {focused && focusShade ? (
                 <StepPanel
                   key={`${focused.hue.id}:${focusShade.grade}`}
@@ -808,6 +811,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onTweak={(patch) => tweakStep(focused.hue.id, focusShade.grade, patch)}
                   onResetStep={() => resetTweaks(focused.hue.id, focusShade.grade)}
                   onResetAll={() => resetTweaks(focused.hue.id)}
+                  overlay={overlay}
                   stepActions={stepActions}
                   settings={renderSettings}
                 />
@@ -822,19 +826,20 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onResetTweaks={() => resetTweaks(focused.hue.id)}
                   onOpenStep={(g) => openStep(focused.hue.id, g)}
                   display={(shade) => displayShade(shade, overlay, state.gamut)}
+                  overlay={overlay}
                   settings={renderSettings}
                 />
               ) : (
                 <>
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
-                  <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} overlay={overlay} />
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} /> : null} />
+                  <ContrastRulesSection scale={state.scale} onScale={setScale} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} grades={state.scale.grades} /> : null} />
                 </>
               )}
-                </SectionGroup>
-              )}
-            </ScrollFade>
+                </ScrollFade>
+              </SectionGroup>
+            )}
             </div>
           )}
         </aside>

@@ -45,25 +45,6 @@ export function ColorsList({
     <CollapsibleSection
       id="colors"
       title="Colors"
-      count={generated.length}
-      className="pt-2"
-      action={
-        <AddColorPopover
-          align="end"
-          onAddPreset={(p) => actions.onAddPreset(p, generated.length)}
-          onAddHex={(hex) => actions.onAddHex(hex, generated.length)}
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Add a color"
-              title="Add a color"
-            />
-          }
-        >
-          <Plus />
-        </AddColorPopover>
-      }
     >
       <ul
         ref={listRef}
@@ -149,6 +130,17 @@ export function ColorsList({
           );
         })}
       </ul>
+        <AddColorPopover
+          align="start"
+          onAddPreset={(p) => actions.onAddPreset(p, generated.length)}
+          onAddHex={(hex) => actions.onAddHex(hex, generated.length)}
+          render={
+            <Button variant="ghost" size="sm" className="-ml-2 mt-1" />
+          }
+        >
+          <Plus />
+          Add color
+        </AddColorPopover>
     </CollapsibleSection>
   );
 }

@@ -91,6 +91,10 @@ export function sanitizeState(raw: unknown): PaletteState | null {
     }
   }
 
+  const looseGrades = Array.isArray(scaleRaw.looseGrades)
+    ? (scaleRaw.looseGrades as unknown[]).filter((g): g is number => typeof g === "number" && Number.isInteger(g))
+    : [];
+
   const hues = Array.isArray(r.hues)
     ? (r.hues as unknown[]).map(sanitizeHue).filter((h): h is HueConfig => h !== null)
     : [];
@@ -109,6 +113,7 @@ export function sanitizeState(raw: unknown): PaletteState | null {
       luminanceMode:
         scaleRaw.luminanceMode === "custom" || scaleRaw.luminanceMode === "uniform" ? scaleRaw.luminanceMode : "envoy",
       customLuminance,
+      ...(looseGrades.length > 0 ? { looseGrades } : {}),
       rules,
     },
     hues,

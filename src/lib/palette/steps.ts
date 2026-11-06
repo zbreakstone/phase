@@ -65,7 +65,12 @@ export function renameStep(state: PaletteState, from: number, to: number): Palet
 
   return {
     ...state,
-    scale: { ...state.scale, grades, customLuminance },
+    scale: {
+      ...state.scale,
+      grades,
+      customLuminance,
+      ...(state.scale.looseGrades ? { looseGrades: state.scale.looseGrades.map((g) => (g === from ? to : g)) } : {}),
+    },
     hues: state.hues.map((h) => {
       let next = h;
       if (h.stepTweaks && oldKey in h.stepTweaks) {
