@@ -25,14 +25,16 @@ export interface Prefs extends ViewPrefs {
 }
 
 const METRICS: Metric[] = ["contrast", "apca", "luminance", "off"];
-const AGAINST: Against[] = ["white", "black", "selected"];
 
 const parseOverlay = (v: unknown): Overlay | undefined => {
   if (!v || typeof v !== "object") return undefined;
   const o = v as Record<string, unknown>;
-  if (!METRICS.includes(o.metric as Metric) || !AGAINST.includes(o.against as Against)) return undefined;
+  // A step is saved by its grade. The old "selected" (the open step) has no grade to keep, so it falls back to white.
+  const against = o.against === "selected" ? "white" : o.against;
+  const validAgainst = against === "white" || against === "black" || (typeof against === "number" && Number.isInteger(against));
+  if (!METRICS.includes(o.metric as Metric) || !validAgainst) return undefined;
   if (typeof o.grayscale !== "boolean" || !VISIONS.some((x) => x.id === o.vision)) return undefined;
-  return { metric: o.metric as Metric, against: o.against as Against, grayscale: o.grayscale, vision: o.vision as Overlay["vision"] };
+  return { metric: o.metric as Metric, against: against as Against, grayscale: o.grayscale, vision: o.vision as Overlay["vision"] };
 };
 
 const parseView = (v: unknown): ViewPrefs => {

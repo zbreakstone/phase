@@ -19,7 +19,7 @@ import {
   systemGrades,
   targetLuminance,
 } from "@/lib/palette/scale";
-import { luminanceFromMetric, stepMetric } from "./step-metric";
+import { luminanceFromMetric, referenceOf, stepMetric } from "./step-metric";
 import type { ContrastRule, ScaleConfig } from "@/lib/palette/types";
 
 const toPos = (y: number) => Math.log((y + 0.05) / 1.05) / Math.log(0.05 / 1.05);
@@ -316,11 +316,12 @@ export function StepTarget({ scale, grade, overlay, onChange }: { scale: ScaleCo
   const pos = toPos(y);
 
   const id = `step-${grade}-luminance`;
-  const shown = stepMetric(overlay, y);
+  const ref = referenceOf(overlay, scale);
+  const shown = stepMetric(overlay, y, ref);
 
   const commit = (raw: string) => {
     const n = Number(raw);
-    if (raw.trim() !== "" && Number.isFinite(n)) set(luminanceFromMetric(overlay, n));
+    if (raw.trim() !== "" && Number.isFinite(n)) set(luminanceFromMetric(overlay, n, ref, grade));
     setDraft(null);
   };
 

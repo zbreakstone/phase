@@ -8,7 +8,7 @@ import { targetLuminance } from "@/lib/palette/scale";
 import type { ScaleConfig } from "@/lib/palette/types";
 import { midpointGrade } from "@/lib/palette/steps";
 import { CollapsibleSection } from "./panel-section";
-import { stepMetric } from "./step-metric";
+import { referenceOf, stepMetric } from "./step-metric";
 import { StepMenu, type StepHeaderActions } from "./step-header";
 import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, resetTargets, setStepTarget } from "./scale-settings";
 
@@ -18,6 +18,7 @@ import { StepTarget, clearStepTarget, hasTargetOverrides, isStepOverridden, rese
  */
 export function StepsEditor({ actions, scale, onScale, overlay }: { actions: StepHeaderActions; scale: ScaleConfig; onScale: (scale: ScaleConfig) => void; overlay: Overlay }) {
   const { grades } = actions;
+  const ref = referenceOf(overlay, scale);
   const [editing, setEditing] = React.useState<number | null>(null);
 
   // The header "+" drops a new step into the widest gap, so the scale stays evenly filled.
@@ -41,7 +42,7 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
       </p>
       <div className="grid grid-cols-[1fr_6rem_1.5rem] gap-2 px-0 text-[10px] text-muted-foreground">
         <span>Step</span>
-        <span className="text-right" title={stepMetric(overlay, 0.5).title}>{stepMetric(overlay, 0.5).header}</span>
+        <span className="text-right" title={stepMetric(overlay, 0.5, ref).title}>{stepMetric(overlay, 0.5, ref).header}</span>
         <span />
       </div>
       <ul>
@@ -64,7 +65,7 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
                     {isStepOverridden(scale, grade) ? <span aria-hidden title="Adjusted" className="size-1.5 rounded-full bg-foreground/60" /> : null}
                     <ChevronDown aria-hidden className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
                   </span>
-                  <span className="text-right text-xs text-muted-foreground">{stepMetric(overlay, y).value}</span>
+                  <span className="text-right text-xs text-muted-foreground">{grade === ref.grade ? "—" : stepMetric(overlay, y, ref).value}</span>
                 </button>
                 <StepMenu
                   grade={grade}

@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { useRovingFocus } from "./use-roving-focus";
-import { Check, Crosshair, Pin, X } from "lucide-react";
+import { Hint } from "./hint";
+import { Check, Lock, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
 import { type Gamut } from "@/lib/color/gamut";
-import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
+import { displayHex, displayShade, middleShade, swatchLabel, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
 import type { Failure } from "@/lib/palette/validate";
@@ -42,8 +43,6 @@ interface Props {
   /** Visible film grain over the smooth gradient. A faint dither is always applied to hide banding. */
   grain: boolean;
   blend: Blend;
-  /** The shade other swatches are compared against when the overlay says "selected". */
-  reference: Shade | null;
   onOpenHue: (hueId: string) => void;
   onOpenStep: (hueId: string, grade: number) => void;
   /** The color and step you last opened: where the keyboard lands when you come back to a level. */
@@ -205,7 +204,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, ends = true, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, ends = true, failures = [], gamut, mode, grain, blend, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -272,8 +271,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
 
   const label = (r: number, c: number) => {
     const shade = rows[r].shades[c];
-    const meta = swatchMeta(shade, overlay, reference, rules);
-    return { shade, ...meta };
+    const reference = typeof overlay.against === "number" ? (rows[r].g.shades.find((s) => s.grade === overlay.against) ?? null) : null;
+    return { shade, label: swatchLabel(shade, overlay, reference) };
   };
 
   const content = (
@@ -324,24 +323,29 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row, r) =>
             row.shades.map((shade, c) => {
-              const { label: text, status } = label(r, c);
+              const { label: text } = label(r, c);
               const fg = readableOn(displayHex(shade, overlay));
               return (
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
                   <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl", level === "step" && marksOn && "mt-16")}>
-                    {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
-                    {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
                     {level === "all" ? null : text}
                   </span>
                   {level === "hue" ? <StepName grade={shade.grade} className={LABEL_MOTION} /> : null}
-                  {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
                   {level === "all" && marksOn && shade !== middleShade(row.shades) ? (
                     <Mark status={shadeStatus(row, shade)} light={fg === "#000000"} />
                   ) : null}
                   {shade.isSource ? (
-                    <span className={cn(LABEL_MOTION, "pointer-events-none absolute top-1 right-1 opacity-80")}>
-                      {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
-                    </span>
+                    <Hint
+                      label={
+                        shade.pinned
+                          ? "Base color"
+                          : "Adjusted base color"
+                      }
+                    >
+                      <span className={cn(LABEL_MOTION, "absolute bottom-3 left-1/2 -translate-x-1/2", inkBlend(fg === "#000000"))}>
+                        {shade.pinned ? <Lock className="size-4" strokeWidth={2.5} aria-label="Exact source color, kept as entered" /> : <Pin className="size-4" strokeWidth={2.5} aria-label="Source color landed here" />}
+                      </span>
+                    </Hint>
                   ) : null}
                   {!shade.anchor && (tweakAt(row.g.hue, shade.grade).dh !== 0 || tweakAt(row.g.hue, shade.grade).dc !== 0) ? (
                     <span aria-hidden title="Tuned" className={cn(LABEL_MOTION, "pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80")} />

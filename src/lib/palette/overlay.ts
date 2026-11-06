@@ -2,11 +2,11 @@ import { apcaContrastLinear, contrastFromLuminance } from "@/lib/color/contrast"
 import type { RGB } from "@/lib/color/convert";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { luminanceGrayLinear, simulateVisionLinear, type VisionId } from "@/lib/color/vision";
-import { requiredRatio } from "./scale";
-import type { ContrastRule, GeneratedHue, Shade } from "./types";
+import type { GeneratedHue, Shade } from "./types";
 
 export type Metric = "contrast" | "apca" | "luminance" | "off";
-export type Against = "white" | "black" | "selected";
+/** What contrast is measured against: white, black, or a step (by grade) of the same color. */
+export type Against = "white" | "black" | number;
 
 /** What the swatches show: a number on each one, and whether they're painted as grays or through a vision simulation. */
 export interface Overlay {
@@ -37,31 +37,18 @@ const fmtLc = (lc: number) => String(Math.round(Math.abs(lc)));
 const fmtLuminance = (y: number) => y.toFixed(3);
 const fmtRatio = (r: number) => (r >= 10 ? r.toFixed(1) : r.toFixed(2));
 
-export type SwatchStatus = "pass" | "fail" | "none" | "self" | null;
-
-/** The number to print on a swatch for the current overlay, and whether it passes the contrast rules against the reference. */
-export function swatchMeta(shade: Shade, overlay: Overlay, reference: Shade | null, rules: ContrastRule[]): { label: string; status: SwatchStatus } {
-  let label = "";
-  let status: SwatchStatus = null;
-
-  if (overlay.metric === "luminance") label = fmtLuminance(shade.luminance);
+/**
+ * The number to print on a swatch for the current overlay. Against a step, `reference` is that step of the swatch's
+ * own color; the reference swatch itself prints nothing.
+ */
+export function swatchLabel(shade: Shade, overlay: Overlay, reference: Shade | null = null): string {
+  if (overlay.metric === "luminance") return fmtLuminance(shade.luminance);
+  if (overlay.metric === "off") return "";
+  const step = typeof overlay.against === "number";
+  if (step && (!reference || reference === shade)) return "";
   // APCA is one-directional: the "against" color is the text and the swatch is the background.
-  else if (overlay.metric === "apca" && overlay.against === "white") label = fmtLc(apcaContrastLinear(WHITE, shade.linear));
-  else if (overlay.metric === "apca" && overlay.against === "black") label = fmtLc(apcaContrastLinear(BLACK, shade.linear));
-  else if (overlay.metric === "apca" && reference) label = reference === shade ? "" : fmtLc(apcaContrastLinear(reference.linear, shade.linear));
-  else if (overlay.metric === "contrast" && overlay.against === "white") label = fmtRatio(contrastFromLuminance(1, shade.luminance));
-  else if (overlay.metric === "contrast" && overlay.against === "black") label = fmtRatio(contrastFromLuminance(0, shade.luminance));
-  else if (overlay.metric === "contrast" && reference) {
-    if (reference === shade) {
-      status = "self";
-    } else {
-      const ratio = contrastFromLuminance(reference.luminance, shade.luminance);
-      const required = requiredRatio(Math.abs(reference.grade - shade.grade), rules);
-      status = required === null ? "none" : ratio + 1e-9 >= required ? "pass" : "fail";
-      label = fmtRatio(ratio);
-    }
-  }
-  return { label, status };
+  if (overlay.metric === "apca") return fmtLc(apcaContrastLinear(step ? reference!.linear : overlay.against === "white" ? WHITE : BLACK, shade.linear));
+  return fmtRatio(contrastFromLuminance(step ? reference!.luminance : overlay.against === "white" ? 1 : 0, shade.luminance));
 }
 
 /** The shade a hue is best summed up by: the middle of its ramp, ignoring the white and black ends. */
