@@ -488,6 +488,7 @@ function Dot({
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
+  const ink = darkInk ? `color-mix(in oklab, ${color} 60%, black)` : `color-mix(in oklab, ${color} 45%, white)`;
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
@@ -506,19 +507,17 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full", darkInk ? "shadow-[inset_0_0_0_1px_#00000026,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]" : "shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full mix-blend-overlay", darkInk ? "shadow-[inset_0_0_0_2px_#000]" : "shadow-[inset_0_0_0_2px_#fff]", marked, on)} />
+            {/* Ring and mark are the dot's own color pushed darker (on light colors) or lighter (on dark ones), so they
+                read as a tone of the swatch instead of a gray sitting on top of it. */}
+            <span
+              aria-hidden
+              className={cn("absolute inset-0 rounded-full", marked, on)}
+              style={{ backgroundColor: color, boxShadow: `inset 0 0 0 1.5px ${ink}, 0 1px 2px 0 #0000001a` }}
+            />
             {status ? (
-              // Like the ring, the mark blends into the color beneath it: white on colors where white reads best, dark
-              // on light colors where it wouldn't. A faint plain copy keeps it visible at the extremes.
-              <>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center mix-blend-overlay", darkInk ? "text-black" : "text-white", on)}>
-                  <Icon className="size-3" strokeWidth={3} />
-                </span>
-                <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", darkInk ? "text-black/40" : "text-white/50", on)}>
-                  <Icon className="size-3" strokeWidth={2.5} />
-                </span>
-              </>
+              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", on)} style={{ color: ink }}>
+                <Icon className="size-2.5" strokeWidth={3} />
+              </span>
             ) : null}
           </button>
         }
