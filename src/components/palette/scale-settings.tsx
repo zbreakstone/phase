@@ -4,6 +4,7 @@ import * as React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { makeRules, uid } from "@/lib/palette/defaults";
@@ -222,16 +223,56 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
   const [draft, setDraft] = React.useState<string | null>(null);
   const pos = toPos(y);
 
+  const id = `step-${grade}-luminance`;
+
+  const commit = (raw: string) => {
+    const n = Number(raw);
+    if (raw.trim() !== "" && Number.isFinite(n)) onChange(Math.min(1, Math.max(0, n)));
+    setDraft(null);
+  };
+
+  // Laid out exactly like the Adjustments sliders: label and field on one row, the bar below.
   return (
-    <div className="grid grid-cols-[1fr_6rem] items-center gap-2">
-      <div className="relative py-1.5">
-        {/* The window the rules allow: green while the target sits inside it, red when it doesn't. */}
-        <div aria-hidden className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-muted" />
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={id} className="text-sm">
+          Luminance
+        </Label>
         <div
-          aria-hidden
-          className={`absolute top-1/2 h-2 -translate-y-1/2 rounded-full ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
-          style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
-        />
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget || !(e.target instanceof HTMLInputElement)) {
+              e.preventDefault();
+              e.currentTarget.querySelector("input")?.focus();
+            }
+          }}
+          className="flex h-7 w-24 items-center rounded-lg bg-white shadow-(--shadow-default) transition-[color,box-shadow] focus-within:ring-3 focus-within:ring-ring/50 hover:shadow-(--shadow-large) dark:bg-input/30"
+        >
+          <Input
+            id={id}
+            aria-label={`Luminance for step ${grade}`}
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={1}
+            step={0.001}
+            value={draft ?? y.toFixed(3)}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
+            }}
+            className="h-full min-w-0 flex-1 rounded-none bg-transparent px-2 text-left font-mono text-xs tabular-nums shadow-none hover:shadow-none focus-visible:ring-0 dark:bg-transparent"
+          />
+        </div>
+      </div>
+      <div className="relative flex h-5 items-center">
+        {/* The bar, with the window the rules allow on it: green while the target sits inside, red when it doesn't. */}
+        <div aria-hidden className="absolute inset-x-0 h-4 overflow-hidden rounded-full bg-muted shadow-(--shadow-default)">
+          <div
+            className={`absolute inset-y-0 rounded-full ${inRange ? "bg-emerald-500/40" : "bg-red-500/40"}`}
+            style={{ left: `${left}%`, width: `${Math.max(1, right - left)}%` }}
+          />
+        </div>
         <Slider
           aria-label={`Luminance target for step ${grade}`}
           value={[pos]}
@@ -258,24 +299,9 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
             const near = stops.find((p) => Math.abs(p - raw) <= SNAP);
             onChange(fromPos(near ?? raw));
           }}
-          className="relative [&_[data-slot=slider-track]]:bg-transparent [&_[data-slot=slider-range]]:bg-transparent"
+          className="relative [&_[data-slot=slider-range]]:hidden [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-white [&_[data-slot=slider-thumb]]:shadow-(--shadow-default) [&_[data-slot=slider-track]]:bg-transparent"
         />
       </div>
-      <Input
-        aria-label={`Luminance for step ${grade}`}
-        type="number"
-        min={0}
-        max={1}
-        step={0.001}
-        value={draft ?? y.toFixed(3)}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => {
-          const n = Number(e.target.value);
-          if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
-          setDraft(null);
-        }}
-        className="h-7 px-1.5 text-left font-mono text-[11px] tabular-nums md:text-[11px]"
-      />
     </div>
   );
 }
