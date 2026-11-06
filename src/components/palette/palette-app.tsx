@@ -827,8 +827,8 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
               ) : (
                 <>
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
-                  <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} overlay={overlay} />
+                  <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} /> : null} />
                 </>
               )}

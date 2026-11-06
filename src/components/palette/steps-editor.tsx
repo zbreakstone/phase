@@ -49,11 +49,6 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
       id="steps"
       title="Steps"
       className="space-y-2"
-      action={
-        <Button variant="ghost" size="icon-sm" aria-label="Add a step" title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : "Add a step"} disabled={actions.stepLimit === "max"} onClick={addInWidestGap}>
-          <Plus />
-        </Button>
-      }
     >
       <p className="text-[11px] text-muted-foreground">
         Shared by every color. Each step has a luminance target: how bright it is between white and black. Open one to adjust it within what your contrast rules allow.
@@ -115,6 +110,10 @@ export function StepsEditor({ actions, scale, onScale, overlay }: { actions: Ste
           );
         })}
       </ul>
+      <Button variant="ghost" size="sm" className="-ml-2" disabled={actions.stepLimit === "max"} title={actions.stepLimit === "max" ? "A scale can have at most 16 steps." : undefined} onClick={addInWidestGap}>
+        <Plus />
+        Add step
+      </Button>
       {hasTargetOverrides(scale) ? (
         <Button variant="ghost" size="sm" onClick={() => onScale(resetTargets(scale))}>
           <RotateCcw />

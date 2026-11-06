@@ -159,7 +159,7 @@ export function PaletteSettings({
 /** The contrast rules, which live at the bottom of the palette sidebar. */
 export function ContrastRulesSection({ scale, onScale }: { scale: ScaleConfig; onScale: (scale: ScaleConfig) => void }) {
   return (
-    <CollapsibleSection id="rules" title="Contrast rules">
+    <CollapsibleSection id="rules" title="Rules">
       <RulesSettings scale={scale} onChange={onScale} />
     </CollapsibleSection>
   );

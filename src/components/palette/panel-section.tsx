@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useRovingFocus } from "./use-roving-focus";
@@ -40,8 +39,6 @@ type Group = {
   activeId: string | null;
   select: (id: string) => void;
   register: (tab: Tab) => () => void;
-  actionSlot: HTMLElement | null;
-  setActionSlot: (el: HTMLElement | null) => void;
 };
 const SectionGroupContext = React.createContext<Group | null>(null);
 
@@ -52,25 +49,24 @@ const SectionGroupContext = React.createContext<Group | null>(null);
 export function SectionGroup({ defaultOpen = null, children }: { defaultOpen?: string | null; children: React.ReactNode }) {
   const [openId, setOpenId] = React.useState<string | null>(defaultOpen);
   const [tabs, setTabs] = React.useState<Tab[]>([]);
-  const [actionSlot, setActionSlot] = React.useState<HTMLElement | null>(null);
   const register = React.useCallback((tab: Tab) => {
     setTabs((prev) => (prev.some((t) => t.id === tab.id) ? prev.map((t) => (t.id === tab.id ? tab : t)) : [...prev, tab]));
     return () => setTabs((prev) => prev.filter((t) => t.id !== tab.id));
   }, []);
   const activeId = tabs.find((t) => t.id === openId)?.id ?? tabs[0]?.id ?? null;
-  const value = React.useMemo(() => ({ tabs, activeId, select: setOpenId, register, actionSlot, setActionSlot }), [tabs, activeId, register, actionSlot]);
+  const value = React.useMemo(() => ({ tabs, activeId, select: setOpenId, register }), [tabs, activeId, register]);
   return <SectionGroupContext.Provider value={value}>{children}</SectionGroupContext.Provider>;
 }
 
-/** The tab bar for the sections in the group, styled like the chart's metric tabs. The active section's action (an add button) sits at its right. */
+/** The tab bar for the sections in the group, styled like the chart's metric tabs. */
 export function SectionTabs() {
   const group = React.useContext(SectionGroupContext);
   const ref = React.useRef<HTMLDivElement>(null);
   useRovingFocus(ref, { items: '[role="tab"]' });
   if (!group) return null;
-  const { tabs, activeId, select, setActionSlot } = group;
+  const { tabs, activeId, select } = group;
   return (
-    <div className="flex min-h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-5">
+    <div className="flex shrink-0 items-center px-5 pt-3 pb-1">
       <div ref={ref} role="tablist" aria-label="Sidebar sections" className="-ml-1.5 flex min-w-0 items-center gap-0.5">
         {tabs.map((t) => {
           const on = t.id === activeId;
@@ -96,25 +92,22 @@ export function SectionTabs() {
           );
         })}
       </div>
-      <div ref={setActionSlot} className="flex shrink-0 items-center" />
     </div>
   );
 }
 
 /**
- * One tab's content in the sidebar. `action` (e.g. an add button) shows in the tab bar while this tab is chosen.
+ * One tab's content in the sidebar.
  * Hidden tabs stay mounted, so a half-edited field survives a visit to another tab.
  */
 export function CollapsibleSection({
   id,
   title,
-  action,
   className,
   children,
 }: {
   id: string;
   title: React.ReactNode;
-  action?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -125,7 +118,6 @@ export function CollapsibleSection({
   return (
     <PanelSection role="tabpanel" id={`${id}-body`} aria-labelledby={`${id}-tab`} hidden={!open}>
       <div className={className}>{children}</div>
-      {open && action && group?.actionSlot ? createPortal(action, group.actionSlot) : null}
     </PanelSection>
   );
 }
