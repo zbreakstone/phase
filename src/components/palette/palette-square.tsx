@@ -4,11 +4,11 @@ import * as React from "react";
 import { useRovingFocus } from "./use-roving-focus";
 import { Check, Crosshair, Pin, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
-import { type Gamut, cssColor } from "@/lib/color/gamut";
+import { type Gamut } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
 import type { ContrastRule, GeneratedHue, Shade } from "@/lib/palette/types";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { Failure } from "@/lib/palette/validate";
 import { cn } from "@/lib/utils";
 
 export type SquareMode = "smooth" | "cells";
@@ -33,6 +33,8 @@ interface Props {
   focusGrade: number | null;
   rules: ContrastRule[];
   overlay: Overlay;
+  /** The failing pairs, which mark every swatch with whether it keeps the contrast rules. */
+  failures?: Failure[];
   gamut: Gamut;
   mode: SquareMode;
   /** Visible film grain over the smooth gradient. A faint dither is always applied to hide banding. */
@@ -101,7 +103,12 @@ interface LayerAnim {
   fade: "in" | "out" | "none";
   duration: number;
   easing?: string;
+  /** Scales one axis only, which would stretch any text in the picture, so labels hide while it plays. */
+  stretch?: boolean;
 }
+
+/** Labels and marks drawn in a layer: hidden at once while it stretches, faded back in once it settles. */
+const LABEL_MOTION = "transition-opacity duration-150 group-data-[stretching]/layer:opacity-0 group-data-[stretching]/layer:duration-0";
 
 // Zooming in covers a lot of ground (the picture scales up to 13x), so it eases in as well as out and takes longer, or it reads as a cut.
 const EASE_IN_OUT = "cubic-bezier(0.65, 0, 0.35, 1)";
@@ -129,8 +136,8 @@ function levelMotion(from: View, to: View): { enter: LayerAnim; exit: LayerAnim 
     const duration = 320;
     // Going in, the old picture zooms into the row underneath while the new one, already full size, fades in over it. (Growing the new one from the row left its hard edges visible against the old picture's soft blend between rows.)
     return deeper
-      ? { enter: { origin, from: REST, to: REST, fade: "in", duration: 320, easing: EASE_IN_OUT } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration: 320, easing: EASE_IN_OUT } as LayerAnim }
-      : { enter: { origin, from: scale(k), to: REST, fade: "none", duration } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration } as LayerAnim };
+      ? { enter: { origin, from: REST, to: REST, fade: "in", duration: 320, easing: EASE_IN_OUT } as LayerAnim, exit: { origin, from: REST, to: scale(k), fade: "none", duration: 320, easing: EASE_IN_OUT, stretch: true } as LayerAnim }
+      : { enter: { origin, from: scale(k), to: REST, fade: "none", duration, stretch: true } as LayerAnim, exit: { origin, from: REST, to: scale(1 / k), fade: "out", duration, stretch: true } as LayerAnim };
   };
   if (from.level === "all" && to.level === "hue" && from.R > 0) return zoom("y", pin(to.hueIdx, from.R), from.R, true);
   if (from.level === "hue" && to.level === "all" && to.R > 0) return zoom("y", pin(from.hueIdx, to.R), to.R, false);
@@ -147,13 +154,17 @@ function Layer({ children, enter, exit, onExited }: { children: React.ReactNode;
     if (!el) return null;
     el.style.transformOrigin = a.origin;
     const opacity = a.fade === "none" ? [1, 1] : a.fade === "in" ? [0, 1] : [1, 0];
-    return el.animate(
+    if (a.stretch) el.dataset.stretching = "";
+    const anim = el.animate(
       [
         { transform: a.from, opacity: opacity[0] },
         { transform: a.to, opacity: opacity[1] },
       ],
       { duration: a.duration, easing: a.easing ?? EASE_OUT, fill: leaving ? "forwards" : "backwards" },
     );
+    // A leaving layer stays stretched until it unmounts; an arriving one shows its labels again once it lands.
+    if (a.stretch && !leaving) anim.finished.then(() => delete el.dataset.stretching).catch(() => {});
+    return anim;
   };
   React.useLayoutEffect(() => {
     if (enter) play(enter, false);
@@ -171,7 +182,7 @@ function Layer({ children, enter, exit, onExited }: { children: React.ReactNode;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exit]);
   return (
-    <div ref={ref} className={cn("absolute inset-0", exit && "pointer-events-none")}>
+    <div ref={ref} className={cn("group/layer absolute inset-0", exit && "pointer-events-none")}>
       {children}
     </div>
   );
@@ -192,7 +203,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -207,8 +218,38 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   const C = rows[0]?.shades.length ?? 0;
   const colors = React.useMemo(() => rows.map((r) => r.shades.map((s) => displayShade(s, overlay, gamut))), [rows, overlay, gamut]);
 
+  // For every swatch, the other swatches it fails its contrast rule against.
+  const misses = React.useMemo(() => {
+    const map = new Map<string, string[]>();
+    const add = (hueId: string, grade: number, text: string) => map.set(`${hueId}:${grade}`, [...(map.get(`${hueId}:${grade}`) ?? []), text]);
+    for (const f of failures) {
+      const ratio = `${f.ratio.toFixed(2)}:1, needs ${f.required}:1`;
+      add(f.fgHueId, f.fg.grade, `${f.bgHue || "Unnamed"} ${f.bg.grade} (${ratio})`);
+      add(f.bgHueId, f.bg.grade, `${f.fgHue || "Unnamed"} ${f.fg.grade} (${ratio})`);
+    }
+    return map;
+  }, [failures]);
+  // Like a color's steps (mark on the dot, number below it), a single step puts its mark in the middle and its score underneath.
+  const marksOn = rules.length > 0;
+  // The palette marks every step (all at once over swatches, the pointed-at color's over the gradient), so each color's dot
+  // moves onto its middle step and carries that one's mark.
+  const missesOf = (hueId: string, grade: number) => misses.get(`${hueId}:${grade}`) ?? [];
+  const ruleNote = (hueId: string, grade: number) => {
+    const list = missesOf(hueId, grade);
+    return list.length === 0 ? "" : `, misses its contrast rule against ${list.length} step${list.length === 1 ? "" : "s"}`;
+  };
+
+  const shadeStatus = (row: Row, shade: Shade): DotStatus => (!marksOn ? null : missesOf(row.g.hue.id, shade.grade).length > 0 ? "fail" : "pass");
+
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
+  // A dot's keyboard focus shows the same way as pointing at it (the outline round its row or column, the dot enlarged),
+  // so there's no separate ring to linger once the pointer takes over.
+  const keyboardAt = React.useRef<{ row: number; col: number } | null>(null);
+  const keyboardTo = (at: { row: number; col: number } | null) => {
+    keyboardAt.current = at;
+    setHover(at);
+  };
   // The dots are one tab stop: arrows move between them (up and down for colors, left and right for steps).
   useRovingFocus(boxRef, { orientation: level === "all" ? "vertical" : "horizontal", enabled: level !== "step" });
 
@@ -235,7 +276,47 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   const content = (
     <>
       {mode === "smooth" ? (
-        <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+        <>
+          <SmoothCanvas colors={colors} grain={grain} blend={blend} />
+          {/* The step being pointed at (or focused) shows its name and number, in the same spots as the swatch view. */}
+          {level === "hue" ? (
+            <div className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+              {rows[0].shades.map((shade, c) => (
+                <div
+                  key={shade.grade}
+                  className={cn("relative flex items-center justify-center font-mono text-[11px] tabular-nums transition-opacity duration-150 pointer-coarse:opacity-100", hover?.col === c ? "opacity-100" : "opacity-0")}
+                  style={{ color: readableOn(displayHex(shade, overlay)) }}
+                >
+                  <StepName grade={shade.grade} />
+                  <span className="mt-24">{label(0, c).label}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {level === "all" && marksOn ? (
+            <div className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+              {rows.map((row, r) =>
+                row.shades.map((shade) => (
+                  <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
+                    {shade !== middleShade(row.shades) ? (
+                      <Mark
+                        status={shadeStatus(row, shade)}
+                        light={readableOn(displayHex(shade, overlay)) === "#000000"}
+                        className={cn("pointer-coarse:opacity-100", hover?.row === r ? "opacity-100" : "opacity-0")}
+                      />
+                    ) : null}
+                  </div>
+                )),
+              )}
+            </div>
+          ) : null}
+          {/* A single step is one flat color either way, so its score shows in the gradient view too. */}
+          {level === "step" && label(0, 0).label ? (
+            <div className={cn(LABEL_MOTION, "absolute inset-0 flex items-center justify-center font-mono text-3xl tabular-nums")} style={{ color: readableOn(displayHex(rows[0].shades[0], overlay)) }}>
+              <span className={cn(marksOn && "mt-32")}>{label(0, 0).label}</span>
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="grid size-full" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row, r) =>
@@ -244,19 +325,23 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               const fg = readableOn(displayHex(shade, overlay));
               return (
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative flex items-center justify-center font-mono text-[11px] tabular-nums" style={{ backgroundColor: colors[r][c], color: fg }}>
-                  <span className={cn(level === "hue" && "mt-24", level === "step" && "text-3xl")}>
+                  <span className={cn(LABEL_MOTION, level === "hue" && "mt-24", level === "step" && "text-3xl", level === "step" && marksOn && "mt-32")}>
                     {status === "pass" ? <Check className="mr-0.5 inline size-3" aria-label="Meets its rule" /> : null}
                     {status === "fail" ? <X className="mr-0.5 inline size-3" aria-label="Breaks its rule" /> : null}
-                    {text}
+                    {level === "all" ? null : text}
                   </span>
-                  {status === "fail" ? <span aria-hidden className="pointer-events-none absolute inset-0 border-2 border-red-500" /> : null}
+                  {level === "hue" ? <StepName grade={shade.grade} className={LABEL_MOTION} /> : null}
+                  {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
+                  {level === "all" && marksOn && shade !== middleShade(row.shades) ? (
+                    <Mark status={shadeStatus(row, shade)} light={fg === "#000000"} />
+                  ) : null}
                   {shade.isSource ? (
-                    <span className="pointer-events-none absolute top-1 right-1 opacity-80">
+                    <span className={cn(LABEL_MOTION, "pointer-events-none absolute top-1 right-1 opacity-80")}>
                       {shade.pinned ? <Pin className="size-2.5" aria-label="Pinned source color" /> : <Crosshair className="size-2.5" aria-label="Source color landed here" />}
                     </span>
                   ) : null}
                   {!shade.anchor && (tweakAt(row.g.hue, shade.grade).dh !== 0 || tweakAt(row.g.hue, shade.grade).dc !== 0) ? (
-                    <span aria-hidden title="Tuned" className="pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80" />
+                    <span aria-hidden title="Tuned" className={cn(LABEL_MOTION, "pointer-events-none absolute bottom-1 left-1 size-1.5 rounded-full bg-current opacity-80")} />
                   ) : null}
                 </div>
               );
@@ -264,6 +349,28 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           )}
         </div>
       )}
+      {marksOn && level === "step" ? (
+        <div aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
+          {rows.map((row) =>
+            row.shades.map((shade) => {
+              const list = misses.get(`${row.g.hue.id}:${shade.grade}`) ?? [];
+              const pair = list.length === 1 ? "1 pair" : `${list.length} pairs`;
+              return (
+                <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
+                  <span
+                    title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
+                    className={cn("absolute top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000"))}
+                  >
+                    {list.length === 0 ? <Check className="size-8" strokeWidth={2.5} /> : <X className="size-8" strokeWidth={2.5} />}
+                    {list.length === 0 ? null : list.length}
+                    {list.length === 0 ? null : <span className="sr-only">{pair}</span>}
+                  </span>
+                </div>
+              );
+            }),
+          )}
+        </div>
+      ) : null}
     </>
   );
 
@@ -321,7 +428,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           const at = locate(e);
           setHover((prev) => (prev && at && prev.row === at.row && prev.col === at.col ? prev : at));
         }}
-        onPointerLeave={() => setHover(null)}
+        // Leaving with the pointer hands the highlight back to the dot the keyboard is on, if any.
+        onPointerLeave={() => setHover(keyboardAt.current)}
         onClick={(e) => {
           const at = locate(e);
           if (at) open(at.row, at.col);
@@ -340,9 +448,11 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
         {/* The row or column under the pointer. Corners that sit in the canvas's corners share its radius; the rest are square. */}
         {hover && level !== "step" ? (
           <>
-            {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black and white. */}
+            {/* A wide ring that blends into the colors beneath it, and a faint plain one so it still shows over black. */}
             <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-overlay" shadow="shadow-[inset_0_0_0_2px_#fff]" />
             <HoverRing level={level} hover={hover} rows={R} cols={C} shadow="shadow-[inset_0_0_0_1px_#ffffff40]" />
+            {/* White has nothing to brighten on light colors, so a dark ring multiplied in carries it there (and vanishes on dark ones). */}
+            <HoverRing level={level} hover={hover} rows={R} cols={C} className="mix-blend-multiply" shadow="shadow-[inset_0_0_0_2px_#00000026]" />
           </>
         ) : null}
 
@@ -354,16 +464,17 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               return (
                 <Dot
                   key={row.g.hue.id}
-                  x={50}
+                  x={marksOn ? ((row.shades.indexOf(mid) + 0.5) / C) * 100 : 50}
                   y={((r + 0.5) / R) * 100}
-                  color={displayShade(mid, overlay, gamut)}
                   active={active}
+                  status={shadeStatus(row, mid)}
+                  pinned={mode === "cells"}
+                  light={readableOn(displayHex(mid, overlay)) === "#000000"}
                   current={row.g.hue.id === currentHueId}
-                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
-                  onBlur={() => setHover(null)}
-                  label={`Open ${row.g.hue.name || "Unnamed"}`}
-                  chip={row.g.hue.name || "Unnamed"}
-                  chipSide="right"
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: r, col: 0 })}
+                  onBlur={() => keyboardTo(null)}
+                  label={`Open ${row.g.hue.name || "Unnamed"}${row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? `, ${row.shades.filter((sh) => missesOf(row.g.hue.id, sh.grade).length > 0).length} steps miss contrast rules` : ""}`}
+                  name={row.g.hue.name || "Unnamed"}
                   onOpen={() => onOpenHue(row.g.hue.id)}
                 />
               );
@@ -371,21 +482,19 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           : null}
         {level === "hue"
           ? rows[0].shades.map((shade, c) => {
-              const { label: text } = label(0, c);
-              const hex = cssColor(shade.hex, shade.linear, gamut);
               return (
                 <Dot
                   key={shade.grade}
                   x={((c + 0.5) / C) * 100}
                   y={50}
-                  color={colors[0][c]}
                   active={hover?.col === c}
+                  status={shadeStatus(rows[0], shade)}
+                  pinned={mode === "cells"}
+                  light={readableOn(displayHex(shade, overlay)) === "#000000"}
                   current={shade.grade === currentGrade}
-                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
-                  onBlur={() => setHover(null)}
-                  label={`Open ${rows[0].g.hue.name} ${shade.grade}`}
-                  chip={`${shade.grade} · ${text || hex}`}
-                  chipSide="top"
+                  onFocus={(e) => e.currentTarget.matches(":focus-visible") && keyboardTo({ row: 0, col: c })}
+                  onBlur={() => keyboardTo(null)}
+                  label={`Open ${rows[0].g.hue.name} ${shade.grade}${ruleNote(rows[0].g.hue.id, shade.grade)}`}
                   onOpen={() => onOpenStep(rows[0].g.hue.id, shade.grade)}
                 />
               );
@@ -396,63 +505,107 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   );
 }
 
+type DotStatus = "pass" | "fail" | null;
+
+/** A step's name, above its dot as the score sits below it. */
+function StepName({ grade, className }: { grade: number; className?: string }) {
+  return (
+    <span aria-hidden className={cn("pointer-events-none absolute inset-0 flex items-center justify-center", className)}>
+      <span className="mb-24">{grade}</span>
+    </span>
+  );
+}
+
+/** A swatch's contrast mark where there's no dot to carry it, drawn the same way a dot draws its own. */
+function Mark({ status, light, className }: { status: DotStatus; light: boolean; className?: string }) {
+  if (!status) return null;
+  const Icon = status === "pass" ? Check : X;
+  return (
+    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light), className)}>
+      <Icon className="size-4" strokeWidth={2.5} />
+    </span>
+  );
+}
+
+/**
+ * How a mark blends into the color beneath it: plus-lighter adds white on dark colors and plus-darker takes
+ * it away on light ones, so even pure black and white still show it. Browsers without plus-darker (Chrome) get the
+ * nearest look from multiply.
+ */
+const inkBlend = (light: boolean) =>
+  cn(light ? "mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker text-black/50" : "mix-blend-plus-lighter text-white/50");
+
 function Dot({
   x,
   y,
-  color,
   active,
+  status,
+  pinned,
+  light,
   current,
   onFocus,
   onBlur,
   label,
-  chip,
-  chipSide,
+  name,
   onOpen,
 }: {
   x: number;
   y: number;
-  color: string;
   active: boolean;
+  /** Whether the dot's step keeps the contrast rules; with no rules set the dot draws nothing. */
+  status: DotStatus;
+  /** Keep the mark showing without hover (the swatch view). */
+  pinned: boolean;
+  /** A light color, where white has nothing to brighten, so the mark goes deeper instead. */
+  light: boolean;
   /** Where Tab lands when it enters the dots. */
   current: boolean;
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
   onBlur: () => void;
   label: string;
-  chip: string;
-  chipSide: "right" | "top";
+  /** A name written above the dot while it's active; steps leave it out, since the canvas already names them. */
+  name?: string;
   onOpen: () => void;
 }) {
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
-  // The button itself carries no z-index, opacity or transform: those would wall the blended ring off from the
-  // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
-  const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
+  // The button itself carries no z-index, opacity or transform: those would wall the blended mark off from the
+  // canvas, so they sit on the inner layers instead.
   const on = active && "scale-150 opacity-100";
+  // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
+  const marked = cn("transition-[opacity,scale] duration-150", pinned ? "opacity-100" : "opacity-0 pointer-coarse:opacity-100");
+  const Icon = status === "pass" ? Check : X;
   return (
-    <Tooltip open={active}>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={label}
-            data-current={current || undefined}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen();
-            }}
-            className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            style={{ left: `${x}%`, top: `${y}%` }}
-          >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", shown, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", shown, on)} />
-          </button>
-        }
-      />
-      <TooltipContent side={chipSide} sideOffset={12} glass>
-        {chip}
-      </TooltipContent>
-    </Tooltip>
+    <button
+      type="button"
+      aria-label={label}
+      data-current={current || undefined}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen();
+      }}
+      className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none"
+      style={{ left: `${x}%`, top: `${y}%` }}
+    >
+      {status ? (
+        <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light), marked, on)}>
+          <Icon className="size-4" strokeWidth={2.5} />
+        </span>
+      ) : null}
+      {name ? (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap transition-opacity duration-150 pointer-coarse:opacity-100",
+            light ? "text-black" : "text-white",
+            active ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {name}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

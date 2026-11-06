@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import type { Stepper } from "./crumbs";
 import { toggleVariants } from "@/components/ui/toggle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ContrastReport } from "./contrast-report";
 import { DEFAULT_GAMUT, type Gamut } from "@/lib/color/gamut";
 import { SPACES, type SpaceId } from "@/lib/color/spaces";
 import { maxChromaAt } from "@/lib/color/solve";
@@ -37,7 +36,7 @@ import { PaletteSquare, type SquareMode } from "./palette-square";
 import { StepPanel } from "./step-panel";
 import { StepsEditor } from "./steps-editor";
 import { ScrollFade } from "./scroll-fade";
-import { DisplaySettings, type Panel } from "./display-settings";
+import { DisplaySettings } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
 import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
@@ -179,7 +178,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
   const [grain, setGrain] = React.useState(true);
-  const [panel, setPanel] = React.useState<Panel | null>(null);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
@@ -430,7 +428,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const focused = focus.hueId ? (generated.find((g) => g.hue.id === focus.hueId) ?? null) : null;
   const focusShade = focused && focus.grade !== null ? (focused.shades.find((s) => s.grade === focus.grade) ?? null) : null;
   const renderSettings = (danger: React.ReactNode) => (
-    <DisplaySettings overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} extra={danger} />
+    <DisplaySettings overlay={overlay} onOverlay={setOverlay} extra={danger} />
   );
 
   useApplyAccent();
@@ -638,7 +636,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
 
-  const rules = [...state.scale.rules].sort((a, b) => a.minDiff - b.minDiff);
   const reference = focusShade ?? null;
   const level = focused ? (focusShade ? "step" : "hue") : "all";
   const stepIndex = focused && focusShade ? focused.shades.findIndex((s) => s.grade === focusShade.grade) : -1;
@@ -668,7 +665,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
     });
     return () => cancelAnimationFrame(frame);
   }, [level, ready]);
-  const openPanel: Panel | null = panel === "report" ? panel : null;
 
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
@@ -698,6 +694,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     focusGrade={focusShade?.grade ?? null}
                     rules={state.scale.rules}
                     overlay={overlay}
+                    failures={report.failures}
                     gamut={state.gamut}
                     mode={mode}
                     grain={grain}
@@ -728,10 +725,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     />
                   </div>
                 </div>
-                {openPanel ? <div className="mt-16 space-y-6" /> : null}
-                {openPanel === "report" ? (
-                  <ContrastReport report={report} rules={rules} gamut={state.gamut} showApcaNote={overlay.metric === "apca"} onSelect={openStep} />
-                ) : null}
               </>
             )}
           </div>
@@ -824,7 +817,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} overlay={overlay} />
-                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} panel={openPanel} onPanel={setPanel} /> : null} />
+                  <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} /> : null} />
                 </>
               )}
                 </SectionGroup>
