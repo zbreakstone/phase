@@ -79,7 +79,16 @@ export function SliderField({
           {label}
           {hint ? <HelpTip>{hint}</HelpTip> : null}
         </Label>
-        <div className="flex items-center gap-1">
+        {/* The unit lives inside the field, so every field is the same width and the right edges line up. */}
+        <div
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget || !(e.target instanceof HTMLInputElement)) {
+              e.preventDefault();
+              e.currentTarget.querySelector("input")?.focus();
+            }
+          }}
+          className="flex h-7 w-24 items-center rounded-lg bg-white shadow-(--shadow-default) transition-[color,box-shadow] focus-within:ring-3 focus-within:ring-ring/50 hover:shadow-(--shadow-large) has-disabled:opacity-50 dark:bg-input/30"
+        >
           <Input
             id={id}
             type="number"
@@ -94,9 +103,13 @@ export function SliderField({
             onKeyDown={(e) => {
               if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
             }}
-            className="h-7 w-20 px-2 text-left font-mono text-xs tabular-nums"
+            className="h-full min-w-0 flex-1 rounded-none bg-transparent px-2 text-left font-mono text-xs tabular-nums shadow-none hover:shadow-none focus-visible:ring-0 dark:bg-transparent"
           />
-          {unit ? <span className="w-3 text-xs text-muted-foreground">{unit}</span> : null}
+          {unit ? (
+            <span aria-hidden className="pointer-events-none w-6 shrink-0 pr-2 text-right text-xs text-muted-foreground">
+              {unit}
+            </span>
+          ) : null}
         </div>
       </div>
       {/* With a guide the gradient is the track itself: one bar with the thumb riding on it. */}
