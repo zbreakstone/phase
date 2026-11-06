@@ -179,7 +179,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
   const [historySlot, setHistorySlot] = React.useState<HTMLElement | null>(null);
   const [grain, setGrain] = React.useState(true);
   /** Marks each swatch with whether it keeps the contrast rules. */
-  const [showRules, setShowRules] = React.useState(false);
   const [overlay, setOverlay] = React.useState<Overlay>({ metric: "contrast", against: "white", grayscale: false, vision: "normal" });
   const storage = React.useMemo(() => getStorage(), []);
   /** The cloud palette being edited, remembered across reloads so unsaved changes stay visible. */
@@ -696,7 +695,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     focusGrade={focusShade?.grade ?? null}
                     rules={state.scale.rules}
                     overlay={overlay}
-                    showRules={showRules}
                     failures={report.failures}
                     gamut={state.gamut}
                     mode={mode}
@@ -713,10 +711,6 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                     <ViewToolbar
                       overlay={overlay}
                       onOverlay={setOverlay}
-                      showRules={showRules}
-                      onShowRules={setShowRules}
-                      ruleCount={state.scale.rules.length}
-                      failingPairs={report.failures.length}
                       mode={mode}
                       onMode={setMode}
                       grain={grain}

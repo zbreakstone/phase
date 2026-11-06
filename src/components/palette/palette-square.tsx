@@ -33,8 +33,7 @@ interface Props {
   focusGrade: number | null;
   rules: ContrastRule[];
   overlay: Overlay;
-  /** Mark every swatch with whether it keeps the contrast rules, using the failing pairs below. */
-  showRules?: boolean;
+  /** The failing pairs, which mark every swatch with whether it keeps the contrast rules. */
   failures?: Failure[];
   gamut: Gamut;
   mode: SquareMode;
@@ -204,7 +203,7 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, showRules = false, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
@@ -231,17 +230,16 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     return map;
   }, [failures]);
   // Like a color's steps (mark on the dot, number below it), a single step puts its mark in the middle and its score underneath.
-  const marksOn = showRules && rules.length > 0;
+  const marksOn = rules.length > 0;
   // The palette marks every step (all at once over swatches, the pointed-at color's over the gradient), so each color's dot
   // moves onto its middle step and carries that one's mark.
-  const everyMark = marksOn;
-  const missesOf = (hueId: string, grade: number) => (showRules ? (misses.get(`${hueId}:${grade}`) ?? []) : []);
+  const missesOf = (hueId: string, grade: number) => misses.get(`${hueId}:${grade}`) ?? [];
   const ruleNote = (hueId: string, grade: number) => {
     const list = missesOf(hueId, grade);
     return list.length === 0 ? "" : `, misses its contrast rule against ${list.length} step${list.length === 1 ? "" : "s"}`;
   };
 
-  const shadeStatus = (row: Row, shade: Shade): DotStatus => (!showRules || rules.length === 0 ? null : missesOf(row.g.hue.id, shade.grade).length > 0 ? "fail" : "pass");
+  const shadeStatus = (row: Row, shade: Shade): DotStatus => (!marksOn ? null : missesOf(row.g.hue.id, shade.grade).length > 0 ? "fail" : "pass");
 
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
@@ -295,7 +293,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               ))}
             </div>
           ) : null}
-          {level === "all" && everyMark ? (
+          {level === "all" && marksOn ? (
             <div className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
               {rows.map((row, r) =>
                 row.shades.map((shade) => (
@@ -334,7 +332,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   </span>
                   {level === "hue" ? <StepName grade={shade.grade} className={LABEL_MOTION} /> : null}
                   {status === "fail" ? <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 border-2 border-red-500")} /> : null}
-                  {level === "all" && everyMark && shade !== middleShade(row.shades) ? (
+                  {level === "all" && marksOn && shade !== middleShade(row.shades) ? (
                     <Mark status={shadeStatus(row, shade)} light={fg === "#000000"} />
                   ) : null}
                   {shade.isSource ? (
@@ -351,7 +349,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           )}
         </div>
       )}
-      {showRules && rules.length > 0 && level === "step" ? (
+      {marksOn && level === "step" ? (
         <div aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 grid")} style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row) =>
             row.shades.map((shade) => {
@@ -361,7 +359,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                 <div key={`${row.g.hue.id}-${shade.grade}`} className="relative">
                   <span
                     title={list.length === 0 ? "Keeps every contrast rule" : `Misses its rule against ${list.join(", ")}`}
-                    className={cn("absolute top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000", true))}
+                    className={cn("absolute top-1/2 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 font-mono text-2xl tabular-nums", inkBlend(readableOn(displayHex(shade, overlay)) === "#000000"))}
                   >
                     {list.length === 0 ? <Check className="size-8" strokeWidth={2.5} /> : <X className="size-8" strokeWidth={2.5} />}
                     {list.length === 0 ? null : list.length}
@@ -466,9 +464,8 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
               return (
                 <Dot
                   key={row.g.hue.id}
-                  x={everyMark ? ((row.shades.indexOf(mid) + 0.5) / C) * 100 : 50}
+                  x={marksOn ? ((row.shades.indexOf(mid) + 0.5) / C) * 100 : 50}
                   y={((r + 0.5) / R) * 100}
-                  color={displayShade(mid, overlay, gamut)}
                   active={active}
                   status={shadeStatus(row, mid)}
                   pinned={mode === "cells"}
@@ -490,7 +487,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   key={shade.grade}
                   x={((c + 0.5) / C) * 100}
                   y={50}
-                  color={colors[0][c]}
                   active={hover?.col === c}
                   status={shadeStatus(rows[0], shade)}
                   pinned={mode === "cells"}
@@ -525,28 +521,23 @@ function Mark({ status, light, className }: { status: DotStatus; light: boolean;
   if (!status) return null;
   const Icon = status === "pass" ? Check : X;
   return (
-    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light, true), className)}>
+    <span aria-hidden className={cn(LABEL_MOTION, "pointer-events-none absolute inset-0 flex items-center justify-center", inkBlend(light), className)}>
       <Icon className="size-4" strokeWidth={2.5} />
     </span>
   );
 }
 
 /**
- * How a ring or mark blends into the color beneath it: plus-lighter adds white on dark colors and plus-darker takes
+ * How a mark blends into the color beneath it: plus-lighter adds white on dark colors and plus-darker takes
  * it away on light ones, so even pure black and white still show it. Browsers without plus-darker (Chrome) get the
  * nearest look from multiply.
  */
-const inkBlend = (light: boolean, strong = false) =>
-  cn(
-    light ? "mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker" : "mix-blend-plus-lighter",
-    // Stronger while the contrast marks are on, so the marks and their rings stand out from the plain dots.
-    light ? (strong ? "text-black/50" : "text-black/35") : strong ? "text-white/50" : "text-white/35",
-  );
+const inkBlend = (light: boolean) =>
+  cn(light ? "mix-blend-multiply supports-[mix-blend-mode:plus-darker]:mix-blend-plus-darker text-black/50" : "mix-blend-plus-lighter text-white/50");
 
 function Dot({
   x,
   y,
-  color,
   active,
   status,
   pinned,
@@ -560,13 +551,12 @@ function Dot({
 }: {
   x: number;
   y: number;
-  color: string;
   active: boolean;
-  /** When the contrast rules are shown: the mark drawn inside the dot, which then stays visible. */
+  /** Whether the dot's step keeps the contrast rules; with no rules set the dot draws nothing. */
   status: DotStatus;
   /** Keep the mark showing without hover (the swatch view). */
   pinned: boolean;
-  /** A light color, where white has nothing to brighten, so the ring and mark go deeper instead. */
+  /** A light color, where white has nothing to brighten, so the mark goes deeper instead. */
   light: boolean;
   /** Where Tab lands when it enters the dots. */
   current: boolean;
@@ -578,12 +568,11 @@ function Dot({
   onOpen: () => void;
 }) {
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
-  // The button itself carries no z-index, opacity or transform: those would wall the blended ring off from the
+  // The button itself carries no z-index, opacity or transform: those would wall the blended mark off from the
   // canvas, so they sit on the inner layers instead.
-  const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
   // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
-  const marked = status ? (pinned ? "opacity-100 transition-[opacity,scale] duration-150" : "opacity-0 transition-[opacity,scale] duration-150 pointer-coarse:opacity-100") : shown;
+  const marked = cn("transition-[opacity,scale] duration-150", pinned ? "opacity-100" : "opacity-0 pointer-coarse:opacity-100");
   const Icon = status === "pass" ? Check : X;
   return (
     <button
@@ -599,15 +588,8 @@ function Dot({
       className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none"
       style={{ left: `${x}%`, top: `${y}%` }}
     >
-      {/* With the contrast marks on, the mark stands in for the ring; otherwise the dot is a ring. */}
-      {status ? null : (
-        <>
-          <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
-          <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]", inkBlend(light), marked, on)} />
-        </>
-      )}
       {status ? (
-        <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light, status !== null), marked, on)}>
+        <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center", inkBlend(light), marked, on)}>
           <Icon className="size-4" strokeWidth={2.5} />
         </span>
       ) : null}
