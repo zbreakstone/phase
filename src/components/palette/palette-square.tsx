@@ -542,8 +542,8 @@ function Dot({
   // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
-  // In the swatch view the marks stay up; over the gradient they come and go on hover like the rings do.
-  const marked = status && pinned ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
+  // In the swatch view the marks stay up; over the gradient only the one being pointed at (or focused) shows.
+  const marked = status ? (pinned ? "opacity-100 transition-[opacity,scale] duration-150" : "opacity-0 transition-[opacity,scale] duration-150") : shown;
   const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
