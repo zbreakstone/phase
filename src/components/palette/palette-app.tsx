@@ -46,6 +46,7 @@ import { ResetDialog } from "./reset-dialog";
 import { SavesDialog, type CurrentPalette } from "./saves-dialog";
 import { ShareMenu, type ExportKind } from "./share-menu";
 import { Hint } from "./hint";
+import { useKeyShortcut } from "./use-key-shortcut";
 import { useMorph } from "./use-morph";
 import { PaletteSwitcher } from "./palette-switcher";
 import { usePaletteActions } from "./use-palette-actions";
@@ -559,6 +560,11 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       toast.error(e instanceof Error ? e.message : "Couldn't open that palette.");
     }
   };
+  /** Starts a blank palette, asking first when leaving would drop changes that were never saved. */
+  const newPalette = () => {
+    if (confirmLeave()) router.push("/p/new");
+  };
+  useKeyShortcut("KeyN", newPalette, { command: true, enabled: !!session });
   const { duplicate } = usePaletteActions(() => {});
   /** Saves a copy of the last saved version, under "<name> copy". */
   const duplicateCurrent = () => (current ? duplicate({ id: current.id, name: current.name, updatedAt: Date.now() }) : undefined);
@@ -574,7 +580,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                 if (confirmLeave()) void switchTo(id);
               }}
               onNew={() => {
-                if (confirmLeave()) router.push("/p/new");
+                newPalette();
               }}
             />
           ),
@@ -782,7 +788,13 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
             const tones = generated.map(representativeShade);
             const vivid = tones.filter((t) => t.chroma >= 0.04);
             const colors = ready ? (vivid.length ? vivid : tones).map((t) => t.hex) : undefined;
-            return (
+            return session ? (
+              <Hint label="New palette" shortcut={["⌘", "N"]}>
+                <button type="button" onClick={newPalette} aria-label="New palette" className="group pointer-events-auto relative isolate rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Logo colors={colors} />
+                </button>
+              </Hint>
+            ) : (
               <span className="group pointer-events-auto relative isolate rounded-md">
                 <Logo colors={colors} />
               </span>
