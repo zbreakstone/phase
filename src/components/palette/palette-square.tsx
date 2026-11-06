@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRovingFocus } from "./use-roving-focus";
-import { Check, Crosshair, Pin, X } from "lucide-react";
+import { Check, Crosshair, Pin, TriangleAlert, X } from "lucide-react";
 import { readableOn } from "@/lib/color/contrast";
 import { type Gamut, cssColor } from "@/lib/color/gamut";
 import { displayHex, displayShade, middleShade, swatchMeta, type Overlay } from "@/lib/palette/overlay";
@@ -228,6 +228,10 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
     return list.length === 0 ? "" : `, misses its contrast rule against ${list.length} step${list.length === 1 ? "" : "s"}`;
   };
 
+  /** The mark on a dot: a color is only flagged ("warn") so it can be opened; its steps then say which ones miss ("fail"). */
+  const rowStatus = (row: Row): DotStatus => (!showRules || rules.length === 0 ? null : row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? "warn" : "pass");
+  const shadeStatus = (row: Row, shade: Shade): DotStatus => (!showRules || rules.length === 0 ? null : missesOf(row.g.hue.id, shade.grade).length > 0 ? "fail" : "pass");
+
   const boxRef = React.useRef<HTMLDivElement>(null);
   const [hover, setHover] = React.useState<{ row: number; col: number } | null>(null);
   // The dots are one tab stop: arrows move between them (up and down for colors, left and right for steps).
@@ -285,7 +289,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
           )}
         </div>
       )}
-      {showRules && rules.length > 0 ? (
+      {showRules && rules.length > 0 && level === "step" ? (
         <div aria-hidden className="pointer-events-none absolute inset-0 grid" style={{ gridTemplateRows: `repeat(${R}, minmax(0, 1fr))`, gridTemplateColumns: `repeat(${C}, minmax(0, 1fr))` }}>
           {rows.map((row) =>
             row.shades.map((shade) => {
@@ -404,6 +408,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   y={((r + 0.5) / R) * 100}
                   color={displayShade(mid, overlay, gamut)}
                   active={active}
+                  status={rowStatus(row)}
                   current={row.g.hue.id === currentHueId}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: r, col: 0 })}
                   onBlur={() => setHover(null)}
@@ -426,6 +431,7 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   y={50}
                   color={colors[0][c]}
                   active={hover?.col === c}
+                  status={shadeStatus(rows[0], shade)}
                   current={shade.grade === currentGrade}
                   onFocus={(e) => e.currentTarget.matches(":focus-visible") && setHover({ row: 0, col: c })}
                   onBlur={() => setHover(null)}
@@ -442,11 +448,14 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   );
 }
 
+type DotStatus = "pass" | "warn" | "fail" | null;
+
 function Dot({
   x,
   y,
   color,
   active,
+  status,
   current,
   onFocus,
   onBlur,
@@ -459,6 +468,8 @@ function Dot({
   y: number;
   color: string;
   active: boolean;
+  /** When the contrast rules are shown: the mark drawn inside the dot, which then stays visible. */
+  status: DotStatus;
   /** Where Tab lands when it enters the dots. */
   current: boolean;
   onFocus: (e: React.FocusEvent<HTMLButtonElement>) => void;
@@ -473,6 +484,8 @@ function Dot({
   // canvas, so they sit on the inner layers instead. The name chip is the shared tooltip, in its glass style.
   const shown = "opacity-0 transition-[opacity,scale] duration-150 group-hover/square:opacity-100 group-focus-within/square:opacity-100 pointer-coarse:opacity-100";
   const on = active && "scale-150 opacity-100";
+  const marked = status ? "opacity-100 transition-[opacity,scale] duration-150" : shown;
+  const Icon = status === "pass" ? Check : status === "warn" ? TriangleAlert : X;
   return (
     <Tooltip open={active}>
       <TooltipTrigger
@@ -490,8 +503,13 @@ function Dot({
             className="absolute -mt-2 -ml-2 size-4 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", shown, on)} style={{ backgroundColor: color }} />
-            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", shown, on)} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_1px_#ffffff40,0_1px_1px_-1px_#0000001a,0_1px_2px_0_#0000000d]", marked, on)} style={{ backgroundColor: color }} />
+            <span aria-hidden className={cn("absolute inset-0 rounded-full shadow-[inset_0_0_0_2px_#fff] mix-blend-overlay", marked, on)} />
+            {status ? (
+              <span aria-hidden className={cn("absolute inset-0 flex items-center justify-center rounded-full text-white shadow-[inset_0_0_0_1px_#ffffff80]", status === "pass" ? "bg-emerald-600" : status === "warn" ? "bg-amber-500" : "bg-red-600", on)}>
+                <Icon className="size-2.5" strokeWidth={3} />
+              </span>
+            ) : null}
           </button>
         }
       />
