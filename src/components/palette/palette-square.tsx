@@ -473,7 +473,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   onBlur={() => keyboardTo(null)}
                   label={`Open ${row.g.hue.name || "Unnamed"}${row.shades.some((sh) => missesOf(row.g.hue.id, sh.grade).length > 0) ? `, ${row.shades.filter((sh) => missesOf(row.g.hue.id, sh.grade).length > 0).length} steps miss contrast rules` : ""}`}
                   chip={row.g.hue.name || "Unnamed"}
-                  chipSide="right"
                   onOpen={() => onOpenHue(row.g.hue.id)}
                 />
               );
@@ -498,7 +497,6 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
                   onBlur={() => keyboardTo(null)}
                   label={`Open ${rows[0].g.hue.name} ${shade.grade}${ruleNote(rows[0].g.hue.id, shade.grade)}`}
                   chip={`${shade.grade} · ${text || hex}`}
-                  chipSide="top"
                   onOpen={() => onOpenStep(rows[0].g.hue.id, shade.grade)}
                 />
               );
@@ -547,7 +545,6 @@ function Dot({
   onBlur,
   label,
   chip,
-  chipSide,
   onOpen,
 }: {
   x: number;
@@ -566,7 +563,6 @@ function Dot({
   onBlur: () => void;
   label: string;
   chip: string;
-  chipSide: "right" | "top";
   onOpen: () => void;
 }) {
   // The square decides when a dot is "active" (the pointer is over its cell or column), not the dot's own hover.
@@ -609,7 +605,7 @@ function Dot({
           </button>
         }
       />
-      <TooltipContent side={chipSide} sideOffset={12} glass>
+      <TooltipContent side="top" sideOffset={12} glass>
         {chip}
       </TooltipContent>
     </Tooltip>
