@@ -75,6 +75,7 @@ export function CollapsibleSection({
         <h2 id={`${id}-heading`} className="min-w-0 text-sm font-semibold">
           <button
             type="button"
+            data-section-trigger=""
             aria-expanded={open}
             aria-controls={`${id}-body`}
             onClick={toggle}

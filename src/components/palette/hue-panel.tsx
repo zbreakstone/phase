@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRovingFocus } from "./use-roving-focus";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,8 @@ export function HuePanel({
   display,
   settings,
 }: Props) {
+  const stepsRef = React.useRef<HTMLUListElement>(null);
+  useRovingFocus(stepsRef, { orientation: "vertical" });
   const hue = generated.hue;
   const def = SPACES[space];
   const ramp = generated.shades.filter((s) => !s.anchor);
@@ -156,7 +159,7 @@ export function HuePanel({
               </Button>
             ) : null}
           </div>
-          <ul className="space-y-1.5">
+          <ul ref={stepsRef} className="space-y-1.5">
             {generated.shades.map((s) => (
               <li key={s.grade}>
                 <button

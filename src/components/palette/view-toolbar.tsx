@@ -18,6 +18,7 @@ import { Crumbs, type Crumb, type Stepper } from "./crumbs";
 import type { SquareMode } from "./palette-square";
 import { Hint } from "./hint";
 import { isPopupOpen, isTextEntry } from "./text-entry";
+import { useRovingFocus } from "./use-roving-focus";
 import { useTheme } from "./use-theme";
 import type { Theme } from "@/lib/theme";
 
@@ -121,8 +122,12 @@ export function ViewToolbar({
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
+  // One toolbar for the whole row (navigation, preview, display), the same way the actions row above the sidebar is.
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+  useRovingFocus(toolbarRef);
+
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
+    <div ref={toolbarRef} role="toolbar" aria-label="View controls" data-region="view" className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-4 px-2">
       <div className="min-w-0">
         <Crumbs items={crumbs} stepper={stepper} />
       </div>

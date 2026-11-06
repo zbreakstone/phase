@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRovingFocus } from "./use-roving-focus";
 import { GripVertical, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
@@ -29,6 +30,8 @@ export function ColorsList({
   onOpen,
   onReorder,
 }: Props) {
+  const listRef = React.useRef<HTMLUListElement>(null);
+  useRovingFocus(listRef, { orientation: "vertical" });
   const [dragId, setDragId] = React.useState<string | null>(null);
   /** The slot (0…n) a drop would land in. */
   const [slot, setSlot] = React.useState<number | null>(null);
@@ -63,6 +66,7 @@ export function ColorsList({
       }
     >
       <ul
+        ref={listRef}
         onDragOver={(e) => {
           if (dragId) e.preventDefault();
         }}
