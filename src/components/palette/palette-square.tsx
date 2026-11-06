@@ -33,6 +33,8 @@ interface Props {
   focusGrade: number | null;
   rules: ContrastRule[];
   overlay: Overlay;
+  /** Whether the white and black ends of each color are drawn; off shows only the steps the user controls. */
+  ends?: boolean;
   /** The failing pairs, which mark every swatch with whether it keeps the contrast rules. */
   failures?: Failure[];
   gamut: Gamut;
@@ -203,16 +205,17 @@ export function PalettePreview({ generated, gamut }: { generated: GeneratedHue[]
  * "smooth" mode the colors melt into each other like a gradient, in "cells" mode they stay crisp.
  * Hovering shows a dot on each thing you can open.
  */
-export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
+export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overlay, ends = true, failures = [], gamut, mode, grain, blend, reference, onOpenHue, onOpenStep, currentHueId = null, currentGrade = null }: Props) {
   const focused = focusHueId ? generated.find((g) => g.hue.id === focusHueId) ?? null : null;
   const focusShade = focused && focusGrade !== null ? focused.shades.find((s) => s.grade === focusGrade) ?? null : null;
   const level: Level = focused ? (focusShade ? "step" : "hue") : "all";
 
+  const visible = React.useCallback((shades: Shade[]) => (ends ? shades : shades.filter((s) => !s.anchor)), [ends]);
   const rows: Row[] = React.useMemo(() => {
     if (focused && focusShade) return [{ g: focused, shades: [focusShade] }];
-    if (focused) return [{ g: focused, shades: focused.shades }];
-    return generated.map((g) => ({ g, shades: g.shades }));
-  }, [generated, focused, focusShade]);
+    if (focused) return [{ g: focused, shades: visible(focused.shades) }];
+    return generated.map((g) => ({ g, shades: visible(g.shades) }));
+  }, [generated, focused, focusShade, visible]);
 
   const R = rows.length;
   const C = rows[0]?.shades.length ?? 0;
@@ -380,9 +383,9 @@ export function PaletteSquare({ generated, focusHueId, focusGrade, rules, overla
   const view: View = {
     level,
     hueIdx: focused ? generated.indexOf(focused) : -1,
-    gradeIdx: focusShade && focused ? focused.shades.indexOf(focusShade) : -1,
+    gradeIdx: focusShade && focused ? visible(focused.shades).indexOf(focusShade) : -1,
     R: level === "all" ? generated.length : 0,
-    C: focused ? focused.shades.length : (generated[0]?.shades.length ?? 0),
+    C: visible(focused ? focused.shades : (generated[0]?.shades ?? [])).length,
   };
   const [shown, setShown] = React.useState({ key, view });
   // The square settles in when it first appears.
