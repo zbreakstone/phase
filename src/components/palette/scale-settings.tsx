@@ -235,7 +235,7 @@ export function StepTarget({ scale, grade, onChange }: { scale: ScaleConfig; gra
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id} className="text-sm">
+        <Label htmlFor={id} className="font-sans text-sm">
           Luminance
         </Label>
         <div
