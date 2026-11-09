@@ -187,13 +187,18 @@ export function ExportPanel({ state, generated, tab }: Props) {
         </p>
       ) : dual && tab === "json" ? (
         <p className="text-xs text-muted-foreground">
-          <code>$value</code> is the sRGB color, so standard token tools read this file as-is. The Display P3 color ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
+          <code>$value</code> {format === "oklch" ? "is a color any screen can show" : "is the sRGB color"}, so standard token tools read this file as-is. The Display P3 color ({format === "oklch" ? "OKLCH" : "Display P3"}), solved separately at the same luminance targets, is in{" "}
           <code>$extensions.gamut[&quot;display-p3&quot;]</code> for a transform to emit under <code>@media (color-gamut: p3)</code>.
+        </p>
+      ) : dual && format === "oklch" ? (
+        <p className="text-xs text-muted-foreground">
+          The base values are the palette solved in P3 wherever it fits in sRGB, so any screen can show them, and the sRGB solve where it doesn&apos;t. Inside <code>@media (color-gamut: p3)</code>, those
+          out-of-sRGB colors are overridden with their P3 values. Both solves hit the same luminance targets, so contrast holds on either.
         </p>
       ) : dual ? (
         <p className="text-xs text-muted-foreground">
           The base values are the palette solved in sRGB, which any screen can show. Inside <code>@media (color-gamut: p3)</code>, only the colors that differ are overridden with the palette solved in P3
-          {format === "oklch" ? " (OKLCH)" : " (Display P3)"}. Both hit the same luminance targets, so contrast holds on either.
+          (Display P3). Both hit the same luminance targets, so contrast holds on either.
         </p>
       ) : formatClipsGamut(format, state.gamut) ? (
         <p className="text-xs text-muted-foreground">

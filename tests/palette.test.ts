@@ -244,7 +244,8 @@ import { analyzeSource, nearestGrade, sourceAnchor } from "@/lib/palette/source"
 import { hueFromSource } from "@/lib/palette/defaults";
 import { coordsOf } from "@/lib/palette/source";
 import { sanitizeState, decodeState, encodeState, hashForState, stateFromHash } from "@/lib/palette/serialize";
-import { toCss, toCssDual, toFigmaVariables, toTailwindV4, toTokensJson, toTokensJsonDual } from "@/lib/export/formats";
+import { formatShade, toCss, toCssDual, toFigmaVariables, toTailwindV4, toTokensJson, toTokensJsonDual } from "@/lib/export/formats";
+import { inGamut } from "@/lib/color/solve";
 
 describe("step names and anchors", () => {
   it("defaults to 50..950 with white 0 and black 1000 on every hue", () => {
@@ -315,6 +316,37 @@ describe("step names and anchors", () => {
     const colors = figma[0]["Phase palette"].modes.Default.colors;
     expect(colors.white.$value).toBe("#ffffff");
     expect(colors.red["0"]).toBeUndefined();
+  });
+  it("OKLCH base values use the P3 solve wherever it fits in sRGB, so they match the editor", () => {
+    const state = defaultState();
+    const srgb = generatePalette(state.space, state.scale, state.hues, "srgb");
+    const p3 = generatePalette(state.space, state.scale, state.hues, "p3");
+    const css = toCssDual(srgb, p3, "oklch");
+    const [root, media = ""] = css.split("@media");
+    const declared = (block: string, name: string) => block.match(new RegExp(`--${name}: ([^;]+);`))?.[1];
+    let fits = 0;
+    let outside = 0;
+    p3.forEach((g, i) => {
+      const slug = g.hue.name.toLowerCase().replace(/\s+/g, "-");
+      for (const s of g.shades.filter((x) => !x.anchor)) {
+        const name = `${slug}-${s.grade}`;
+        if (inGamut(s.linear, "srgb")) {
+          fits++;
+          expect(declared(root, name)).toBe(formatShade(s, "oklch", "p3"));
+          expect(declared(media, name)).toBeUndefined();
+        } else {
+          outside++;
+          const base = srgb[i].shades.find((x) => x.grade === s.grade)!;
+          expect(declared(root, name)).toBe(formatShade(base, "oklch", "srgb"));
+          // A P3 color just past sRGB can look the same as the sRGB solve, and then it isn't overridden.
+          expect([undefined, formatShade(s, "oklch", "p3")]).toContain(declared(media, name));
+        }
+      }
+    });
+    expect(fits).toBeGreaterThan(0);
+    expect(outside).toBeGreaterThan(0);
+    const hex = toCssDual(srgb, p3, "hex");
+    expect(hex).toContain(`--${srgb[0].hue.name.toLowerCase()}-${srgb[0].shades[1].grade}: ${srgb[0].shades[1].hex};`);
   });
 });
 

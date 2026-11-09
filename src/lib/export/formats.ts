@@ -1,5 +1,6 @@
 import { type RGB, hexToBytes, hexToLinear, linearToOklab, rectToPolar } from "../color/convert";
 import { GAMUTS, type Gamut, p3Css } from "../color/gamut";
+import { inGamut } from "../color/solve";
 import { SPACES } from "../color/spaces";
 import type { GeneratedHue, PaletteState, SemanticToken, Shade, TokenRef } from "../palette/types";
 
@@ -234,9 +235,20 @@ const sameColor = (a: RGB, b: RGB) => {
 };
 
 /**
+ * The base value of a dual-gamut export. Hex, RGB and HSL are 8-bit sRGB, so they take the sRGB solve.
+ * OKLCH can carry the full-precision color, so when the P3 solve fits in sRGB it takes that instead,
+ * which every screen can show and which matches what the editor displays.
+ */
+function baseOf(s: Shade, w: Shade | undefined, format: ColorFormat): { shade: Shade; gamut: Gamut; final: boolean } {
+  if (format === "oklch" && w && inGamut(w.linear, "srgb")) return { shade: w, gamut: "p3", final: true };
+  return { shade: s, gamut: "srgb", final: false };
+}
+
+/**
  * Both gamuts as CSS custom properties. The base declarations are the palette solved in sRGB, which
  * every screen can show. The `@media (color-gamut: p3)` block overrides only the colors that differ,
  * using the palette solved in P3. Both solves hit the same luminance targets, so contrast holds either way.
+ * In OKLCH, a P3 color that fits in sRGB goes straight in the base declarations instead.
  */
 function dualBlocks(
   srgb: GeneratedHue[],
@@ -256,9 +268,10 @@ function dualBlocks(
     if (i > 0) base.push("");
     const other = b[i];
     for (const s of ramp(n.shades)) {
-      base.push(`${name(n.slug, s.grade)}: ${formatShade(s, format, "srgb")};`);
       const w = other?.shades.find((x) => x.grade === s.grade);
-      if (w && !sameColor(w.linear, s.linear)) wide.push(`${name(n.slug, s.grade)}: ${formatShade(w, wideFormat, "p3")};`);
+      const pick = baseOf(s, w, format);
+      base.push(`${name(n.slug, s.grade)}: ${formatShade(pick.shade, format, pick.gamut)};`);
+      if (w && !pick.final && !sameColor(w.linear, s.linear)) wide.push(`${name(n.slug, s.grade)}: ${formatShade(w, wideFormat, "p3")};`);
     }
   });
   return { base, wide };
@@ -332,9 +345,10 @@ export function toTokensJsonDual(state: PaletteState, srgb: GeneratedHue[], p3: 
     const group: Record<string, unknown> = {};
     for (const s of ramp(n.shades)) {
       const w = b[i]?.shades.find((x) => x.grade === s.grade) ?? s;
+      const base = baseOf(s, w, format);
       group[String(s.grade)] = {
         $type: "color",
-        $value: formatShade(s, format, "srgb"),
+        $value: formatShade(base.shade, format, base.gamut),
         $extensions: {
           gamut: { "display-p3": formatShade(w, wideFormat, "p3") },
           ...(includeMetadata ? { phase: { luminance: { srgb: round(s.luminance, 4), p3: round(w.luminance, 4) } } } : {}),
