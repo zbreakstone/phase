@@ -21,6 +21,7 @@ import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { Hint } from "./hint";
+import { TagsBlock } from "./tags-field";
 import type { StepHeaderActions } from "./step-header";
 
 interface Props {
@@ -33,6 +34,8 @@ interface Props {
   onResetAll: () => void;
   /** When measuring against a step, that step of this color gets its own contrast row. */
   overlay: Overlay;
+  /** The tag field for this step's semantic tokens. */
+  tags: React.ReactNode;
   /** Renders the Settings section, with the delete button passed in to sit at its end. */
   settings: (danger: React.ReactNode) => React.ReactNode;
   /** Open the neighboring step, or null at either end. */
@@ -68,6 +71,7 @@ export function StepPanel({
   onResetStep,
   onResetAll,
   overlay,
+  tags,
   settings,
   stepActions,
 }: Props) {
@@ -161,6 +165,9 @@ export function StepPanel({
               </p>
             </div>
           </div>
+          <TagsBlock htmlFor="step-tags" hint="Each tag names this one step. Give it a different dark value in the palette's Tokens tab.">
+            {tags}
+          </TagsBlock>
           <div className="space-y-3">
             {!shade.anchor ? (
               <SettingRow id="step-name" label="Step name">

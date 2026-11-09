@@ -42,6 +42,8 @@ import { displayShade, representativeShade, type Overlay } from "@/lib/palette/o
 import { tweakAt } from "@/lib/palette/tweaks";
 import { removeHueFromTokens } from "@/lib/palette/tokens";
 import { AccountMenu } from "./account-menu";
+import { TagsField } from "./tags-field";
+import { TokensSection } from "./tokens-section";
 import { useApplyAccent } from "@/lib/accent";
 import { usePrefsSync, useViewPref } from "@/lib/prefs";
 import { ResetDialog } from "./reset-dialog";
@@ -813,6 +815,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onResetStep={() => resetTweaks(focused.hue.id, focusShade.grade)}
                   onResetAll={() => resetTweaks(focused.hue.id)}
                   overlay={overlay}
+                  tags={<TagsField id="step-tags" state={state} at={{ hueId: focused.hue.id, grade: focusShade.grade }} onApply={setState} />}
                   stepActions={stepActions}
                   settings={renderSettings}
                 />
@@ -828,6 +831,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   onOpenStep={(g) => openStep(focused.hue.id, g)}
                   display={(shade) => displayShade(shade, overlay, state.gamut)}
                   overlay={overlay}
+                  tags={<TagsField id="color-tags" state={state} at={{ hueId: focused.hue.id, grade: null }} onApply={setState} />}
                   settings={renderSettings}
                 />
               ) : (
@@ -835,6 +839,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
                   <ColorsList generated={generated} overlay={overlay} gamut={state.gamut} actions={colorActions} onOpen={openHue} onReorder={reorder} />
                   <StepsEditor actions={stepActions} scale={state.scale} onScale={setScale} overlay={overlay} />
                   <ContrastRulesSection scale={state.scale} onScale={setScale} />
+                  <TokensSection state={state} generated={generated} display={(shade) => displayShade(shade, overlay, state.gamut)} onApply={setState} />
                   <PaletteSettings space={state.space} gamut={state.gamut} onSpace={setSpace} onGamut={setGamut} onDelete={current ? () => void deleteCurrent() : undefined} name={current?.name} paletteName={name} onPaletteName={updateName} onDuplicate={current ? () => void duplicateCurrent() : undefined} display={generated.length > 0 ? <DisplaySettings bare overlay={overlay} onOverlay={setOverlay} grades={state.scale.grades} /> : null} />
                 </>
               )}

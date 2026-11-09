@@ -16,6 +16,7 @@ import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { CollapsibleSection, SettingRow } from "./panel-section";
 import { ResetTweaksDialog } from "./reset-tweaks-dialog";
 import { SourceEditor } from "./source-editor";
+import { TagsBlock } from "./tags-field";
 
 interface Props {
   generated: GeneratedHue;
@@ -29,6 +30,8 @@ interface Props {
   display: (shade: Shade) => string;
   /** What each step's number shows, and against what. */
   overlay: Overlay;
+  /** The tag field for this color's semantic tokens. */
+  tags: React.ReactNode;
   /** Renders the Settings section, with the delete button passed in to sit at its end. */
   settings: (danger: React.ReactNode) => React.ReactNode;
 }
@@ -58,6 +61,7 @@ export function HuePanel({
   onOpenStep,
   display,
   overlay,
+  tags,
   settings,
 }: Props) {
   const stepsRef = React.useRef<HTMLUListElement>(null);
@@ -144,6 +148,9 @@ export function HuePanel({
           analysis={generated.source}
           onChange={(source) => onChange({ source })}
         />
+        <TagsBlock htmlFor="color-tags" hint="A tag on the whole color names every step, so warning gives warning/50 to warning/950.">
+          {tags}
+        </TagsBlock>
         <div role="region" aria-labelledby="hue-steps" className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h3
