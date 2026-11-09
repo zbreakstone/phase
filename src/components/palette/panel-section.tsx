@@ -101,7 +101,7 @@ export function SectionTabs() {
 
 /**
  * One tab's content in the sidebar.
- * Hidden tabs stay mounted, so a half-edited field survives a visit to another tab.
+ * Once opened, a tab stays mounted while hidden, so a half-edited field survives a visit to another tab.
  */
 export function CollapsibleSection({
   id,
@@ -118,9 +118,13 @@ export function CollapsibleSection({
   const register = group?.register;
   React.useLayoutEffect(() => register?.({ id, title }), [register, id, title]);
   const open = !group || group.activeId === id;
+  // Content mounts the first time its tab opens: Base UI sliders measure on mount and keep their thumbs hidden
+  // if that happens under `display: none`.
+  const [seen, setSeen] = React.useState(open);
+  if (open && !seen) setSeen(true);
   return (
     <PanelSection role="tabpanel" id={`${id}-body`} aria-labelledby={`${id}-tab`} hidden={!open}>
-      <div className={className}>{children}</div>
+      {seen ? <div className={className}>{children}</div> : null}
     </PanelSection>
   );
 }
