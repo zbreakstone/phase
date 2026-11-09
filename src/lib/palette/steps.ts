@@ -1,4 +1,5 @@
 import { MAX_GRADES, MIN_GRADES, SCALE_MAX, withGrades } from "./scale";
+import { removeGradeFromTokens, renameGradeInTokens } from "./tokens";
 import type { PaletteState } from "./types";
 
 /**
@@ -47,7 +48,7 @@ export function parseStepName(text: string, grades: number[], from: number): Ste
 /**
  * Renames a step. Steps are named by their number, which is also where they sit on the scale, so the
  * list is re-sorted. Everything keyed to the old name moves with it: a custom luminance value, tweaks
- * on that step in every color, and a source color aimed at it.
+ * on that step in every color, a source color aimed at it, and tokens on it.
  */
 export function renameStep(state: PaletteState, from: number, to: number): PaletteState {
   if (from === to || !state.scale.grades.includes(from)) return state;
@@ -63,7 +64,7 @@ export function renameStep(state: PaletteState, from: number, to: number): Palet
     delete customLuminance[oldKey];
   }
 
-  return {
+  return renameGradeInTokens({
     ...state,
     scale: {
       ...state.scale,
@@ -81,15 +82,15 @@ export function renameStep(state: PaletteState, from: number, to: number): Palet
       if (h.source && h.source.grade === from) next = { ...next, source: { ...h.source, grade: to } };
       return next;
     }),
-  };
+  }, from, to);
 }
 
-/** Removes a step and everything that pointed at it: tweaks on it, and any source color aimed at it. */
+/** Removes a step and everything that pointed at it: tweaks on it, any source color aimed at it, and tokens on it (left unassigned). */
 export function removeStep(state: PaletteState, grade: number): PaletteState {
   if (removeBlockedReason(state) || !state.scale.grades.includes(grade)) return state;
   const grades = state.scale.grades.filter((g) => g !== grade);
   const key = String(grade);
-  return {
+  return removeGradeFromTokens({
     ...state,
     scale: withGrades(state.scale, grades),
     hues: state.hues.map((h) => {
@@ -102,5 +103,5 @@ export function removeStep(state: PaletteState, grade: number): PaletteState {
       if (h.source && h.source.grade === grade) next = { ...next, source: { ...h.source, grade: null } };
       return next;
     }),
-  };
+  }, grade);
 }

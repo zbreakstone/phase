@@ -69,6 +69,23 @@ export interface ContrastReference {
   hex: string;
 }
 
+/** What a semantic token points at: a whole color (grade null), or one step of it (0 is white, 1000 is black). */
+export interface TokenRef {
+  hueId: string;
+  grade: number | null;
+}
+
+/** A semantic name, such as `border/subtle/base`, for a color or a step. */
+export interface SemanticToken {
+  id: string;
+  /** Levels joined by "/", lowercase. Unique within a palette. */
+  path: string;
+  /** Null until it's assigned (preset names start out that way). */
+  light: TokenRef | null;
+  /** Dark mode's value, for step tokens. Absent means the same as light. */
+  dark?: TokenRef | null;
+}
+
 export interface PaletteState {
   space: SpaceId;
   /** The colors the palette may use. Chroma is limited to fit inside it. */
@@ -77,6 +94,7 @@ export interface PaletteState {
   scale: ScaleConfig;
   hues: HueConfig[];
   selectedHueId: string | null;
+  tokens?: SemanticToken[];
 }
 
 export interface Shade {

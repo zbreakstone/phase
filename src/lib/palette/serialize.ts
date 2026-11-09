@@ -2,6 +2,7 @@ import { SPACE_ORDER, type SpaceId } from "../color/spaces";
 import { parseHex } from "../color/convert";
 import { uid } from "./defaults";
 import { MAX_GRADES } from "./scale";
+import { sanitizeTokens } from "./tokens";
 import type { ContrastReference, ContrastRule, HueConfig, HueDirection, PaletteState, SourceColor, StepTweak } from "./types";
 
 const num = (v: unknown, fallback: number, min = -Infinity, max = Infinity): number =>
@@ -103,6 +104,8 @@ export function sanitizeState(raw: unknown): PaletteState | null {
     ? (r.selectedHueId as string)
     : hues[0]?.id ?? null;
 
+  const tokens = sanitizeTokens(r.tokens, new Set(hues.map((h) => h.id)));
+
   return {
     space: r.space as SpaceId,
     // Links made before the gamut control existed have no gamut and were always sRGB.
@@ -118,6 +121,7 @@ export function sanitizeState(raw: unknown): PaletteState | null {
     },
     hues,
     selectedHueId: selected,
+    ...(tokens.length > 0 ? { tokens } : {}),
   };
 }
 

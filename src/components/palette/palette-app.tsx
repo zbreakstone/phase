@@ -40,6 +40,7 @@ import { DisplaySettings } from "./display-settings";
 import { ViewToolbar } from "./view-toolbar";
 import { displayShade, representativeShade, type Overlay } from "@/lib/palette/overlay";
 import { tweakAt } from "@/lib/palette/tweaks";
+import { removeHueFromTokens } from "@/lib/palette/tokens";
 import { AccountMenu } from "./account-menu";
 import { useApplyAccent } from "@/lib/accent";
 import { usePrefsSync, useViewPref } from "@/lib/prefs";
@@ -494,7 +495,7 @@ export function PaletteApp({ shareCode, paletteId, fresh }: PaletteAppProps = {}
       const idx = s.hues.findIndex((h) => h.id === id);
       const hues = s.hues.filter((h) => h.id !== id);
       const next = hues[Math.min(idx, hues.length - 1)]?.id ?? null;
-      return { ...s, hues, selectedHueId: s.selectedHueId === id ? next : s.selectedHueId };
+      return removeHueFromTokens({ ...s, hues, selectedHueId: s.selectedHueId === id ? next : s.selectedHueId }, id);
     });
 
   const reorder = (id: string, toIndex: number) =>

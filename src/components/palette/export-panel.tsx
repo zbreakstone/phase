@@ -65,20 +65,20 @@ export function ExportPanel({ state, generated, tab }: Props) {
     const useDual = gamutOut === "both";
     return {
       css: useDual
-        ? { text: toCssDual(both.srgb, both.p3, format, cleanPrefix), file: "palette.css", mime: "text/css" }
-        : { text: toCss(generated, format, cleanPrefix, state.gamut), file: "palette.css", mime: "text/css" },
+        ? { text: toCssDual(both.srgb, both.p3, format, cleanPrefix, state.tokens), file: "palette.css", mime: "text/css" }
+        : { text: toCss(generated, format, cleanPrefix, state.gamut, state.tokens), file: "palette.css", mime: "text/css" },
       json: useDual
         ? { text: toTokensJsonDual(state, both.srgb, both.p3, format, metadata), file: "tokens.json", mime: "application/json" }
         : { text: toTokensJson(state, generated, format, metadata), file: "tokens.json", mime: "application/json" },
       figma: useDual
-        ? { text: toFigmaVariablesDual(both.srgb, both.p3, cleanPrefix), file: "figma-variables.json", mime: "application/json" }
-        : { text: toFigmaVariables(generated, cleanPrefix), file: "figma-variables.json", mime: "application/json" },
+        ? { text: toFigmaVariablesDual(both.srgb, both.p3, cleanPrefix, state.tokens), file: "figma-variables.json", mime: "application/json" }
+        : { text: toFigmaVariables(generated, cleanPrefix, state.tokens), file: "figma-variables.json", mime: "application/json" },
       tailwind:
         twVersion === "v4"
           ? useDual
-            ? { text: toTailwindV4Dual(both.srgb, both.p3, format), file: "theme.css", mime: "text/css" }
-            : { text: toTailwindV4(generated, format, state.gamut), file: "theme.css", mime: "text/css" }
-          : { text: toTailwindV3(generated, format, state.gamut), file: "tailwind.palette.js", mime: "text/javascript" },
+            ? { text: toTailwindV4Dual(both.srgb, both.p3, format, state.tokens), file: "theme.css", mime: "text/css" }
+            : { text: toTailwindV4(generated, format, state.gamut, state.tokens), file: "theme.css", mime: "text/css" }
+          : { text: toTailwindV3(generated, format, state.gamut, state.tokens), file: "tailwind.palette.js", mime: "text/javascript" },
     };
   }, [generated, both, state, format, twVersion, cleanPrefix, metadata, gamutOut]);
 
